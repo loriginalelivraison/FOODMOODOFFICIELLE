@@ -102,3 +102,22 @@ export async function getLivreurBytelephone(telephone) {
     (l) => clean(l.telephone) === clean(telephone)
   );
 }
+//rendre le livreur occupé
+export async function setLivreurUnavailable(id) {
+  const token = localStorage.getItem("access");
+
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/set_unavailable/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || data.error || "Erreur désactivation livreur");
+  }
+
+  return data;
+}
