@@ -1,38 +1,21 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo1.png";
 
-export default function SplashScreen() {
+export default function SplashLogo() {
   const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setTimeout(() => {
       navigate("/livreurs");
-    }, 2000);
+    }, 3000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [navigate]);
 
   return (
-    <section
-      style={{
-        height: "100vh",
-        width: "100%",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "#ffffff",
-      }}
-    >
-      <img
-        src={logo}
-        alt="Logo"
-        style={{
-          width: "70%",
-          maxWidth: "420px",
-          objectFit: "contain",
-        }}
-      />
-    </section>
+    <div className="splash">
+      <img src={logo} className="scooter-logo" alt="Foodmood logo" />
+    </div>
   );
 }
