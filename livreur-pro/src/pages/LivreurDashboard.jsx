@@ -1,63 +1,84 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { updateLivreurPosition } from "../livreursapi.js";
-
-
+import { updateLivreurPosition, setLivreurUnavailable } from "../livreursapi.js";
 
 export default function LivreurDashboard() {
   const { id } = useParams();
 
-  // UNE SEULE VERSION
   const livreurStorage = localStorage.getItem("livreur");
   const livreur = livreurStorage ? JSON.parse(livreurStorage) : null;
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [position, setPosition] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [trackingEnabled, setTrackingEnabled] = useState(true);
- 
 
+  useEffect(() => {
+    if (!livreur) return;
+    if (!trackingEnabled) return;
 
-useEffect(() => {
-  if (!livreur) return;
+    let stopped = false;
 
-  if (!trackingEnabled) return;
+    function sendPosition() {
+      if (stopped) return;
 
-  function sendPosition() {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const newPosition = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          };
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          if (stopped) return;
 
-          await updateLivreurPosition(id, newPosition);
+          try {
+            const newPosition = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            };
 
-          setPosition(newPosition);
+            await updateLivreurPosition(id, newPosition);
 
-          console.log("Position envoyée");
-        } catch (err) {
-          setError(err.message);
+            if (stopped) return;
+
+            setPosition(newPosition);
+            console.log("Position envoyée");
+          } catch (err) {
+            if (!stopped) {
+              setError(err.message);
+            }
+          }
+        },
+        () => {
+          if (!stopped) {
+            setError("Permission GPS refusée.");
+          }
         }
-      },
-      () => {
-        setError("Permission GPS refusée.");
+      );
+    }
+
+    sendPosition();
+
+    const interval = setInterval(sendPosition, 10000);
+
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
+  }, [trackingEnabled, id]);
+
+  async function handleToggleTracking() {
+    setError("");
+    setMessage("");
+
+    try {
+      if (trackingEnabled) {
+        setTrackingEnabled(false);
+        await setLivreurUnavailable(id);
+        setMessage("Suivi GPS désactivé. Vous êtes maintenant occupé.");
+      } else {
+        setTrackingEnabled(true);
+        setMessage("Suivi GPS activé. Vous êtes maintenant disponible.");
       }
-    );
+    } catch (err) {
+      setError(err.message);
+    }
   }
-
-  // envoi immédiat
-  sendPosition();
-
-  // toutes les 10 secondes
-  const interval = setInterval(sendPosition, 10000);
-
-  return () => clearInterval(interval);
-}, [trackingEnabled]);
-
-
 
   return (
     <section className="page">
@@ -65,7 +86,7 @@ useEffect(() => {
         <span className="eyebrow">Espace livreur</span>
         <h1>Dashboard livreur</h1>
         <p>
-          Ici, le livreur peut partager sa position GPS pour être suivi par le client.
+          Ici, le livreur peut activer ou désactiver son suivi GPS.
         </p>
       </div>
 
@@ -76,19 +97,18 @@ useEffect(() => {
         <p>Téléphone : {livreur?.telephone || "Non disponible"}</p>
         <p>Ville : {livreur?.ville || "Non disponible"}</p>
 
-    
-                <button
-  className="primary-btn full"
-  style={{
-    marginTop: "15px",
-    background: trackingEnabled ? "#dc2626" : "#16a34a",
-  }}
-  onClick={() => setTrackingEnabled(!trackingEnabled)}
->
-  {trackingEnabled
-    ? "Désactiver le suivi GPS"
-    : "Activer le suivi GPS"}
-</button>
+        <button
+          className="primary-btn full"
+          style={{
+            marginTop: "15px",
+            background: trackingEnabled ? "#dc2626" : "#16a34a",
+          }}
+          onClick={handleToggleTracking}
+        >
+          {trackingEnabled
+            ? "Désactiver le suivi GPS"
+            : "Activer le suivi GPS"}
+        </button>
 
         {message && <p style={{ color: "green" }}>{message}</p>}
         {error && <p style={{ color: "red" }}>{error}</p>}
