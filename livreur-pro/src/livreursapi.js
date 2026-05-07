@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://livreur-pro-back.fly.dev/api";
+const API_BASE_URL = "https://foodmood-backend.herokuapp.com/api";
 
 export async function getLivreurs() {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
