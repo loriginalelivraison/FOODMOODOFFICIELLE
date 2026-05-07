@@ -27,6 +27,7 @@ class LivreurViewSet(ModelViewSet):
 
         livreur.latitude = latitude
         livreur.longitude = longitude
+        livreur.disponible = True
         livreur.save()
 
         return Response({
@@ -35,6 +36,22 @@ class LivreurViewSet(ModelViewSet):
             "latitude": livreur.latitude,
             "longitude": livreur.longitude,
         })
+
+        
+    #livreur indisponible
+    @action(detail=True, methods=["patch"])
+    def set_unavailable(self, request, pk=None):
+        livreur = self.get_object()
+        livreur.disponible = False
+        livreur.save()
+
+        return Response({
+            "message": "Livreur passé en occupé",
+            "id": livreur.id,
+            "disponible": livreur.disponible,
+        })
+
+
 
 class DemandeLivraisonViewSet(ModelViewSet):
     queryset = DemandeLivraison.objects.all().order_by("-created_at")
