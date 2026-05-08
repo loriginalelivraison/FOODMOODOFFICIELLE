@@ -1,6 +1,6 @@
 from rest_framework.viewsets import ModelViewSet
-from .models import Livreur, DemandeLivraison
-from .serializers import LivreurSerializer, DemandeLivraisonSerializer
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client
+from .serializers import LivreurSerializer, DemandeLivraisonSerializer, CommentaireLivreurSerializer, ClientSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
@@ -92,3 +92,55 @@ def register_livreur(request):
         "message": "Livreur créé avec succès",
         "id": livreur.id,
     })
+
+class CommentaireLivreurViewSet(ModelViewSet):
+    serializer_class = CommentaireLivreurSerializer
+
+    def get_queryset(self):
+        livreur_id = self.request.query_params.get("livreur")
+        queryset = CommentaireLivreur.objects.all().order_by("-created_at")
+
+        if livreur_id:
+            queryset = queryset.filter(livreur_id=livreur_id)
+
+        return queryset
+
+class ClientViewSet(ModelViewSet):
+    queryset = Client.objects.all().order_by("-created_at")
+    serializer_class = ClientSerializer
+@api_view(["POST"])
+def register_client(request):
+    nom = request.data.get("nom")
+    telephone = request.data.get("telephone")
+    password = request.data.get("password")
+
+    if not nom or not telephone or not password:
+        return Response(
+            {"error": "Nom, téléphone et mot de passe sont obligatoires"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if User.objects.filter(username=telephone).exists():
+        return Response(
+            {"error": "Un utilisateur avec ce téléphone existe déjà"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = User.objects.create_user(
+        username=telephone,
+        password=password
+    )
+
+    client = Client.objects.create(
+        user=user,
+        nom=nom,
+        telephone=telephone,
+        
+    )
+
+    return Response({
+        "message": "Client créé avec succès",
+        "id": client.id,
+        "nom": client.nom,
+        "telephone": client.telephone,
+    }, status=status.HTTP_201_CREATED)
