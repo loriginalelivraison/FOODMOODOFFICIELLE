@@ -60,28 +60,37 @@ class DemandeLivraisonViewSet(ModelViewSet):
 @api_view(["POST"])
 def register_livreur(request):
     nom = request.data.get("nom")
-    email = request.data.get("email")
     telephone = request.data.get("telephone")
     ville = request.data.get("ville")
     vehicule = request.data.get("vehicule")
     password = request.data.get("password")
 
+    if not nom or not telephone or not password:
+        return Response(
+            {"error": "Nom, téléphone et mot de passe sont obligatoires"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     if User.objects.filter(username=telephone).exists():
         return Response(
-            {"error": "Un utilisateur avec cet email existe déjà"},
+            {"error": "Un compte avec ce téléphone existe déjà"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if Livreur.objects.filter(telephone=telephone).exists():
+        return Response(
+            {"error": "Ce téléphone est déjà utilisé par un livreur"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
     user = User.objects.create_user(
         username=telephone,
-        email=email,
         password=password
     )
 
     livreur = Livreur.objects.create(
         user=user,
         nom=nom,
-        email=email,
         telephone=telephone,
         ville=ville,
         vehicule=vehicule,
@@ -91,8 +100,10 @@ def register_livreur(request):
     return Response({
         "message": "Livreur créé avec succès",
         "id": livreur.id,
-    })
-
+        "nom": livreur.nom,
+        "telephone": livreur.telephone,
+    }, status=status.HTTP_201_CREATED)
+    
 class CommentaireLivreurViewSet(ModelViewSet):
     serializer_class = CommentaireLivreurSerializer
 
