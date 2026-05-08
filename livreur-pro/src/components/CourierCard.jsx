@@ -5,10 +5,22 @@ import defaultAvatar from "../assets/logo2.png";
 export default function CourierCard({ courier }) {
   const navigate = useNavigate();
 
+  const isAvailable = courier.available;
+
+  function handleClick() {
+    if (!isAvailable) return;
+
+    navigate(`/tracking/${courier.id}`);
+  }
+
   return (
     <div
       className="courier-card mini-courier-card"
-      onClick={() => navigate(`/tracking/${courier.id}`)}
+      onClick={handleClick}
+      style={{
+        cursor: isAvailable ? "pointer" : "not-allowed",
+        opacity: isAvailable ? 1 : 0.7,
+      }}
     >
       {/* PHOTO */}
       <div className="courier-avatar">
@@ -17,11 +29,14 @@ export default function CourierCard({ courier }) {
           alt={courier.name}
         />
       </div>
+
       <div className="courier-top">
         <h3>{courier.name}</h3>
 
-        <span className={courier.available ? "status available" : "status busy"}>
-          {courier.available ? "Disponible" : "Occupé"}
+        <span
+          className={courier.available ? "status available" : "status busy"}
+        >
+          {courier.available ? "متاح" : "مشغول"}
         </span>
       </div>
 
@@ -30,8 +45,21 @@ export default function CourierCard({ courier }) {
 
       <div className="courier-footer">
         <span>⭐ {courier.rating || 5}</span>
-        <span>{courier.deliveries || 0} courses</span>
+        <span>{courier.deliveries || 0} توصيل</span>
       </div>
+
+      {!isAvailable && (
+        <p
+          style={{
+            color: "#dc2626",
+            fontSize: "12px",
+            marginTop: "8px",
+            fontWeight: "600",
+          }}
+        >
+          {courier.name} مشغول حالياً
+        </p>
+      )}
     </div>
   );
 }

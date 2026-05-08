@@ -1,127 +1,121 @@
 import React, { useState } from "react";
-import { CheckCircle2, UploadCloud } from "lucide-react";
-import { loginJWT, createLivreur, getLivreurBytelephone } from "../livreursapi.js";
+import { UploadCloud } from "lucide-react";
+import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 
 export default function CourierRegister() {
   const navigate = useNavigate();
 
+  const quartiers = [
+    "كل المدينة",
+    "وسط المدينة",
+    "حي السلام",
+    "حي النصر",
+    "حي الحرية",
+    "حي الأمير عبد القادر",
+    "حي 5 جويلية",
+    "حي 20 أوت",
+    "حي المحطة",
+    "حي الجامعة",
+    "حي السوق",
+    "حي الميناء",
+  ];
+
   const [mode, setMode] = useState("register");
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  // AJOUT : formulaire connexion
- const [loginForm, setLoginForm] = useState({
-  telephone: "",
-  password: "",
-});
+  const [loginForm, setLoginForm] = useState({
+    telephone: "",
+    password: "",
+  });
 
-  // AJOUT : formulaire inscription envoyé à Django
   const [registerForm, setRegisterForm] = useState({
     nom: "",
     telephone: "",
-    email: "",
-    ville: "",
+    ville: "كل المدينة",
     vehicule: "scooter",
     disponible: true,
     password: "",
   });
 
-async function handleSubmit(e) {
-  e.preventDefault();
-  setError("");
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
 
-  try {
-    await createLivreur(registerForm);
+    try {
+      await createLivreur(registerForm);
 
-    const tokens = await loginJWT({
-      telephone: registerForm.telephone,
-      password: registerForm.password,
-    });
+      await loginJWT({
+        telephone: registerForm.telephone,
+        password: registerForm.password,
+      });
 
-    localStorage.setItem("access", tokens.access);
-    localStorage.setItem("refresh", tokens.refresh);
+      const livreur = JSON.parse(localStorage.getItem("livreur"));
 
-    const livreur = await getLivreurBytelephone(registerForm.telephone);
+      if (!livreur?.id) {
+        throw new Error("تعذر العثور على حساب السائق بعد التسجيل");
+      }
 
-    if (!livreur) {
-      throw new Error("Profil livreur introuvable après inscription");
+      navigate(`/livreur-dashboard/${livreur.id}`);
+    } catch (err) {
+      setError(err.message);
     }
-
-    localStorage.setItem("livreur", JSON.stringify(livreur));
-
-    navigate(`/livreur-dashboard/${livreur.id}`);
-  } catch (err) {
-    setError(err.message);
   }
-}
 
   async function handleLogin(e) {
-  e.preventDefault();
-  setError("");
+    e.preventDefault();
+    setError("");
 
-  try {
-    const tokens = await loginJWT(loginForm);
+    try {
+      await loginJWT(loginForm);
 
-    localStorage.setItem("access", tokens.access);
-    localStorage.setItem("refresh", tokens.refresh);
+      const livreur = JSON.parse(localStorage.getItem("livreur"));
 
-    const livreur = await getLivreurBytelephone(loginForm.telephone);
+      if (!livreur?.id) {
+        throw new Error("تعذر العثور على حساب السائق");
+      }
 
-    if (!livreur) {
-      throw new Error("Profil livreur introuvable");
+      navigate(`/livreur-dashboard/${livreur.id}`);
+    } catch (err) {
+      setError(err.message);
     }
-
-    localStorage.setItem("livreur", JSON.stringify(livreur));
-
-    navigate(`/livreur-dashboard/${livreur.id}`);
-  } catch (err) {
-    setError(err.message);
-  }
-}
-
-  if (submitted) {
-    return (
-      <section className="page centered-page">
-        <div className="success-box">
-          <CheckCircle2 size={54} />
-          <h1>Demande envoyée</h1>
-          <p>Votre profil livreur a été enregistré.</p>
-          <p className="muted">
-            Vous pouvez maintenant vous connecter avec votre email et téléphone.
-          </p>
-        </div>
-      </section>
-    );
   }
 
   return (
-    <section className="page form-page">
+    <section className="page form-page" dir="rtl">
       <div className="page-title narrow">
-        <span className="eyebrow">Espace livreur</span>
-        <h1>{mode === "register" ? "Inscription livreur" : "Connexion livreur"}</h1>
+        <span className="eyebrow">فضاء السائق</span>
+
+        <h1>
+          {mode === "register" ? "تسجيل سائق جديد" : "تسجيل دخول السائق"}
+        </h1>
+
         <p>
           {mode === "register"
-            ? "Rejoignez la plateforme comme livreur."
-            : "Connectez-vous si vous êtes déjà inscrit."}
+            ? "انضم إلى المنصة كسائق وابدأ في استقبال طلبات التوصيل."
+            : "قم بتسجيل الدخول إذا كنت مسجلاً من قبل."}
         </p>
       </div>
 
       <div className="auth-switch">
         <button
           type="button"
-          className={mode === "register" ? "primary-btn small" : "secondary-btn small"}
+          className={
+            mode === "register" ? "primary-btn small" : "secondary-btn small"
+          }
           onClick={() => setMode("register")}
         >
-          Inscription
+          تسجيل جديد
         </button>
 
         <button
           type="button"
-          className={mode === "login" ? "primary-btn small" : "secondary-btn small"}
+          className={
+            mode === "login" ? "primary-btn small" : "secondary-btn small"
+          }
           onClick={() => setMode("login")}
         >
-          Déjà inscrit ? Connexion
+          لدي حساب بالفعل
         </button>
       </div>
 
@@ -130,36 +124,40 @@ async function handleSubmit(e) {
           {error && <p style={{ color: "red" }}>{error}</p>}
 
           <div className="form-grid">
-                  <label>
-          Téléphone
-          <input
-            required
-            placeholder="0555555555"
-            value={loginForm.telephone}
-            onChange={(e) =>
-              setLoginForm({
-                ...loginForm,
-                telephone: e.target.value,
-              })
-            }
-          />
-        </label>
+            <label>
+              رقم الهاتف
+              <input
+                required
+                placeholder="0555555555"
+                value={loginForm.telephone}
+                onChange={(e) =>
+                  setLoginForm({
+                    ...loginForm,
+                    telephone: e.target.value,
+                  })
+                }
+              />
+            </label>
 
             <label>
-                Mot de passe
-                <input
-                  type="password"
-                  required
-                  value={loginForm.password}
-                  onChange={(e) =>
-                    setLoginForm({ ...loginForm, password: e.target.value })
-                  }
-                />
-              </label>
+              كلمة المرور
+              <input
+                type="password"
+                required
+                placeholder="أدخل كلمة المرور"
+                value={loginForm.password}
+                onChange={(e) =>
+                  setLoginForm({
+                    ...loginForm,
+                    password: e.target.value,
+                  })
+                }
+              />
+            </label>
           </div>
 
           <button className="primary-btn full" type="submit">
-            Se connecter
+            تسجيل الدخول
           </button>
         </form>
       ) : (
@@ -168,72 +166,80 @@ async function handleSubmit(e) {
 
           <div className="form-grid">
             <label>
-              Nom complet
+              الاسم الكامل
               <input
                 required
-                placeholder="Ex: Ahmed Benali"
+                maxLength={20}
+                placeholder="مثال: أحمد بن علي"
                 value={registerForm.nom}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, nom: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    nom: e.target.value,
+                  })
                 }
               />
+              <small style={{ color: "#666", fontSize: "12px" }}>
+                الحد الأقصى هو 20 حرفًا
+              </small>
             </label>
 
             <label>
-              Téléphone
+              رقم الهاتف
               <input
                 required
-                placeholder="+33 ..."
+                placeholder="0555555555"
                 value={registerForm.telephone}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, telephone: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    telephone: e.target.value,
+                  })
                 }
               />
             </label>
 
             <label>
-              Email
-              <input
-                type="email"
-                required
-                placeholder="livreur@email.com"
-                value={registerForm.email}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, email: e.target.value })
-                }
-              />
-            </label>
-
-            <label>
-              Ville principale
-              <input
-                required
-                placeholder="Paris, Lyon, Marseille..."
-                value={registerForm.ville}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, ville: e.target.value })
-                }
-              />
-            </label>
-
-            <label>
-              Type de véhicule
+              منطقة العمل
               <select
                 required
-                value={registerForm.vehicule}
+                value={registerForm.ville}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, vehicule: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    ville: e.target.value,
+                  })
                 }
               >
-                <option value="scooter">Scooter</option>
-                <option value="moto">Moto</option>
-                <option value="velo">Vélo</option>
-                <option value="voiture">Voiture</option>
+                {quartiers.map((quartier) => (
+                  <option key={quartier} value={quartier}>
+                    {quartier}
+                  </option>
+                ))}
               </select>
             </label>
 
             <label>
-              Disponibilité
+              نوع المركبة
+              <select
+                required
+                value={registerForm.vehicule}
+                onChange={(e) =>
+                  setRegisterForm({
+                    ...registerForm,
+                    vehicule: e.target.value,
+                  })
+                }
+              >
+                <option value="scooter">سكوتر</option>
+                <option value="moto">دراجة نارية</option>
+                <option value="velo">دراجة هوائية</option>
+                <option value="voiture">سيارة</option>
+              </select>
+            </label>
+
+            <label>
+              الحالة
               <select
                 required
                 value={registerForm.disponible ? "true" : "false"}
@@ -244,45 +250,49 @@ async function handleSubmit(e) {
                   })
                 }
               >
-                <option value="true">Disponible maintenant</option>
-                <option value="false">Indisponible</option>
+                <option value="true">متاح الآن</option>
+                <option value="false">غير متاح</option>
               </select>
             </label>
           </div>
 
           <label>
-            Services proposés
+            الخدمات المقترحة
             <textarea
               rows="4"
-              placeholder="Documents, repas, petits colis, courses, pharmacie..."
+              placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، أدوية..."
             />
           </label>
-                  <label>
-          Mot de passe
-          <input
-            type="password"
-            required
-            placeholder="Mot de passe"
-            value={registerForm.password}
-            onChange={(e) =>
-              setRegisterForm({
-                ...registerForm,
-                password: e.target.value,
-              })
-            }
-          />
-        </label>
+
+          <label>
+            كلمة المرور
+            <input
+              type="password"
+              required
+              placeholder="أدخل كلمة المرور"
+              value={registerForm.password}
+              onChange={(e) =>
+                setRegisterForm({
+                  ...registerForm,
+                  password: e.target.value,
+                })
+              }
+            />
+          </label>
 
           <div className="upload-box">
             <UploadCloud />
             <div>
-              <strong>Documents justificatifs</strong>
-              <p>Pièce d’identité, assurance, permis si nécessaire. Zone prévue pour upload.</p>
+              <strong>الوثائق المطلوبة</strong>
+              <p>
+                بطاقة الهوية، التأمين، ورخصة السياقة إذا كانت ضرورية. سيتم تفعيل
+                رفع الملفات لاحقًا.
+              </p>
             </div>
           </div>
 
           <button className="primary-btn full" type="submit">
-            Envoyer ma demande
+            إنشاء حساب السائق
           </button>
         </form>
       )}
