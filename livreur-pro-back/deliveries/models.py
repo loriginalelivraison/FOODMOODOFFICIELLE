@@ -20,7 +20,6 @@ class Livreur(models.Model):
 
     nom = models.CharField(max_length=100)
     telephone = models.CharField(max_length=30)
-    email = models.EmailField(unique=True)
     ville = models.CharField(max_length=100)
     vehicule = models.CharField(max_length=30, choices=VEHICULE_CHOICES)
     disponible = models.BooleanField(default=True)
