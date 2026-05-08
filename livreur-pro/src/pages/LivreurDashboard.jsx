@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { updateLivreurPosition, setLivreurUnavailable } from "../livreursapi.js";
+import { updateLivreurPosition, setLivreurUnavailable, getLivreurById } from "../livreursapi.js";
 
 export default function LivreurDashboard() {
   const { id } = useParams();
@@ -11,9 +11,29 @@ export default function LivreurDashboard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [position, setPosition] = useState(null);
-  const [trackingEnabled, setTrackingEnabled] = useState(true);
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  
+  //use effecte pour mettre le boutton de desactivation de localisation stable 
+  useEffect(() => {
+  async function loadLivreurStatus() {
+    try {
+      const data = await getLivreurById(id);
+
+      setTrackingEnabled(data.disponible === true);
+    } catch (err) {
+      setError("Impossible de récupérer l'état du livreur.");
+    } finally {
+      setLoadingStatus(false);
+    }
+  }
+
+  loadLivreurStatus();
+}, [id]);
+
 
   useEffect(() => {
+    if (loadingStatus) return;
     if (!livreur) return;
     if (!trackingEnabled) return;
 
