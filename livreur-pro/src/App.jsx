@@ -7,6 +7,8 @@ import Tracking from './pages/Tracking.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import LivreurDashboard from "./pages/LivreurDashboard.jsx";
 import NotFound from './pages/NotFound.jsx'
+import ClientAuth from "./pages/ClientAuth.jsx";
+import ClientDashboard from "./pages/ClientDashboard.jsx";
 import React from "react";
 
 export default function App() {
@@ -18,7 +20,9 @@ export default function App() {
         <Route path="/inscription-livreur" element={<CourierRegister />} />
         <Route path="/livreur-dashboard/:id" element={<LivreurDashboard />} />
         <Route path="/tracking/:id" element={<Tracking />} />
+        <Route path="/connexion-client" element={<ClientAuth />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/client-dashboard" element={<ClientDashboard />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

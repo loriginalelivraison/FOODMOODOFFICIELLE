@@ -17,6 +17,8 @@ export default function Couriers() {
   // AJOUT : état pour afficher une erreur si l'API Django ne répond pas
   const [error, setError] = useState("");
   
+
+
    // AJOUT : appel API Django au chargement de la page
   useEffect(() => {
     getLivreurs()
@@ -55,10 +57,29 @@ export default function Couriers() {
     return match && (!onlyAvailable || c.available === true)
   }), [query, onlyAvailable, couriers])
 
+  const token = localStorage.getItem("access");
+const role = localStorage.getItem("role");
+
+const clientStorage = localStorage.getItem("client");
+
+const client = clientStorage
+  ? JSON.parse(clientStorage)
+  : null;
+
   return (
     <section className="page">
       <div className="page-title">
-        <span className="eyebrow">Espace client</span>
+        <span className="eyebrow auth-status">
+  {token && role === "client" && client ? (
+    <>
+      <span className="online-dot"></span>
+      Bonjour {client.nom}
+    </>
+  ) : (
+    "Espace client"
+  )}
+</span>
+
         <h1>Livreurs disponibles autour de vous</h1>
         <p>Le client peut consulter, comparer, choisir un livreur et suivre la course via un lien public sécurisé.</p>
       </div>

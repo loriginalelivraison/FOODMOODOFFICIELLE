@@ -8,6 +8,11 @@ import logo from "../assets/logo.png";
 export default function Layout() {
   const [open, setOpen] = useState(false)
   const linkClass = ({ isActive }) => `nav-link ${isActive ? 'active' : ''}`
+  const token = localStorage.getItem("access");
+  const livreur = JSON.parse(localStorage.getItem("livreur"));
+  const role = localStorage.getItem("role");
+  const client = JSON.parse(localStorage.getItem("client"));
+
 
   return (
     <div className="app-shell">
@@ -19,7 +24,8 @@ export default function Layout() {
     style={{
       width: "40px",
       height: "40px",
-      objectFit: "contain",
+      objectFit: "cover",
+      borderRadius: "40%",
     }} /></span>
           <span>FoodMood</span>
         </Link>
@@ -30,6 +36,29 @@ export default function Layout() {
           <NavLink to="/" className={linkClass} onClick={() => setOpen(false)}>Accueil</NavLink>
           <NavLink to="/livreurs" className={linkClass} onClick={() => setOpen(false)}>Livreurs</NavLink>
           <NavLink to="/inscription-livreur" className={linkClass} onClick={() => setOpen(false)}>Devenir livreur</NavLink>
+           {/* NOUVEAU LINK */}
+          <NavLink
+  to={
+    !token
+      ? "/inscription-livreur"
+      : role === "livreur"
+      ? `/livreur-dashboard/${livreur?.id}`
+      : "/client-dashboard"
+  }
+  className={linkClass}
+  onClick={() => setOpen(false)}
+>
+  Mon dashboard
+</NavLink>
+
+<NavLink
+  to="/connexion-client"
+  className={linkClass}
+  onClick={() => setOpen(false)}
+>
+  inscription client
+</NavLink>
+
           <NavLink to="/admin" className={linkClass} onClick={() => setOpen(false)}>Admin</NavLink>
           <LogoutButton />
         </nav>
