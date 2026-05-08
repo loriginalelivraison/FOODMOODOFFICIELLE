@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 export async function getLivreurs() {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
@@ -37,6 +37,23 @@ export async function loginJWT(credentials) {
   if (!response.ok) {
     throw new Error(data.detail || "Connexion impossible");
   }
+
+  const livreur = await getLivreurBytelephone(credentials.telephone);
+
+  localStorage.clear();
+
+  localStorage.setItem("access", data.access);
+  localStorage.setItem("refresh", data.refresh);
+  localStorage.setItem("role", "livreur");
+
+  localStorage.setItem(
+    "livreur",
+    JSON.stringify({
+      id: livreur?.id,
+      nom: livreur?.nom || credentials.nom || "Livreur",
+      telephone: credentials.telephone,
+    })
+  );
 
   return data;
 }
@@ -120,4 +137,107 @@ export async function setLivreurUnavailable(id) {
   }
 
   return data;
+}
+
+export async function getCommentairesLivreur(livreurId) {
+  const response = await fetch(
+    `${API_BASE_URL}/commentaires-livreurs/?livreur=${livreurId}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Erreur chargement commentaires");
+  }
+
+  return response.json();
+}
+
+export async function createCommentaireLivreur(commentaire) {
+  const response = await fetch(`${API_BASE_URL}/commentaires-livreurs/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(commentaire),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || data.message || "Erreur ajout commentaire");
+  }
+
+  return data;
+}
+//inscription client 
+export async function createClient(client) {
+  const response = await fetch(`${API_BASE_URL}/clients/register/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(client),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Erreur inscription client");
+  }
+
+  return data;
+}
+
+//login client
+export async function loginClient(credentials) {
+  const response = await fetch(`${API_BASE_URL}/token/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username: credentials.telephone,
+      password: credentials.password,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || "Connexion client impossible");
+  }
+
+  const client = await getClientByTelephone(credentials.telephone);
+
+  localStorage.clear();
+  localStorage.setItem("access", data.access);
+  localStorage.setItem("refresh", data.refresh);
+  localStorage.setItem("role", "client");
+
+  localStorage.setItem(
+    "client",
+    JSON.stringify({
+      id: client?.id,
+      nom: client?.nom || "Client",
+      telephone: credentials.telephone,
+    })
+  );
+
+  return data;
+}
+
+export async function getClientByTelephone(telephone) {
+  const response = await fetch(`${API_BASE_URL}/clients/?format=json`);
+
+  if (!response.ok) {
+    throw new Error("Erreur récupération client");
+  }
+
+  const data = await response.json();
+  const clients = Array.isArray(data) ? data : data.results || [];
+
+  const clean = (value) => String(value || "").replace(/\s/g, "");
+
+  return clients.find(
+    (c) => clean(c.telephone) === clean(telephone)
+  );
 }
