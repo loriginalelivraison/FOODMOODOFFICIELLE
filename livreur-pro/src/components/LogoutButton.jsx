@@ -4,14 +4,18 @@ import { useNavigate } from "react-router-dom";
 export default function LogoutButton() {
   const navigate = useNavigate();
 
-  function logout() {
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    localStorage.removeItem("livreur");
+ function logout() {
+  localStorage.removeItem("access");
+  localStorage.removeItem("refresh");
 
-    navigate("/inscription-livreur");
-  }
+  localStorage.removeItem("livreur");
+  localStorage.removeItem("client");
+  localStorage.removeItem("role");
 
+  window.dispatchEvent(new Event("authChanged"));
+  navigate("/");
+
+}
   const isLoggedIn = localStorage.getItem("access");
 
   if (!isLoggedIn) return null;
@@ -29,7 +33,7 @@ export default function LogoutButton() {
         fontWeight: "600",
       }}
     >
-      Déconnexion
+    خروج
     </button>
   );
 }

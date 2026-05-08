@@ -86,7 +86,8 @@ export default function ClientAuth() {
                 type="text"
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
-                placeholder="Ex: Mohamed Ali"
+                placeholder="عبد الفادر"
+                maxLength={13}
                 required
               />
 

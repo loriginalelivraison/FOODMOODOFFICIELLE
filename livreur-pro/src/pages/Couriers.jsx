@@ -69,19 +69,10 @@ const client = clientStorage
   return (
     <section className="page">
       <div className="page-title">
-        <span className="eyebrow auth-status">
-  {token && role === "client" && client ? (
-    <>
-      <span className="online-dot"></span>
-      Bonjour {client.nom}
-    </>
-  ) : (
-    "Espace client"
-  )}
-</span>
+        
 
-        <h1>Livreurs disponibles autour de vous</h1>
-        <p>Le client peut consulter, comparer, choisir un livreur et suivre la course via un lien public sécurisé.</p>
+        <center><strong>قائمة السائقين</strong></center>
+        
       </div>
 
       <div className="toolbar">

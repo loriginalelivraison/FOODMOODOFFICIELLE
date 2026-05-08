@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { updateLivreurPosition, setLivreurUnavailable, getLivreurById } from "../livreursapi.js";
+import {
+  updateLivreurPosition,
+  setLivreurUnavailable,
+  getLivreurById,
+} from "../livreursapi.js";
 
 export default function LivreurDashboard() {
   const { id } = useParams();
@@ -10,28 +14,27 @@ export default function LivreurDashboard() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [position, setPosition] = useState(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
-  
-  //use effecte pour mettre le boutton de desactivation de localisation stable 
+
+  // تحميل حالة السائق
   useEffect(() => {
-  async function loadLivreurStatus() {
-    try {
-      const data = await getLivreurById(id);
+    async function loadLivreurStatus() {
+      try {
+        const data = await getLivreurById(id);
 
-      setTrackingEnabled(data.disponible === true);
-    } catch (err) {
-      setError("Impossible de récupérer l'état du livreur.");
-    } finally {
-      setLoadingStatus(false);
+        setTrackingEnabled(data.disponible === true);
+      } catch (err) {
+        setError("تعذر تحميل حالة السائق");
+      } finally {
+        setLoadingStatus(false);
+      }
     }
-  }
 
-  loadLivreurStatus();
-}, [id]);
+    loadLivreurStatus();
+  }, [id]);
 
-
+  // إرسال الموقع كل 10 ثواني
   useEffect(() => {
     if (loadingStatus) return;
     if (!livreur) return;
@@ -56,8 +59,7 @@ export default function LivreurDashboard() {
 
             if (stopped) return;
 
-            setPosition(newPosition);
-            console.log("Position envoyée");
+            console.log("تم تحديث الموقع بنجاح");
           } catch (err) {
             if (!stopped) {
               setError(err.message);
@@ -66,7 +68,7 @@ export default function LivreurDashboard() {
         },
         () => {
           if (!stopped) {
-            setError("Permission GPS refusée.");
+            setError("تم رفض صلاحية تحديد الموقع");
           }
         }
       );
@@ -80,8 +82,9 @@ export default function LivreurDashboard() {
       stopped = true;
       clearInterval(interval);
     };
-  }, [trackingEnabled, id]);
+  }, [trackingEnabled, id, loadingStatus, livreur]);
 
+  // تشغيل / إيقاف التتبع
   async function handleToggleTracking() {
     setError("");
     setMessage("");
@@ -89,11 +92,14 @@ export default function LivreurDashboard() {
     try {
       if (trackingEnabled) {
         setTrackingEnabled(false);
+
         await setLivreurUnavailable(id);
-        setMessage("Suivi GPS désactivé. Vous êtes maintenant occupé.");
+
+        setMessage("تم إيقاف التتبع، حالتك الآن مشغول");
       } else {
         setTrackingEnabled(true);
-        setMessage("Suivi GPS activé. Vous êtes maintenant disponible.");
+
+        setMessage("تم تفعيل التتبع، حالتك الآن متاح");
       }
     } catch (err) {
       setError(err.message);
@@ -101,43 +107,94 @@ export default function LivreurDashboard() {
   }
 
   return (
-    <section className="page">
+    <section
+      className="page"
+      dir="rtl"
+      style={{
+        fontFamily: '"Cairo", sans-serif',
+      }}
+    >
       <div className="page-title">
-        <span className="eyebrow">Espace livreur</span>
-        <h1>Dashboard livreur</h1>
-        <p>
-          Ici, le livreur peut activer ou désactiver son suivi GPS.
-        </p>
+        <span
+          className="eyebrow"
+          style={{
+            fontWeight: "700",
+            fontSize: "14px",
+          }}
+        >
+          مساحة السائق
+        </span>
+
+        <h1
+          style={{
+            fontWeight: "800",
+            fontSize: "32px",
+          }}
+        >
+          لوحة تحكم السائق
+        </h1>
+
+
       </div>
 
       <div className="tracking-card">
-        <h2>{livreur?.nom || "Livreur"}</h2>
+        <h2
+          style={{
+            fontWeight: "700",
+            marginBottom: "18px",
+          }}
+        >
+          {livreur?.nom || "السائق"}
+        </h2>
 
-        <p>Email : {livreur?.email || "Non disponible"}</p>
-        <p>Téléphone : {livreur?.telephone || "Non disponible"}</p>
-        <p>Ville : {livreur?.ville || "Non disponible"}</p>
+        <p>
+          <strong>رقم الهاتف:</strong>{" "}
+          {livreur?.telephone || "غير متوفر"}
+        </p>
+
+        <p>
+          <strong>المدينة:</strong>{" "}
+          {livreur?.ville || "غير متوفر"}
+        </p>
 
         <button
           className="primary-btn full"
           style={{
-            marginTop: "15px",
+            marginTop: "22px",
             background: trackingEnabled ? "#dc2626" : "#16a34a",
+            fontFamily: '"Cairo", sans-serif',
+            fontWeight: "700",
+            fontSize: "15px",
           }}
           onClick={handleToggleTracking}
         >
           {trackingEnabled
-            ? "Désactiver le suivi GPS"
-            : "Activer le suivi GPS"}
+            ? "إيقاف مشاركة الموقع"
+            : "تفعيل مشاركة الموقع"}
         </button>
 
-        {message && <p style={{ color: "green" }}>{message}</p>}
-        {error && <p style={{ color: "red" }}>{error}</p>}
+        {message && (
+          <p
+            style={{
+              color: "#16a34a",
+              marginTop: "16px",
+              fontWeight: "600",
+            }}
+          >
+            {message}
+          </p>
+        )}
 
-        {position && (
-          <div>
-            <p>Latitude : {position.latitude}</p>
-            <p>Longitude : {position.longitude}</p>
-          </div>
+        {error && (
+          <p
+            style={{
+              color: "#dc2626",
+              marginTop: "16px",
+              fontWeight: "600",
+            }}
+          >
+            {error}
+          </p>
         )}
       </div>
     </section>

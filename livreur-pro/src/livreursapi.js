@@ -54,12 +54,16 @@ export async function loginJWT(credentials) {
       telephone: credentials.telephone,
     })
   );
-
+  window.dispatchEvent(new Event("authChanged"));
   return data;
 }
 
 export async function createLivreur(livreur) {
-  const response = await fetch(`${API_BASE_URL}/livreurs/register/`, {
+  const url = `${API_BASE_URL}/livreurs/register/`;
+
+  console.log("URL inscription livreur =", url);
+
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -67,10 +71,23 @@ export async function createLivreur(livreur) {
     body: JSON.stringify(livreur),
   });
 
-  const data = await response.json();
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.error("Réponse non JSON reçue :", text);
+    throw new Error("Le serveur a renvoyé une page HTML au lieu du JSON.");
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || data.email?.[0] || "Erreur lors de l'inscription");
+    throw new Error(
+      data.error ||
+      data.telephone?.[0] ||
+      "Erreur lors de l'inscription"
+    );
   }
 
   return data;
@@ -221,7 +238,7 @@ export async function loginClient(credentials) {
       telephone: credentials.telephone,
     })
   );
-
+   window.dispatchEvent(new Event("authChanged"));
   return data;
 }
 
