@@ -7,7 +7,6 @@ class LivreurAdmin(admin.ModelAdmin):
         "id",
         "nom",
         "telephone",
-        "email",
         "ville",
         "vehicule",
         "disponible",
