@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   getLivreurById,
   getCommentairesLivreur,
@@ -20,6 +20,7 @@ export default function Tracking() {
   const [error, setError] = useState("");
   const [commentError, setCommentError] = useState("");
   const [commentSuccess, setCommentSuccess] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     function loadCourier() {
@@ -105,6 +106,19 @@ export default function Tracking() {
     return <section className="page">{error}</section>;
   }
 
+
+  function requireClientAuth(action) {
+  const token = localStorage.getItem("access");
+  const role = localStorage.getItem("role");
+
+  if (!token || role !== "client") {
+    localStorage.setItem("redirectAfterLogin", `/tracking/${id}`);
+    navigate("/connexion-client");
+    return false;
+  }
+
+  return true;
+}
   return (
     <section className="page">
       <div className="page-title">
@@ -115,23 +129,35 @@ export default function Tracking() {
       </div>
 
       <div className="card-bottom">
-        <a className="primary-btn small" href={`tel:${courier.phone}`}>
-          📞 Appeler
-        </a>
+              <button
+        className="primary-btn small"
+        type="button"
+        onClick={() => {
+          if (!requireClientAuth("call")) return;
+          window.location.href = `tel:${courier.phone}`;
+        }}
+      >
+        📞 Appeler
+      </button>
 
-        <a
-          className="primary-btn small"
-          href={`https://wa.me/${courier.whatsapp}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          WhatsApp
-        </a>
+              <button
+        className="primary-btn small"
+        type="button"
+        onClick={() => {
+          if (!requireClientAuth("whatsapp")) return;
+          window.open(`https://wa.me/${courier.whatsapp}`, "_blank");
+        }}
+      >
+        WhatsApp
+      </button>
 
         <button
           className="primary-btn small"
           type="button"
-          onClick={() => setShowCommentForm(!showCommentForm)}
+          onClick={() => {
+  if (!requireClientAuth("comment")) return;
+  setShowCommentForm(!showCommentForm);
+}}
         >
           Commenter
         </button>

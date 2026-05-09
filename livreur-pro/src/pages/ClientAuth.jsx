@@ -5,120 +5,123 @@ import { createClient, loginClient } from "../livreursapi.js";
 export default function ClientAuth() {
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState("register");
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [password, setPassword] = useState("");
 
-
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  
 
   async function handleSubmit(e) {
-  e.preventDefault();
-  setError("");
-  setMessage("");
-  setLoading(true);
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    setLoading(true);
 
-  try {
-    if (mode === "register") {
-      await createClient({
-        nom,
-        telephone,
-        password,
-      });
+    try {
+      if (mode === "register") {
+        await createClient({
+          nom,
+          telephone,
+          password,
+        });
 
-      await loginClient({
-        nom,
-        telephone,
-        password,
-      });
+        await loginClient({
+          nom,
+          telephone,
+          password,
+        });
 
-      navigate("/livreurs");
-    } else {
-      await loginClient({
-        nom,
-        telephone,
-        password,
-      });
+        const redirect = localStorage.getItem("redirectAfterLogin") || "/livreurs";
+        localStorage.removeItem("redirectAfterLogin");
+        navigate(redirect);
+      } else {
+        await loginClient({
+          nom,
+          telephone,
+          password,
+        });
 
-      navigate("/livreurs");
+        const redirect = localStorage.getItem("redirectAfterLogin") || "/livreurs";
+        localStorage.removeItem("redirectAfterLogin");
+        navigate(redirect);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
   }
-}
 
   return (
-    <section className="page auth-page">
+    <section className="page auth-page" dir="rtl">
       <div className="auth-card">
-        <span className="eyebrow">Espace client</span>
-
-        <h1>{mode === "login" ? "Connexion client" : "Inscription client"}</h1>
+        <h3>
+          {mode === "login"
+            ? "تسجيل الدخول"
+            : "سجّل الآن للتواصل مع السائقين"}
+        </h3>
 
         <div className="auth-tabs">
+             <button
+            className={mode === "register" ? "active" : ""}
+            onClick={() => setMode("register")}
+            type="button"
+          >
+            إنشاء حساب
+          </button>
           <button
             className={mode === "login" ? "active" : ""}
             onClick={() => setMode("login")}
             type="button"
           >
-            Connexion
+            تسجيل الدخول
           </button>
 
-          <button
-            className={mode === "register" ? "active" : ""}
-            onClick={() => setMode("register")}
-            type="button"
-          >
-            Inscription
-          </button>
+       
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
           {mode === "register" && (
             <>
-              <label>Nom complet</label>
+              <label>الاسم الكامل</label>
               <input
                 type="text"
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
-                placeholder="عبد الفادر"
+                placeholder="عبد القادر"
                 maxLength={13}
                 required
               />
-
-             
             </>
           )}
 
-          <label>Téléphone</label>
+          <label>رقم الهاتف</label>
           <input
             type="text"
             value={telephone}
             onChange={(e) => setTelephone(e.target.value)}
-            placeholder="Ex: 0555555555"
+            placeholder="مثال: 0555555555"
             required
           />
 
-          <label>Mot de passe</label>
+          <label>كلمة المرور</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Votre mot de passe"
+            placeholder="أدخل كلمة المرور"
             required
           />
 
           <button className="primary-btn full" type="submit" disabled={loading}>
             {loading
-              ? "Veuillez patienter..."
+              ? "يرجى الانتظار..."
               : mode === "login"
-              ? "Se connecter"
-              : "Créer mon compte"}
+              ? "تسجيل الدخول"
+              : "إنشاء الحساب"}
           </button>
 
           {message && <p style={{ color: "green" }}>{message}</p>}
