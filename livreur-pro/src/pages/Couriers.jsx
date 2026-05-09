@@ -2,6 +2,7 @@ import React from "react";
 import { useMemo, useState, useEffect } from 'react'
 import { getLivreurs } from "../livreursapi.js";
 import CourierCard from '../components/CourierCard.jsx'
+import CouriersMap from '../components/CouriersMap.jsx'
 import { Search } from 'lucide-react'
 
 export default function Couriers() {
@@ -16,8 +17,11 @@ export default function Couriers() {
 
   // AJOUT : état pour afficher une erreur si l'API Django ne répond pas
   const [error, setError] = useState("");
-  
 
+  const [viewMode, setViewMode] = useState("list");
+  //pour lacalisation clien au debut 
+  const [clientPosition, setClientPosition] = useState(null);
+  const [locationError, setLocationError] = useState("");
 
    // AJOUT : appel API Django au chargement de la page
   useEffect(() => {
@@ -66,6 +70,30 @@ const client = clientStorage
   ? JSON.parse(clientStorage)
   : null;
 
+
+  function handleFindAroundMe() {
+  setLocationError("");
+
+  if (!navigator.geolocation) {
+    setLocationError("المتصفح لا يدعم تحديد الموقع");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const position = {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      };
+
+      setClientPosition(position);
+      setViewMode("map");
+    },
+    () => {
+      setLocationError("يجب تفعيل الموقع لرؤية السائقين القريبين منك");
+    }
+  );
+}
   return (
     <section className="page">
       <div className="page-title">
@@ -76,9 +104,42 @@ const client = clientStorage
       </div>
 
       <div className="toolbar">
-        <label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ville, nom, type de livraison..." /></label>
+        <label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث عن سائق حسب مدينتك، أو نوع وسيلة النقل، أو اسم الحي" /></label>
         <label className="toggle"><input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} /> Disponibles uniquement</label>
       </div>
+
+            <div style={{ textAlign: "center", margin: "15px 0" }}>
+        <button
+          type="button"
+          className="primary-btn small"
+          onClick={handleFindAroundMe}
+        >
+          السائقون حولي
+        </button>
+
+        {locationError && (
+          <p style={{ color: "red", marginTop: "8px" }}>
+            {locationError}
+          </p>
+        )}
+      </div>
+                      <div className="view-switch">
+            <button
+              type="button"
+              className={viewMode === "list" ? "primary-btn small" : "secondary-btn small"}
+              onClick={() => setViewMode("list")}
+            >
+              القائمة
+            </button>
+
+            <button
+              type="button"
+              className={viewMode === "map" ? "primary-btn small" : "secondary-btn small"}
+              onClick={() => setViewMode("map")}
+            >
+              الخريطة
+            </button>
+          </div>
 
       {/* AJOUT : message pendant le chargement */}
       {loading && <p>Chargement des livreurs...</p>}
@@ -91,9 +152,15 @@ const client = clientStorage
         <p>Aucun livreur disponible pour le moment.</p>
       )}
 
-      <div className="courier-grid">
-        {filtered.map((courier) => <CourierCard courier={courier} key={courier.id} />)}
-      </div>
+     {viewMode === "list" ? (
+  <div className="courier-grid">
+    {filtered.map((courier) => (
+      <CourierCard courier={courier} key={courier.id} />
+    ))}
+  </div>
+) : (
+  <CouriersMap couriers={filtered} clientPosition={clientPosition} />
+)}
     </section>
   )
 }

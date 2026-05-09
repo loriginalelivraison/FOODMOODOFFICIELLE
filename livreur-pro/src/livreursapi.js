@@ -225,7 +225,13 @@ export async function loginClient(credentials) {
 
   const client = await getClientByTelephone(credentials.telephone);
 
-  localStorage.clear();
+ const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
+
+localStorage.clear();
+
+if (redirectAfterLogin) {
+  localStorage.setItem("redirectAfterLogin", redirectAfterLogin);
+}
   localStorage.setItem("access", data.access);
   localStorage.setItem("refresh", data.refresh);
   localStorage.setItem("role", "client");
