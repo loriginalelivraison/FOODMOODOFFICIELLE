@@ -92,14 +92,26 @@ export default function Layout() {
             السائقون
           </NavLink>
 
-          <NavLink to="/inscription-livreur" className={linkClass} onClick={() => setOpen(false)}>
-            أصبح سائق توصيل
-          </NavLink>
+          {!auth.token && (
+                <>
+                  <NavLink
+                    to="/inscription-livreur"
+                    className={linkClass}
+                    onClick={() => setOpen(false)}
+                  >
+                    أصبح سائق توصيل
+                  </NavLink>
 
-          <NavLink to="/connexion-client" className={linkClass} onClick={() => setOpen(false)}>
-           تسجيل 
-          </NavLink>
-
+                  <NavLink
+                    to="/connexion-client"
+                    className={linkClass}
+                    onClick={() => setOpen(false)}
+                  >
+                    تسجيل
+                  </NavLink>
+                </>
+              )}
+              
           {auth.token && auth.user && (
             <NavLink
               to={dashboardLink}
