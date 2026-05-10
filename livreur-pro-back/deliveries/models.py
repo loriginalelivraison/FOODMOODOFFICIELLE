@@ -13,7 +13,7 @@ class Livreur(models.Model):
 
     VEHICULE_CHOICES = [
         ("velo", "Vélo"),
-        ("scooter", "Scooter"),
+        ("camion", "Camion"),
         ("moto", "Moto"),
         ("voiture", "Voiture"),
     ]
