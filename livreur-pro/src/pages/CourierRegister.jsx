@@ -32,8 +32,8 @@ export default function CourierRegister() {
   const [registerForm, setRegisterForm] = useState({
     nom: "",
     telephone: "",
-    ville: "كل المدينة",
-    vehicule: "scooter",
+    ville: "كل مدينة مستغانم",
+    vehicule: "دراجة نارية",
     disponible: true,
     password: "",
   });
@@ -231,10 +231,11 @@ export default function CourierRegister() {
                   })
                 }
               >
-                <option value="scooter">سكوتر</option>
+                
                 <option value="moto">دراجة نارية</option>
                 <option value="velo">دراجة هوائية</option>
                 <option value="voiture">سيارة</option>
+                <option value="camion">شاحنة</option>
               </select>
             </label>
 
