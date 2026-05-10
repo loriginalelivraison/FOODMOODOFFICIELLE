@@ -40,7 +40,18 @@ export async function loginJWT(credentials) {
 
   const livreur = await getLivreurBytelephone(credentials.telephone);
 
+  if (!livreur) {
+    localStorage.clear();
+    throw new Error("هذا الحساب ليس حساب سائق. يرجى تسجيل الدخول من فضاء العميل.");
+  }
+
+  const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
+
   localStorage.clear();
+
+  if (redirectAfterLogin) {
+    localStorage.setItem("redirectAfterLogin", redirectAfterLogin);
+  }
 
   localStorage.setItem("access", data.access);
   localStorage.setItem("refresh", data.refresh);
@@ -49,11 +60,12 @@ export async function loginJWT(credentials) {
   localStorage.setItem(
     "livreur",
     JSON.stringify({
-      id: livreur?.id,
-      nom: livreur?.nom || credentials.nom || "Livreur",
+      id: livreur.id,
+      nom: livreur.nom || credentials.nom || "Livreur",
       telephone: credentials.telephone,
     })
   );
+
   window.dispatchEvent(new Event("authChanged"));
   return data;
 }
@@ -225,13 +237,19 @@ export async function loginClient(credentials) {
 
   const client = await getClientByTelephone(credentials.telephone);
 
- const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
+  if (!client) {
+    localStorage.clear();
+    throw new Error("هذا الحساب ليس حساب عميل. يرجى تسجيل الدخول من فضاء السائق.");
+  }
 
-localStorage.clear();
+  const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
 
-if (redirectAfterLogin) {
-  localStorage.setItem("redirectAfterLogin", redirectAfterLogin);
-}
+  localStorage.clear();
+
+  if (redirectAfterLogin) {
+    localStorage.setItem("redirectAfterLogin", redirectAfterLogin);
+  }
+
   localStorage.setItem("access", data.access);
   localStorage.setItem("refresh", data.refresh);
   localStorage.setItem("role", "client");
@@ -239,12 +257,13 @@ if (redirectAfterLogin) {
   localStorage.setItem(
     "client",
     JSON.stringify({
-      id: client?.id,
-      nom: client?.nom || "Client",
+      id: client.id,
+      nom: client.nom || "Client",
       telephone: credentials.telephone,
     })
   );
-   window.dispatchEvent(new Event("authChanged"));
+
+  window.dispatchEvent(new Event("authChanged"));
   return data;
 }
 

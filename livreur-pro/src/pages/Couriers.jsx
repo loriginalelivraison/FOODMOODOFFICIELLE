@@ -1,34 +1,40 @@
 import React from "react";
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from "react";
 import { getLivreurs } from "../livreursapi.js";
-import CourierCard from '../components/CourierCard.jsx'
-import CouriersMap from '../components/CouriersMap.jsx'
-import { Search } from 'lucide-react'
+import CourierCard from "../components/CourierCard.jsx";
+import CouriersMap from "../components/CouriersMap.jsx";
+import { Search } from "lucide-react";
 
 export default function Couriers() {
-  const [query, setQuery] = useState('')
-  const [onlyAvailable, setOnlyAvailable] = useState(true)
+  const [query, setQuery] = useState("");
+  const [onlyAvailable, setOnlyAvailable] = useState(true);
 
-   // AJOUT : état pour stocker les livreurs venant du backend Django
+  // filtres compacts
+  const [selectedVehicle, setSelectedVehicle] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+
+  // données
   const [couriers, setCouriers] = useState([]);
 
-  // AJOUT : état de chargement
+  // états
   const [loading, setLoading] = useState(true);
-
-  // AJOUT : état pour afficher une erreur si l'API Django ne répond pas
   const [error, setError] = useState("");
 
+  // affichage
   const [viewMode, setViewMode] = useState("list");
-  //pour lacalisation clien au debut 
+
+  // localisation client
   const [clientPosition, setClientPosition] = useState(null);
   const [locationError, setLocationError] = useState("");
-
-   // AJOUT : appel API Django au chargement de la page
+  const [showFilters, setShowFilters] = useState(false);
+  // chargement livreurs
   useEffect(() => {
     getLivreurs()
       .then((data) => {
-        // AJOUT : adaptation des noms Django vers les noms attendus par CourierCard
-        const livreurs = Array.isArray(data) ? data : data.results || [];
+        const livreurs = Array.isArray(data)
+          ? data
+          : data.results || [];
+
         const formattedCouriers = livreurs.map((livreur) => ({
           id: livreur.id,
           name: livreur.nom,
@@ -42,7 +48,6 @@ export default function Couriers() {
           longitude: livreur.longitude,
           phone: livreur.telephone,
           skills: ["Livraison rapide"],
-          
         }));
 
         setCouriers(formattedCouriers);
@@ -54,113 +59,237 @@ export default function Couriers() {
       });
   }, []);
 
+  // options filtres
+  const vehicleOptions = useMemo(() => {
+    return [...new Set(couriers.map((c) => c.vehicle).filter(Boolean))];
+  }, [couriers]);
 
-//pour filtrer les livreurs
-  const filtered = useMemo(() => couriers.filter((c) => {
-    const match = `${c.name} ${c.city} ${c.zone} ${c.vehicle} ${c.skills.join(' ')}`.toLowerCase().includes(query.toLowerCase())
-    return match && (!onlyAvailable || c.available === true)
-  }), [query, onlyAvailable, couriers])
+  const cityOptions = useMemo(() => {
+    return [...new Set(couriers.map((c) => c.city).filter(Boolean))];
+  }, [couriers]);
 
-  const token = localStorage.getItem("access");
-const role = localStorage.getItem("role");
+  // filtrage
+  const filtered = useMemo(() => {
+    return couriers.filter((c) => {
+      const searchText =
+        `${c.name} ${c.city} ${c.zone} ${c.vehicle} ${c.skills.join(" ")}`
+          .toLowerCase();
 
-const clientStorage = localStorage.getItem("client");
+      const matchSearch = searchText.includes(query.toLowerCase());
 
-const client = clientStorage
-  ? JSON.parse(clientStorage)
-  : null;
+      const matchAvailable =
+        !onlyAvailable || c.available === true;
 
+      const matchVehicle =
+        !selectedVehicle ||
+        c.vehicle === selectedVehicle;
 
+      const matchCity =
+        !selectedCity ||
+        c.city === selectedCity;
+
+      return (
+        matchSearch &&
+        matchAvailable &&
+        matchVehicle &&
+        matchCity
+      );
+    });
+  }, [
+    query,
+    onlyAvailable,
+    selectedVehicle,
+    selectedCity,
+    couriers,
+  ]);
+
+  // géolocalisation
   function handleFindAroundMe() {
-  setLocationError("");
+    setLocationError("");
 
-  if (!navigator.geolocation) {
-    setLocationError("المتصفح لا يدعم تحديد الموقع");
-    return;
+    if (!navigator.geolocation) {
+      setLocationError("المتصفح لا يدعم تحديد الموقع");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const position = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
+
+        setClientPosition(position);
+        setViewMode("map");
+      },
+      () => {
+        setLocationError(
+          "📍يجب تفعيل الموقع لرؤية السائقين القريبين منك"
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
   }
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const position = {
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      };
-
-      setClientPosition(position);
-      setViewMode("map");
-    },
-    () => {
-      setLocationError("يجب تفعيل الموقع لرؤية السائقين القريبين منك");
-    }
-  );
-}
   return (
-    <section className="page">
+    <section className="page" dir="rtl">
+      {/* titre */}
       <div className="page-title">
-        
+        <center>
+                  <div className="around-me-top">
+          <button
+            type="button"
+            className="primary-btn full"
+            onClick={handleFindAroundMe}
+          >
+            📍 السائقون حولي
+          </button>
 
-        <center><strong>قائمة السائقين</strong></center>
-        
+          {locationError && (
+            <p style={{ color: "red", marginTop: "8px" }}>
+              {locationError}
+            </p>
+          )}
+        </div>
+                 
+        </center>
       </div>
 
-      <div className="toolbar">
-        <label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث عن سائق حسب مدينتك، أو نوع وسيلة النقل، أو اسم الحي" /></label>
-        <label className="toggle"><input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} /> Disponibles uniquement</label>
+      {/* barre outils */}
+      <div className="toolbar compact-toolbar">
+        {/* recherche */}
+        <label className="search-box">
+          <Search size={18} />
+
+                  <input
+          value={query}
+          onFocus={() => setShowFilters(true)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShowFilters(true);
+          }}
+          placeholder="ابحث عن سائق"
+        />
+        
+        </label>
+
+        {/* véhicule */}
+{showFilters && (
+  <>
+    <select
+      className="filter-select"
+      value={selectedVehicle}
+      onChange={(e) => setSelectedVehicle(e.target.value)}
+    >
+      <option value="">كل المركبات</option>
+      {vehicleOptions.map((vehicle) => (
+        <option key={vehicle} value={vehicle}>
+          {vehicle}
+        </option>
+      ))}
+    </select>
+
+    <select
+      className="filter-select"
+      value={selectedCity}
+      onChange={(e) => setSelectedCity(e.target.value)}
+    >
+      <option value="">كل المناطق</option>
+      {cityOptions.map((city) => (
+        <option key={city} value={city}>
+          {city}
+        </option>
+      ))}
+    </select>
+
+    <label className="toggle">
+      <input
+        type="checkbox"
+        checked={onlyAvailable}
+        onChange={(e) => setOnlyAvailable(e.target.checked)}
+      />
+      المتاحين فقط
+    </label>
+  </>
+)}
       </div>
 
-            <div style={{ textAlign: "center", margin: "15px 0" }}>
-        <button
-          type="button"
-          className="primary-btn small"
-          onClick={handleFindAroundMe}
-        >
-          السائقون حولي
-        </button>
-
+      {/* bouton autour de moi */}
+      <div
+        style={{
+          textAlign: "center",
+          margin: "15px 0",
+        }}
+      >
+        
         {locationError && (
-          <p style={{ color: "red", marginTop: "8px" }}>
+          <p
+            style={{
+              color: "red",
+              marginTop: "8px",
+            }}
+          >
             {locationError}
           </p>
         )}
       </div>
-                      <div className="view-switch">
-            <button
-              type="button"
-              className={viewMode === "list" ? "primary-btn small" : "secondary-btn small"}
-              onClick={() => setViewMode("list")}
-            >
-              القائمة
-            </button>
 
-            <button
-              type="button"
-              className={viewMode === "map" ? "primary-btn small" : "secondary-btn small"}
-              onClick={() => setViewMode("map")}
-            >
-              الخريطة
-            </button>
-          </div>
 
-      {/* AJOUT : message pendant le chargement */}
-      {loading && <p>Chargement des livreurs...</p>}
-
-      {/* AJOUT : message si erreur API */}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* AJOUT : message si aucun livreur trouvé */}
-      {!loading && !error && filtered.length === 0 && (
-        <p>Aucun livreur disponible pour le moment.</p>
+      {/* chargement */}
+      {loading && (
+        <p>Chargement des livreurs...</p>
       )}
 
-     {viewMode === "list" ? (
-  <div className="courier-grid">
-    {filtered.map((courier) => (
-      <CourierCard courier={courier} key={courier.id} />
-    ))}
-  </div>
-) : (
-  <CouriersMap couriers={filtered} clientPosition={clientPosition} />
-)}
+      {/* erreur */}
+      {error && (
+        <p style={{ color: "red" }}>
+          {error}
+        </p>
+      )}
+
+      {/* aucun résultat */}
+      {!loading &&
+        !error &&
+        filtered.length === 0 && (
+          <p>
+            Aucun livreur disponible pour le
+            moment.
+          </p>
+        )}
+
+      {/* compteur */}
+      {!loading && !error && (
+        <p
+          style={{
+            textAlign: "center",
+            margin: "15px 0",
+            fontWeight: "600",
+          }}
+        >
+          عدد السائقين : {filtered.length}
+        </p>
+      )}
+
+      {/* affichage */}
+      {viewMode === "list" ? (
+        <div className="courier-grid">
+          {filtered.map((courier) => (
+            <CourierCard
+              courier={courier}
+              key={courier.id}
+            />
+          ))}
+        </div>
+      ) : (
+        <CouriersMap
+          couriers={filtered}
+          clientPosition={clientPosition}
+        />
+      )}
     </section>
-  )
+  );
 }
