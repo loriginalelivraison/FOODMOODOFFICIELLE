@@ -100,3 +100,18 @@ class Client(models.Model):
 
     def __str__(self):
         return self.nom
+
+#table de position client 
+class Course(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    livreur = models.ForeignKey(Livreur, on_delete=models.CASCADE)
+
+    client_latitude = models.FloatField(null=True, blank=True)
+    client_longitude = models.FloatField(null=True, blank=True)
+
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Course client {self.client_id} -> livreur {self.livreur_id}"
