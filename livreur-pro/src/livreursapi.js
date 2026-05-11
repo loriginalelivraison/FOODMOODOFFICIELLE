@@ -63,6 +63,8 @@ export async function loginJWT(credentials) {
       id: livreur.id,
       nom: livreur.nom || credentials.nom || "Livreur",
       telephone: credentials.telephone,
+      ville: livreur.ville,
+      vehicule: livreur.vehicule,
     })
   );
 
@@ -282,4 +284,95 @@ export async function getClientByTelephone(telephone) {
   return clients.find(
     (c) => clean(c.telephone) === clean(telephone)
   );
+}
+
+//supprimer un compte livreur 
+export async function deleteLivreur(id) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Impossible de supprimer le compte livreur");
+  }
+
+  return true;
+}
+
+//supprimer un compte client 
+export async function deleteClient(id) {
+  const token = localStorage.getItem("access");
+
+  const response = await fetch(`${API_BASE_URL}/clients/${id}/`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Impossible de supprimer le compte client");
+  }
+
+  return true;
+}
+
+// créer une course
+export async function createCourse(courseData) {
+  const token = localStorage.getItem("access");
+
+  const response = await fetch(`${API_BASE_URL}/courses/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(courseData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || "Erreur création course");
+  }
+
+  return data;
+}
+
+// récupérer course active livreur
+export async function getActiveCourse(livreurId) {
+  const response = await fetch(
+    `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || "Erreur récupération course");
+  }
+
+  return data;
+}
+
+// terminer course
+export async function finishCourse(courseId) {
+  const token = localStorage.getItem("access");
+
+  const response = await fetch(
+    `${API_BASE_URL}/courses/${courseId}/finish/`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || "Erreur fin course");
+  }
+
+  return data;
 }
