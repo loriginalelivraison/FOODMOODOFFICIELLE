@@ -1,11 +1,14 @@
 from rest_framework.viewsets import ModelViewSet
-from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client
-from .serializers import LivreurSerializer, DemandeLivraisonSerializer, CommentaireLivreurSerializer, ClientSerializer
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
+from .serializers import LivreurSerializer, DemandeLivraisonSerializer, CommentaireLivreurSerializer, ClientSerializer, CourseSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
+from django.utils import timezone
+
+
 
 
 class LivreurViewSet(ModelViewSet):
@@ -155,3 +158,53 @@ def register_client(request):
         "nom": client.nom,
         "telephone": client.telephone,
     }, status=status.HTTP_201_CREATED)
+
+class CourseViewSet(ModelViewSet):
+    queryset = Course.objects.all().order_by("-created_at")
+    serializer_class = CourseSerializer
+
+    def perform_create(self, serializer):
+        client = serializer.validated_data.get("client")
+        livreur = serializer.validated_data.get("livreur")
+
+        Course.objects.filter(
+            client=client,
+            livreur=livreur,
+            active=True
+        ).update(active=False, finished_at=timezone.now())
+
+        serializer.save(active=True)
+
+    @action(detail=False, methods=["get"])
+    def active(self, request):
+        livreur_id = request.query_params.get("livreur_id")
+
+        if not livreur_id:
+            return Response({"error": "livreur_id obligatoire"}, status=400)
+
+        course = Course.objects.filter(
+            livreur_id=livreur_id,
+            active=True
+        ).order_by("-created_at").first()
+
+        if not course:
+            return Response({"active": False})
+
+        serializer = self.get_serializer(course)
+
+        return Response({
+            "active": True,
+            "course": serializer.data
+        })
+
+    @action(detail=True, methods=["patch"])
+    def finish(self, request, pk=None):
+        course = self.get_object()
+        course.active = False
+        course.finished_at = timezone.now()
+        course.save()
+
+        return Response({
+            "message": "Course terminée",
+            "active": False
+        })

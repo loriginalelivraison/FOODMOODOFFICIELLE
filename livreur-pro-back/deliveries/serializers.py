@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
 
 
 class LivreurSerializer(serializers.ModelSerializer):
@@ -40,3 +40,8 @@ class ClientSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["user", "created_at"]
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = "__all__"

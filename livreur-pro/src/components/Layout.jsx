@@ -67,7 +67,12 @@ export default function Layout() {
           </span>
           <span> FoodMood</span>
         </Link>
-
+         {auth.token && auth.user && (
+            <span className="eyebrow auth-status">
+              <span className="online-dot"></span>
+             {auth.user.nom}
+            </span>
+          )}     
         <button
           className="menu-btn"
           onClick={() => setOpen(!open)}
@@ -77,12 +82,7 @@ export default function Layout() {
         </button>
 
         <nav className={`nav ${open ? "open" : ""}`}>
-          {auth.token && auth.user && (
-            <span className="eyebrow auth-status">
-              <span className="online-dot"></span>
-              مرحبًا {auth.user.nom}
-            </span>
-          )}
+          
 
           <NavLink to="/" className={linkClass} onClick={() => setOpen(false)}>
             الرئيسية
