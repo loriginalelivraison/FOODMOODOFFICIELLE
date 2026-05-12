@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Home, Users, User, LogIn, Bike } from "lucide-react";
+import { Home, Users, User, LogIn, Bike, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import React from "react";
 import LogoutButton from "./LogoutButton";
@@ -93,12 +93,14 @@ export default function Layout() {
           )}
 
           {auth.token && auth.user && (
-            <NavLink to={dashboardLink} className={linkClass}>
-              حسابي
-            </NavLink>
-          )}
+            <>
+              <NavLink to={dashboardLink} className={linkClass}>
+                حسابي
+              </NavLink>
 
-          <LogoutButton />
+              <LogoutButton />
+            </>
+          )}
         </nav>
       </header>
 
@@ -130,10 +132,17 @@ export default function Layout() {
             </NavLink>
           </>
         ) : (
-          <NavLink to={dashboardLink} className={bottomLinkClass}>
-            <User size={20} />
-            <span>حسابي</span>
-          </NavLink>
+          <>
+            <NavLink to={dashboardLink} className={bottomLinkClass}>
+              <User size={20} />
+              <span>حسابي</span>
+            </NavLink>
+
+            <div className="bottom-link bottom-logout">
+              
+              <LogoutButton />
+            </div>
+          </>
         )}
       </nav>
     </div>
