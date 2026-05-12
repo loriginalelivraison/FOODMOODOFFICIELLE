@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -13,9 +13,6 @@ import L from "leaflet";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
-
 
 delete L.Icon.Default.prototype._getIconUrl;
 
@@ -45,29 +42,74 @@ function RecenterMap({ clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (clientPosition) {
-      map.flyTo(
+    if (clientPosition?.latitude && clientPosition?.longitude) {
+      map.panTo(
         [
           Number(clientPosition.latitude),
           Number(clientPosition.longitude),
         ],
-        15,
-        { duration: 2 }
+        {
+          animate: true,
+          duration: 1,
+        }
       );
     }
   }, [clientPosition, map]);
 
   return null;
 }
+function LocateButton({ clientPosition }) {
+  const map = useMap();
 
-export default function CouriersMap({ couriers = [], clientPosition }) {
+  useEffect(() => {
+    if (!clientPosition) return;
+
+    const control = L.control({ position: "bottomright" });
+
+    control.onAdd = function () {
+      const button = L.DomUtil.create("button", "leaflet-bar");
+      button.innerHTML = "📍 موقعي";
+      button.style.padding = "8px 12px";
+      button.style.background = "white";
+      button.style.border = "none";
+      button.style.cursor = "pointer";
+      button.style.fontWeight = "bold";
+
+      L.DomEvent.disableClickPropagation(button);
+
+      button.onclick = () => {
+        map.flyTo(
+          [
+            Number(clientPosition.latitude),
+            Number(clientPosition.longitude),
+          ],
+          16,
+          { duration: 1.2 }
+        );
+      };
+
+      return button;
+    };
+
+    control.addTo(map);
+
+    return () => {
+      control.remove();
+    };
+  }, [map, clientPosition]);
+
+  return null;
+}
+
+export default function CouriersMap({
+  couriers = [],
+  clientPosition,
+}) {
   const navigate = useNavigate();
-  const liveCouriers = couriers;
-  
-  const availableCouriers = liveCouriers.filter((c) => {
+
+  const availableCouriers = couriers.filter((c) => {
     const isAvailable =
-      c.available === true ||
-      c.disponible === true;
+      c.available === true || c.disponible === true;
 
     const hasPosition =
       c.latitude !== null &&
@@ -93,18 +135,22 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
     : [36.75, 3.06];
 
   return (
-    <div
-      style={{
-        height: "430px",
-        width: "100%",
-        borderRadius: "20px",
-        overflow: "hidden",
-      }}
-    >
+   <div
+  style={{
+    height: "100%",
+    width: "100%",
+    borderRadius: "20px",
+    overflow: "hidden",
+    position: "relative",
+  }}
+>
       <MapContainer
         center={center}
         zoom={13}
-        style={{ height: "100%", width: "100%" }}
+        style={{
+          height: "100%",
+          width: "100%",
+        }}
       >
         <TileLayer
           attribution="&copy; OpenStreetMap"
@@ -113,9 +159,11 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
 
         <RecenterMap clientPosition={clientPosition} />
 
+        <LocateButton clientPosition={clientPosition} />
+
         {clientPosition && (
           <Marker
-             key={`client-${clientPosition.latitude}-${clientPosition.longitude}`}
+            key="client-position"
             position={[
               Number(clientPosition.latitude),
               Number(clientPosition.longitude),
@@ -130,8 +178,7 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
 
         {availableCouriers.map((courier) => (
           <Marker
-
-            key={`${courier.id}-${courier.latitude}-${courier.longitude}`}
+            key={courier.id}
             position={[
               Number(courier.latitude),
               Number(courier.longitude),
@@ -139,15 +186,24 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
           >
             <Popup>
               <div style={{ textAlign: "center" }}>
-                <strong>{courier.name || courier.nom}</strong>
+                <strong>
+                  {courier.name || courier.nom}
+                </strong>
+
                 <br />
+
                 {courier.vehicle || courier.vehicule}
+
                 <br />
+
                 {courier.city || courier.ville}
+
                 <br />
 
                 <button
-                  onClick={() => navigate(`/tracking/${courier.id}`)}
+                  onClick={() =>
+                    navigate(`/tracking/${courier.id}`)
+                  }
                   style={{
                     marginTop: "8px",
                     padding: "6px 10px",

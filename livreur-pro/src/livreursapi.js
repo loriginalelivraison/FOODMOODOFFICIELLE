@@ -284,17 +284,22 @@ export async function getClientByTelephone(telephone) {
 
 //supprimer un compte livreur 
 export async function deleteLivreur(id) {
+  const token = localStorage.getItem("access");
+
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {
-    throw new Error("Impossible de supprimer le compte livreur");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Erreur suppression compte livreur");
   }
 
   return true;
 }
-
 //supprimer un compte client 
 export async function deleteClient(id) {
   const token = localStorage.getItem("access");
