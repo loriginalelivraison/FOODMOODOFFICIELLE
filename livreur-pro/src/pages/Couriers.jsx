@@ -15,77 +15,70 @@ export default function Couriers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [viewMode, setViewMode] = useState("list");
   const [clientPosition, setClientPosition] = useState(null);
 
   const [locationDisabled, setLocationDisabled] = useState(false);
   const [locationEnabledMessage, setLocationEnabledMessage] = useState(false);
-
   const [showFilters, setShowFilters] = useState(false);
-
-  const locationIntervalRef = useRef(null);
-
   const [searchingLocation, setSearchingLocation] = useState(false);
 
+  const locationWatchRef = useRef(null);
+
   useEffect(() => {
-  async function loadLivreurs() {
-    try {
-      const data = await getLivreurs();
-      const livreurs = Array.isArray(data) ? data : data.results || [];
+    async function loadLivreurs() {
+      try {
+        const data = await getLivreurs();
+        const livreurs = Array.isArray(data) ? data : data.results || [];
 
-      const formattedCouriers = livreurs.map((livreur) => ({
-        id: livreur.id,
-        name: livreur.nom,
-        city: livreur.ville,
-        zone: livreur.ville,
-        vehicle: livreur.vehicule,
-        available: Boolean(livreur.disponible),
-        rating: livreur.note,
-        deliveries: livreur.nombre_livraisons,
-        latitude: livreur.latitude,
-        longitude: livreur.longitude,
-        phone: livreur.telephone,
-        photo: livreur.photo,
-        skills: ["Livraison rapide"],
-      }));
+        const formattedCouriers = livreurs.map((livreur) => ({
+          id: livreur.id,
+          name: livreur.nom,
+          city: livreur.ville,
+          zone: livreur.ville,
+          vehicle: livreur.vehicule === "scooter" ? "moto" : livreur.vehicule,
+          available: Boolean(livreur.disponible),
+          rating: livreur.note,
+          deliveries: livreur.nombre_livraisons,
+          latitude: livreur.latitude,
+          longitude: livreur.longitude,
+          phone: livreur.telephone,
+          photo: livreur.photo,
+          skills: ["Livraison rapide"],
+        }));
 
-      setCouriers(formattedCouriers);
-      setLoading(false);
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
+        setCouriers(formattedCouriers);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
     }
-  }
 
-  loadLivreurs();
+    loadLivreurs();
 
-  const interval = setInterval(loadLivreurs, 10000);
+    const interval = setInterval(loadLivreurs, 10000);
 
-  return () => clearInterval(interval);
-}, []);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (locationIntervalRef.current) {
-        clearInterval(locationIntervalRef.current);
+      if (locationWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(locationWatchRef.current);
       }
     };
   }, []);
 
- const allowedVehicles = ["moto", "velo", "voiture", "camion"];
+  const allowedVehicles = ["moto", "velo", "voiture", "camion"];
 
-const vehicleOptions = useMemo(() => {
-  return [
-    ...new Set(
-      couriers
-        .map((c) => c.vehicle === "scooter" ? "moto" : c.vehicle)
-        .filter((vehicle) => allowedVehicles.includes(vehicle))
-    ),
-  ];
-}, [couriers]);
-
-  const cityOptions = useMemo(() => {
-    return [...new Set(couriers.map((c) => c.city).filter(Boolean))];
+  const vehicleOptions = useMemo(() => {
+    return [
+      ...new Set(
+        couriers
+          .map((c) => c.vehicle)
+          .filter((vehicle) => allowedVehicles.includes(vehicle))
+      ),
+    ];
   }, [couriers]);
 
   const filtered = useMemo(() => {
@@ -103,79 +96,67 @@ const vehicleOptions = useMemo(() => {
   }, [query, onlyAvailable, selectedVehicle, selectedCity, couriers]);
 
   function handleLocationSuccess(pos) {
-  const position = {
-    latitude: pos.coords.latitude,
-    longitude: pos.coords.longitude,
-  };
+    const position = {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+    };
 
-  setClientPosition(position);
-  
+    console.log("GPS CLIENT :", position);
 
-  setLocationDisabled(false);
-  setLocationEnabledMessage(true);
-  setSearchingLocation(false);
+    setClientPosition(position);
+    setLocationDisabled(false);
+    setLocationEnabledMessage(true);
+    setSearchingLocation(false);
 
-  if (locationIntervalRef.current) {
-    clearInterval(locationIntervalRef.current);
-    locationIntervalRef.current = null;
+    setTimeout(() => {
+      setLocationEnabledMessage(false);
+    }, 3000);
   }
 
-  setTimeout(() => {
+  function handleLocationError(error) {
+    console.error("Erreur GPS client :", error);
+
+    setSearchingLocation(false);
+    setLocationDisabled(true);
     setLocationEnabledMessage(false);
-  }, 3000);
-}
+  }
 
-function handleLocationError() {
-  setSearchingLocation(false);
-  setLocationDisabled(true);
-  setLocationEnabledMessage(false);
+  function handleFindAroundMe() {
+    if (!navigator.geolocation) {
+      setLocationDisabled(true);
+      return;
+    }
 
-  if (locationIntervalRef.current) return;
+    setSearchingLocation(true);
+    setLocationDisabled(false);
+    setLocationEnabledMessage(false);
 
-  locationIntervalRef.current = setInterval(() => {
-    navigator.geolocation.getCurrentPosition(
+    if (locationWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(locationWatchRef.current);
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
       handleLocationSuccess,
-      () => {
-        setLocationDisabled(true);
-        setSearchingLocation(false);
-      },
+      handleLocationError,
       {
         enableHighAccuracy: true,
-        timeout: 10000,
         maximumAge: 0,
+        timeout: 15000,
       }
     );
-  }, 7000);
-}
 
-function handleFindAroundMe() {
-  if (!navigator.geolocation) {
-    setLocationDisabled(true);
-    return;
+    locationWatchRef.current = watchId;
   }
 
-  setSearchingLocation(true);
-  setLocationDisabled(false);
-  setLocationEnabledMessage(false);
+  const vehicleLabels = {
+    moto: "دراجة نارية",
+    velo: "دراجة هوائية",
+    voiture: "سيارة",
+    camion: "شاحنة",
+  };
 
-  navigator.geolocation.getCurrentPosition(
-    handleLocationSuccess,
-    handleLocationError,
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    }
-  );
-}
-  
-    const vehicleLabels = {
-  moto: "دراجة نارية",
-  velo: "دراجة هوائية",
-  voiture: "سيارة",
-  camion: "شاحنة",
-}
-    const streets = ["كل مدينة مستغانم",
+  const streets = [
+    "كل مدينة مستغانم",
     "وسط المدينة",
     "خروبة",
     "صلامندر",
@@ -186,26 +167,24 @@ function handleFindAroundMe() {
     "عشعاشة",
     "ستيدية",
     "النويصي",
-    "ماسري"]
-    
-;
-
-
-  
+    "ماسري",
+  ];
 
   return (
     <section className="page" dir="rtl">
       <div className="page-title">
         <center>
           <div className="around-me-top">
-                    <button
-            type="button"
-            className="primary-btn full"
-            onClick={handleFindAroundMe}
-            disabled={searchingLocation}
-          >
-            {searchingLocation ? "🔎 جاري البحث عن السائقين..." : "⮚ السائقون حولي"}
-          </button>
+            <button
+              type="button"
+              className="primary-btn full"
+              onClick={handleFindAroundMe}
+              disabled={searchingLocation}
+            >
+              {searchingLocation
+                ? "🔎 جاري البحث عن السائقين..."
+                : "⮚ السائقون حولي"}
+            </button>
           </div>
         </center>
       </div>
@@ -257,37 +236,42 @@ function handleFindAroundMe() {
             }}
             placeholder="ابحث عن سائق"
             style={{
-  width: "300px"
-}}
+              width: "300px",
+              background: "#fff7ed",
+              border: "1px solid #f5bf99",
+              color: "#1f2937",
+            }}
           />
         </label>
 
         {showFilters && (
           <>
-                        <select
-                className="filter-select"
-                value={selectedVehicle}
-                onChange={(e) => setSelectedVehicle(e.target.value)}
-              >
-                <option value="">كل وسائل النقل</option>
+            <select
+              className="filter-select"
+              value={selectedVehicle}
+              onChange={(e) => setSelectedVehicle(e.target.value)}
+            >
+              <option value="">كل وسائل النقل</option>
 
-                {vehicleOptions.map((vehicle) => (
-                  <option key={vehicle} value={vehicle}>
-                    {vehicleLabels[vehicle] || vehicle}
-                  </option>
-                ))}
-              </select>
+              {vehicleOptions.map((vehicle) => (
+                <option key={vehicle} value={vehicle}>
+                  {vehicleLabels[vehicle] || vehicle}
+                </option>
+              ))}
+            </select>
+
             <select
               className="filter-select"
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
             >
               <option value="">كل المناطق</option>
+
               {streets.map((street) => (
-  <option key={street} value={street}>
-    {street}
-  </option>
-))}
+                <option key={street} value={street}>
+                  {street}
+                </option>
+              ))}
             </select>
 
             <label className="toggle">
@@ -310,51 +294,52 @@ function handleFindAroundMe() {
         <p>Aucun livreur disponible pour le moment.</p>
       )}
 
-    
-    <div
-  style={{
-    background: "#fff7ed",
-    border: "2px solid #f5bf99",
-    borderRadius: "24px",
-    padding: "10px",
-    margin: "12px 0 20px",
-    boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
-  }}
->
-  <div
-    style={{
-      height: "260px",
-      borderRadius: "18px",
-      overflow: "hidden",
-    }}
-  >
-    <CouriersMap
-       key={filtered
-    .map((c) => `${c.id}-${c.latitude}-${c.longitude}`)
-    .join("|")}
-      couriers={filtered}
-      clientPosition={clientPosition}
-    />
-  </div>
-</div>
+      <div
+        style={{
+          background: "#fff7ed",
+          border: "2px solid #f5bf99",
+          borderRadius: "24px",
+          padding: "10px",
+          margin: "12px 0 20px",
+          boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
+        }}
+      >
+        <div
+          style={{
+            height: "260px",
+            borderRadius: "18px",
+            overflow: "hidden",
+          }}
+        >
+          <CouriersMap
+            key={`${clientPosition?.latitude || "no-client"}-${
+              clientPosition?.longitude || "no-client"
+            }-${filtered
+              .map((c) => `${c.id}-${c.latitude}-${c.longitude}`)
+              .join("|")}`}
+            couriers={filtered}
+            clientPosition={clientPosition}
+          />
+        </div>
+      </div>
 
-{!loading && !error && (
-  <p
-    style={{
-      textAlign: "center",
-      margin: "15px 0",
-      fontWeight: "600",
-    }}
-  >
-    عدد السائقين : {filtered.length}
-  </p>
-)}
+      {!loading && !error && (
+        <p
+          style={{
+            textAlign: "center",
+            margin: "15px 0",
+            fontWeight: "600",
+          }}
+        >
+          عدد السائقين : {filtered.length}
+        </p>
+      )}
 
-<div className="courier-grid">
-  {filtered.map((courier) => (
-    <CourierCard courier={courier} key={courier.id} />
-  ))}
-</div>
+      <div className="courier-grid">
+        {filtered.map((courier) => (
+          <CourierCard courier={courier} key={courier.id} />
+        ))}
+      </div>
     </section>
   );
 }
