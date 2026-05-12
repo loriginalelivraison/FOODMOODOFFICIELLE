@@ -14,6 +14,7 @@ from pathlib import Path
 import os 
 import dj_database_url
 from datetime import timedelta
+import cloudinary
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=365),
@@ -50,7 +51,9 @@ INSTALLED_APPS = [
     'deliveries',
     'rest_framework',
     'corsheaders',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'cloudinary',
+    'cloudinary_storage',
 ]
 
 MIDDLEWARE = [
@@ -115,6 +118,18 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME":"dzijt4xbh",
+    "API_KEY":"822486142918698",
+    "API_SECRET":"IO6vLgZrtydSQRCIbs8UalvX_7o",
+}
+
+cloudinary.config(
+    cloud_name="dzijt4xbh",
+    api_key="822486142918698",
+    api_secret="IO6vLgZrtydSQRCIbs8UalvX_7o",
+    secure=True
+)
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
@@ -148,7 +163,11 @@ REST_FRAMEWORK = {
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    }
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
 }

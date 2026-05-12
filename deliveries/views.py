@@ -7,11 +7,13 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from django.utils import timezone
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 
 
 class LivreurViewSet(ModelViewSet):
+    
     queryset = Livreur.objects.all().order_by("-disponible", "-note")
     serializer_class = LivreurSerializer
 
@@ -57,11 +59,13 @@ class LivreurViewSet(ModelViewSet):
 
 
 class DemandeLivraisonViewSet(ModelViewSet):
+    parser_classes = [MultiPartParser, FormParser]
     queryset = DemandeLivraison.objects.all().order_by("-created_at")
     serializer_class = DemandeLivraisonSerializer
-
+    
 @api_view(["POST"])
 def register_livreur(request):
+
     nom = request.data.get("nom")
     telephone = request.data.get("telephone")
     ville = request.data.get("ville")
@@ -90,7 +94,8 @@ def register_livreur(request):
         username=telephone,
         password=password
     )
-
+    
+    photo = request.FILES.get("photo")
     livreur = Livreur.objects.create(
         user=user,
         nom=nom,
@@ -98,6 +103,7 @@ def register_livreur(request):
         ville=ville,
         vehicule=vehicule,
         disponible=True,
+        photo = request.FILES.get("photo")
     )
 
     return Response({
