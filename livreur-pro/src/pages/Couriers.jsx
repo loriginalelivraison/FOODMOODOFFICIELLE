@@ -329,6 +329,9 @@ function handleFindAroundMe() {
     }}
   >
     <CouriersMap
+       key={filtered
+    .map((c) => `${c.id}-${c.latitude}-${c.longitude}`)
+    .join("|")}
       couriers={filtered}
       clientPosition={clientPosition}
     />
