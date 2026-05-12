@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { updateLivreurPosition } from "../livreursapi.js";
+import React, { useEffect, useState  } from "react";
+import { updateLivreurPosition, deleteLivreur } from "../livreursapi.js";
+import { useNavigate } from "react-router-dom";
 import {
   MapContainer,
   TileLayer,
@@ -26,17 +27,18 @@ function RecenterMap({ position }) {
 
   useEffect(() => {
     if (position?.latitude && position?.longitude) {
-      map.flyTo(
+      map.panTo(
         [Number(position.latitude), Number(position.longitude)],
-        16,
-        { duration: 1.2 }
+        {
+          animate: true,
+          duration: 1,
+        }
       );
     }
   }, [position, map]);
 
   return null;
 }
-
 export default function LivreurDashboard() {
   const livreurStorage = localStorage.getItem("livreur");
   const livreur = livreurStorage ? JSON.parse(livreurStorage) : null;
@@ -46,6 +48,7 @@ export default function LivreurDashboard() {
   const [position, setPosition] = useState(null);
   const [trackingEnabled, setTrackingEnabled] = useState(true);
 
+  const navigate = useNavigate();
   useEffect(() => {
     if (!livreur?.id) return;
     if (!trackingEnabled) return;
@@ -75,7 +78,7 @@ export default function LivreurDashboard() {
 
           console.log("REPONSE API :", result);
 
-          setMessage("Position livreur actualisée.");
+          
           setError("");
         } catch (err) {
           console.error(err);
@@ -107,6 +110,30 @@ export default function LivreurDashboard() {
   }
 
   const photoUrl = livreur.photo || livreur.image || null;
+
+  async function handleDeleteAccount() {
+  const confirmDelete = window.confirm(
+    "هل أنت متأكد أنك تريد حذف حسابك نهائيا؟"
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+    await deleteLivreur(livreur.id);
+
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+    localStorage.removeItem("role");
+    localStorage.removeItem("livreur");
+
+    window.dispatchEvent(new Event("authChanged"));
+
+    navigate("/inscription-livreur");
+  } catch (err) {
+    console.error(err);
+    setError("Erreur lors de la suppression du compte.");
+  }
+}
 
   return (
     <section className="page" dir="rtl">
@@ -216,12 +243,7 @@ export default function LivreurDashboard() {
             border: "1px solid #e5e7eb",
           }}
         >
-          <p style={{ margin: "5px 0" }}>
-            <strong>Latitude :</strong> {position.latitude}
-          </p>
-          <p style={{ margin: "5px 0" }}>
-            <strong>Longitude :</strong> {position.longitude}
-          </p>
+       
         </div>
       )}
 
@@ -267,7 +289,24 @@ export default function LivreurDashboard() {
             </>
           )}
         </MapContainer>
+       
       </div>
+       <button
+  onClick={handleDeleteAccount}
+  style={{
+    marginTop: "12px",
+    width: "100%",
+    padding: "13px",
+    borderRadius: "14px",
+    border: "1px solid #fecaca",
+    background: "#fef2f2",
+    color: "#c07d7d",
+    fontWeight: "bold",
+    cursor: "pointer",
+  }}
+>
+  حذف الحساب نهائيا
+</button>
     </section>
   );
 }

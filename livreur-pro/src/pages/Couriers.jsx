@@ -312,11 +312,7 @@ export default function Couriers() {
           }}
         >
           <CouriersMap
-            key={`${clientPosition?.latitude || "no-client"}-${
-              clientPosition?.longitude || "no-client"
-            }-${filtered
-              .map((c) => `${c.id}-${c.latitude}-${c.longitude}`)
-              .join("|")}`}
+            
             couriers={filtered}
             clientPosition={clientPosition}
           />

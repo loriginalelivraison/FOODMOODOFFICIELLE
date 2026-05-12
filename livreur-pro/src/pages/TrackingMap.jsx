@@ -6,8 +6,8 @@ import {
   Popup,
   useMap,
 } from "react-leaflet";
-
 import L from "leaflet";
+import { getLivreurById } from "../livreursapi.js";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -15,111 +15,223 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 delete L.Icon.Default.prototype._getIconUrl;
 
-// ICÔNE LIVREUR
-const courierIcon = new L.Icon({
+L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
 });
 
-// ICÔNE CLIENT
-const clientIcon = new L.Icon({
-  iconUrl:
-    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+const clientIcon = new L.DivIcon({
+  className: "client-marker",
+  html: `
+    <div style="
+      width:20px;
+      height:20px;
+      background:#16a34a;
+      border:4px solid white;
+      border-radius:50%;
+      box-shadow:0 0 0 8px rgba(22,163,74,0.25);
+    "></div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
 });
 
-// RECENTRER LA MAP SUR LE LIVREUR
-function RecenterMap({ latitude, longitude }) {
+const livreurIcon = new L.DivIcon({
+  className: "livreur-marker",
+  html: `
+    <div style="
+      width:34px;
+      height:34px;
+      background:#f97316;
+      border:4px solid white;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.25);
+    ">🛵</div>
+  `,
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
+});
+
+function RecenterMap({ courier, clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (latitude && longitude) {
-      map.flyTo([latitude, longitude], map.getZoom(), {
-        duration: 1.5,
-      });
+    if (clientPosition?.latitude && clientPosition?.longitude) {
+      map.panTo(
+        [
+          Number(clientPosition.latitude),
+          Number(clientPosition.longitude),
+        ],
+        {
+          animate: true,
+          duration: 1,
+        }
+      );
     }
-  }, [latitude, longitude, map]);
+  }, [clientPosition, map]);
+
+  useEffect(() => {
+    function zoomToClient() {
+      if (!clientPosition?.latitude || !clientPosition?.longitude) return;
+
+      map.flyTo(
+        [
+          Number(clientPosition.latitude),
+          Number(clientPosition.longitude),
+        ],
+        16,
+        { duration: 1.2 }
+      );
+    }
+
+    function zoomToLivreur() {
+      if (!courier?.latitude || !courier?.longitude) return;
+
+      map.flyTo(
+        [
+          Number(courier.latitude),
+          Number(courier.longitude),
+        ],
+        16,
+        { duration: 1.2 }
+      );
+    }
+
+    window.addEventListener("zoomClientPosition", zoomToClient);
+    window.addEventListener("zoomLivreurPosition", zoomToLivreur);
+
+    return () => {
+      window.removeEventListener("zoomClientPosition", zoomToClient);
+      window.removeEventListener("zoomLivreurPosition", zoomToLivreur);
+    };
+  }, [clientPosition, courier, map]);
 
   return null;
 }
 
-export default function TrackingMap({
-  courier,
-  clientPosition,
-}) {
+export default function TrackingMap({ courier, clientPosition }) {
   const [currentCourier, setCurrentCourier] = useState(courier);
 
-  // SYNCHRO SI LE PROP CHANGE
   useEffect(() => {
     setCurrentCourier(courier);
   }, [courier]);
 
-  // ACTUALISATION TOUTES LES 10 SECONDES
   useEffect(() => {
     if (!courier?.id) return;
 
-    async function refreshCourierPosition() {
+    async function refreshCourier() {
       try {
-        const response = await fetch(
-  `${API_BASE_URL}/livreurs/${courier.id}/?t=${Date.now()}`,
-  {
-    cache: "no-store",
-  }
-);
+        const data = await getLivreurById(courier.id);
 
-        if (!response.ok) {
-          throw new Error("Erreur API");
-        }
-
-        const data = await response.json();
-
-        setCurrentCourier(data);
-      } catch (error) {
-        console.error(
-          "Erreur actualisation position livreur :",
-          error
-        );
+        setCurrentCourier({
+          id: data.id,
+          name: data.nom,
+          city: data.ville,
+          vehicle: data.vehicule,
+          phone: data.telephone,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          available: Boolean(data.disponible),
+        });
+      } catch (err) {
+        console.error("Erreur refresh livreur tracking :", err);
       }
     }
 
-    refreshCourierPosition();
+    refreshCourier();
 
-    const interval = setInterval(
-      refreshCourierPosition,
-      10000
-    );
+    const interval = setInterval(refreshCourier, 5000);
 
     return () => clearInterval(interval);
-  }, [courier]);
+  }, [courier?.id]);
 
-  const latitude = Number(currentCourier?.latitude);
-  const longitude = Number(currentCourier?.longitude);
+  const hasLivreurPosition =
+    currentCourier?.latitude !== null &&
+    currentCourier?.latitude !== undefined &&
+    currentCourier?.longitude !== null &&
+    currentCourier?.longitude !== undefined &&
+    !isNaN(Number(currentCourier.latitude)) &&
+    !isNaN(Number(currentCourier.longitude));
 
-  if (
-    !latitude ||
-    !longitude ||
-    isNaN(latitude) ||
-    isNaN(longitude)
-  ) {
-    return <p>Position GPS non disponible.</p>;
-  }
+  const hasClientPosition =
+    clientPosition?.latitude &&
+    clientPosition?.longitude;
+
+  const center = hasClientPosition
+    ? [
+        Number(clientPosition.latitude),
+        Number(clientPosition.longitude),
+      ]
+    : hasLivreurPosition
+    ? [
+        Number(currentCourier.latitude),
+        Number(currentCourier.longitude),
+      ]
+    : [36.75, 3.06];
 
   return (
     <div
       style={{
-        height: "420px",
+        height: "360px",
         width: "100%",
         borderRadius: "20px",
         overflow: "hidden",
+        position: "relative",
       }}
     >
+      {hasClientPosition && (
+        <button
+          onClick={() =>
+            window.dispatchEvent(new Event("zoomClientPosition"))
+          }
+          style={{
+            position: "absolute",
+            bottom: "14px",
+            right: "14px",
+            zIndex: 9999,
+            background: "#ffffff",
+            border: "1px solid #ddd",
+            borderRadius: "12px",
+            padding: "10px 14px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          }}
+        >
+          📍 موقعي
+        </button>
+      )}
+
+      {hasLivreurPosition && (
+        <button
+          onClick={() =>
+            window.dispatchEvent(new Event("zoomLivreurPosition"))
+          }
+          style={{
+            position: "absolute",
+            bottom: "62px",
+            right: "14px",
+            zIndex: 9999,
+            background: "#ffffff",
+            border: "1px solid #ddd",
+            borderRadius: "12px",
+            padding: "10px 14px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          }}
+        >
+          🛵 السائق
+        </button>
+      )}
+
       <MapContainer
-        center={[latitude, longitude]}
+        center={center}
         zoom={14}
         style={{
           height: "100%",
@@ -132,30 +244,13 @@ export default function TrackingMap({
         />
 
         <RecenterMap
-          latitude={latitude}
-          longitude={longitude}
+          courier={currentCourier}
+          clientPosition={clientPosition}
         />
 
-        {/* LIVREUR */}
-        <Marker
-           key={`${currentCourier.id}-${latitude}-${longitude}`}
-          position={[latitude, longitude]}
-          icon={courierIcon}
-        >
-          <Popup>
-            <strong>
-              {currentCourier.name ||
-                currentCourier.nom}
-            </strong>
-            <br />
-            {currentCourier.vehicle ||
-              currentCourier.vehicule}
-          </Popup>
-        </Marker>
-
-        {/* CLIENT */}
-        {clientPosition && (
+        {hasClientPosition && (
           <Marker
+            key="client-position"
             position={[
               Number(clientPosition.latitude),
               Number(clientPosition.longitude),
@@ -163,7 +258,26 @@ export default function TrackingMap({
             icon={clientIcon}
           >
             <Popup>
-              📍 موقع العميل
+              <strong>أنت هنا</strong>
+            </Popup>
+          </Marker>
+        )}
+
+        {hasLivreurPosition && (
+          <Marker
+            key="livreur-position"
+            position={[
+              Number(currentCourier.latitude),
+              Number(currentCourier.longitude),
+            ]}
+            icon={livreurIcon}
+          >
+            <Popup>
+              <strong>{currentCourier.name}</strong>
+              <br />
+              {currentCourier.vehicle}
+              <br />
+              موقع السائق
             </Popup>
           </Marker>
         )}
