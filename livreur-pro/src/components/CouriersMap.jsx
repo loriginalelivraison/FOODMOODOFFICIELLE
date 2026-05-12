@@ -62,53 +62,8 @@ function RecenterMap({ clientPosition }) {
 
 export default function CouriersMap({ couriers = [], clientPosition }) {
   const navigate = useNavigate();
-  const [liveCouriers, setLiveCouriers] = useState(couriers);
-
-  useEffect(() => {
-    setLiveCouriers(couriers);
-  }, [couriers]);
-
- useEffect(() => {
-  async function refreshCouriers() {
-    try {
-      console.log("Actualisation carte livreurs...");
-
-      const response = await fetch(
-        `${API_BASE_URL}/livreurs/?t=${Date.now()}`,
-        {
-          cache: "no-store",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Erreur API livreurs");
-      }
-
-      const data = await response.json();
-
-      console.log("Livreurs reçus :", data);
-
-      const livreurTest = data.find((l) => l.id === 5);
-      console.log("Position livreur test :", livreurTest?.latitude, livreurTest?.longitude);
-
-      if (Array.isArray(data)) {
-        setLiveCouriers(data);
-      } else if (Array.isArray(data.results)) {
-        setLiveCouriers(data.results);
-      }
-    } catch (error) {
-      console.error("Erreur actualisation livreurs :", error);
-    }
-  }
-
-  refreshCouriers();
-
-  const interval = setInterval(() => {
-    refreshCouriers();
-  }, 10000);
-
-  return () => clearInterval(interval);
-}, []);
+  const liveCouriers = couriers;
+  
   const availableCouriers = liveCouriers.filter((c) => {
     const isAvailable =
       c.available === true ||
