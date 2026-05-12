@@ -29,7 +29,7 @@ class LivreurViewSet(ModelViewSet):
                 {"error": "latitude et longitude sont obligatoires"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        print("POSITION RECUE :", latitude, longitude)
         livreur.latitude = latitude
         livreur.longitude = longitude
         livreur.disponible = True
@@ -40,6 +40,7 @@ class LivreurViewSet(ModelViewSet):
             "id": livreur.id,
             "latitude": livreur.latitude,
             "longitude": livreur.longitude,
+           
         })
 
         

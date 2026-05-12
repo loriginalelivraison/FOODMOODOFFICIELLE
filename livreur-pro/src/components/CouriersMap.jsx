@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -49,9 +49,7 @@ function RecenterMap({ clientPosition }) {
           Number(clientPosition.longitude),
         ],
         15,
-        {
-          duration: 2,
-        }
+        { duration: 2 }
       );
     }
   }, [clientPosition, map]);
@@ -59,17 +57,57 @@ function RecenterMap({ clientPosition }) {
   return null;
 }
 
-export default function CouriersMap({ couriers, clientPosition }) {
+export default function CouriersMap({ couriers = [], clientPosition }) {
   const navigate = useNavigate();
+  const [liveCouriers, setLiveCouriers] = useState(couriers);
 
-  const availableCouriers = couriers.filter(
-    (c) =>
-      c.available === true &&
+  useEffect(() => {
+    setLiveCouriers(couriers);
+  }, [couriers]);
+
+  useEffect(() => {
+    async function refreshCouriers() {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/livreurs/");
+
+        if (!response.ok) {
+          throw new Error("Erreur API livreurs");
+        }
+
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+          setLiveCouriers(data);
+        } else if (Array.isArray(data.results)) {
+          setLiveCouriers(data.results);
+        }
+      } catch (error) {
+        console.error("Erreur actualisation livreurs :", error);
+      }
+    }
+
+    refreshCouriers();
+
+    const interval = setInterval(refreshCouriers, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const availableCouriers = liveCouriers.filter((c) => {
+    const isAvailable =
+      c.available === true ||
+      c.disponible === true;
+
+    const hasPosition =
       c.latitude !== null &&
       c.latitude !== undefined &&
       c.longitude !== null &&
-      c.longitude !== undefined
-  );
+      c.longitude !== undefined &&
+      !isNaN(Number(c.latitude)) &&
+      !isNaN(Number(c.longitude));
+
+    return isAvailable && hasPosition;
+  });
 
   const center = clientPosition
     ? [
@@ -99,7 +137,7 @@ export default function CouriersMap({ couriers, clientPosition }) {
       >
         <TileLayer
           attribution="&copy; OpenStreetMap"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
         <RecenterMap clientPosition={clientPosition} />
@@ -128,17 +166,15 @@ export default function CouriersMap({ couriers, clientPosition }) {
           >
             <Popup>
               <div style={{ textAlign: "center" }}>
-                <strong>{courier.name}</strong>
+                <strong>{courier.name || courier.nom}</strong>
                 <br />
-                {courier.vehicle}
+                {courier.vehicle || courier.vehicule}
                 <br />
-                {courier.city}
+                {courier.city || courier.ville}
                 <br />
 
                 <button
-                  onClick={() =>
-                    navigate(`/tracking/${courier.id}`)
-                  }
+                  onClick={() => navigate(`/tracking/${courier.id}`)}
                   style={{
                     marginTop: "8px",
                     padding: "6px 10px",

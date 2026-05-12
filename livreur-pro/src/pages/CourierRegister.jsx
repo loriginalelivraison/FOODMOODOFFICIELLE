@@ -1,24 +1,25 @@
 import React, { useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
+import logo2 from "../assets/logo2.png"
 import { useNavigate } from "react-router-dom";
 
 export default function CourierRegister() {
   const navigate = useNavigate();
 
   const quartiers = [
-    "كل المدينة",
+    "كل مدينة مستغانم",
     "وسط المدينة",
-    "حي السلام",
-    "حي النصر",
-    "حي الحرية",
-    "حي الأمير عبد القادر",
-    "حي 5 جويلية",
-    "حي 20 أوت",
-    "حي المحطة",
-    "حي الجامعة",
-    "حي السوق",
-    "حي الميناء",
+    "خروبة",
+    "صلامندر",
+    "مزغران",
+    "صيادة",
+    "بوسكي",
+    "دبدابة",
+    "عشعاشة",
+    "ستيدية",
+    "النويصي",
+    "ماسري",
   ];
 
   const [mode, setMode] = useState("register");
@@ -57,9 +58,9 @@ export default function CourierRegister() {
       data.append("services", registerForm.services);
 
       if (registerForm.photo) {
-        data.append("photo", registerForm.photo);
-      }
-
+        data.append("photo", registerForm.photo);}
+ 
+      
       await createLivreur(data);
 
       await loginJWT({
