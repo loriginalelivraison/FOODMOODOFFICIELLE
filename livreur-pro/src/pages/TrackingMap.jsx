@@ -135,6 +135,7 @@ export default function TrackingMap({
 
         {/* LIVREUR */}
         <Marker
+           key={`${currentCourier.id}-${latitude}-${longitude}`}
           position={[latitude, longitude]}
           icon={courierIcon}
         >

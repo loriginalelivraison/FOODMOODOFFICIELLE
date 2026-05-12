@@ -144,6 +144,7 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
 
         {clientPosition && (
           <Marker
+           
             position={[
               Number(clientPosition.latitude),
               Number(clientPosition.longitude),
@@ -158,7 +159,8 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
 
         {availableCouriers.map((courier) => (
           <Marker
-            key={courier.id}
+
+            key={`${courier.id}-${courier.latitude}-${courier.longitude}`}
             position={[
               Number(courier.latitude),
               Number(courier.longitude),
