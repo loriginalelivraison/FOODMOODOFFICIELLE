@@ -33,7 +33,7 @@ export default function Tracking() {
   const [courseStarted, setCourseStarted] = useState(false);
   const [courseFinished, setCourseFinished] = useState(false);
   const [activeCourseId, setActiveCourseId] = useState(null);
-
+  const [courseMessage, setCourseMessage] = useState("");
   useEffect(() => {
     function loadCourier() {
       getLivreurById(id)
@@ -103,6 +103,7 @@ export default function Tracking() {
       navigate("/connexion-client");
       return;
     }
+    
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -112,7 +113,7 @@ export default function Tracking() {
         };
 
         setClientPosition(position);
-
+        
         try {
           const course = await createCourse({
             client: client.id,
@@ -123,6 +124,7 @@ export default function Tracking() {
 
           setActiveCourseId(course.id);
           setCourseStarted(true);
+          setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
           setCourseFinished(false);
           setShowAcceptedQuestion(false);
         } catch (err) {
@@ -148,6 +150,7 @@ export default function Tracking() {
 
       setClientPosition(null);
       setCourseStarted(false);
+      setCourseMessage("");
       setCourseFinished(true);
       setShowCommentForm(true);
     } catch (err) {
@@ -190,15 +193,32 @@ export default function Tracking() {
   if (error) {
     return <section className="page">{error}</section>;
   }
+    function getVehicleLabel(vehicle) {
+    const labels = {
+    moto: "🛵 دراجة نارية",
+    scooter: "🛵 دراجة نارية",
+    velo: "🚴 دراجة هوائية",
+    voiture: "🚘 سيارة",
+    camion: "🚛 شاحنة",
+  };
+
+  return labels[vehicle] || vehicle || "غير محدد";
+}
+  
 
   return (
     <section className="page">
       <div className="page-title">
-        <p>
-          {courier.name} : {courier.city} • {courier.vehicle} •{" "}
-          {courier.available ? "Disponible" : "Occupé"}
-        </p>
-      </div>
+      <center>
+  
+    <h1>{courier.name}</h1>
+    <h5>{courier.city}</h5>
+    <h5>{getVehicleLabel(courier.vehicle)}</h5>
+  </center>
+</div>
+
+        
+      
 
       <div className="card-bottom">
         <button
@@ -265,6 +285,22 @@ export default function Tracking() {
           </div>
         </div>
       )}
+              {courseMessage && (
+          <div
+            style={{
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              color: "#15803d",
+              padding: "14px",
+              borderRadius: "12px",
+              marginBottom: "15px",
+              fontWeight: "700",
+              textAlign: "center",
+            }}
+          >
+            ✅ {courseMessage}
+          </div>
+        )}
 
       {courseStarted && (
         <button
@@ -275,7 +311,7 @@ export default function Tracking() {
           }}
           onClick={handleFinishCourse}
         >
-          الرحلة انتهت
+          عند انتهاءالرحلة اضغط هنا  
         </button>
       )}
 
@@ -312,9 +348,9 @@ export default function Tracking() {
       </div>
 
       <div className="tracking-card">
-        <h3>Commentaires</h3>
+        <h5>تعليق</h5>
 
-        {comments.length === 0 && <p>Aucun commentaire pour ce livreur.</p>}
+        {comments.length === 0 && <h5>لا يوجد بعد اي تعليق </h5>}
 
         {comments.map((comment) => (
           <div key={comment.id} className="comment-card">

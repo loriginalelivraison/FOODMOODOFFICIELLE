@@ -4,8 +4,9 @@ import {
   updateLivreurPosition,
   setLivreurUnavailable,
   getLivreurById,
-  deleteLivreur,
+  deleteLivreur,getActiveCourse,updateLivreurPhoto,
 } from "../livreursapi.js";
+import TrackingMap from "./TrackingMap.jsx";
 
 export default function LivreurDashboard() {
   const { id } = useParams();
@@ -19,12 +20,20 @@ export default function LivreurDashboard() {
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [deleting, setDeleting] = useState(false);
-
+  const [activeCourse, setActiveCourse] = useState(null);
+  const [clientPosition, setClientPosition] = useState(null);
+  const [courseNotification, setCourseNotification] = useState(false);
+  const [livreurData, setLivreurData] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [updatingPhoto, setUpdatingPhoto] = useState(false);
+  
   useEffect(() => {
     async function loadLivreurStatus() {
       try {
         const data = await getLivreurById(id);
+        setLivreurData(data);
         setTrackingEnabled(data.disponible === true);
+
       } catch (err) {
         setError("تعذر تحميل حالة السائق");
       } finally {
@@ -163,6 +172,70 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
+useEffect(() => {
+  if (!id) return;
+
+  async function loadActiveCourse() {
+    try {
+      const data = await getActiveCourse(id);
+
+      if (data.active && data.course) {
+        setActiveCourse(data.course);
+
+        setClientPosition({
+          latitude: data.course.client_latitude,
+          longitude: data.course.client_longitude,
+        });
+
+        setCourseNotification(true);
+      } else {
+        setActiveCourse(null);
+        setClientPosition(null);
+        setCourseNotification(false);
+      }
+    } catch (err) {
+      console.log(err.message);
+    }
+  }
+
+  loadActiveCourse();
+
+  const interval = setInterval(loadActiveCourse, 5000);
+
+  return () => clearInterval(interval);
+}, [id]);
+
+async function handlePhotoChange(e) {
+  const file = e.target.files[0];
+
+  if (!file) return;
+
+  setPhotoPreview(URL.createObjectURL(file));
+  setError("");
+  setMessage("");
+  setUpdatingPhoto(true);
+
+  try {
+    const updatedLivreur = await updateLivreurPhoto(id, file);
+
+    setLivreurData(updatedLivreur);
+
+    const oldLivreur = JSON.parse(localStorage.getItem("livreur")) || {};
+    localStorage.setItem(
+      "livreur",
+      JSON.stringify({
+        ...oldLivreur,
+        photo: updatedLivreur.photo,
+      })
+    );
+
+    setMessage("تم تغيير الصورة بنجاح");
+  } catch (err) {
+    setError(err.message || "تعذر تغيير الصورة");
+  } finally {
+    setUpdatingPhoto(false);
+  }
+}
   return (
     <section
       className="page"
@@ -171,6 +244,38 @@ useEffect(() => {
         fontFamily: '"Cairo", sans-serif',
       }}
     >
+        {courseNotification && (
+  <div
+    style={{
+      background: "#eff6ff",
+      border: "1px solid #bfdbfe",
+      color: "#1d4ed8",
+      padding: "14px",
+      borderRadius: "12px",
+      marginBottom: "18px",
+      fontWeight: "700",
+      textAlign: "center",
+    }}
+  >
+    📍 لديك طلب جديد: موقع العميل ظاهر على الخريطة
+  </div>
+)}
+{clientPosition && (
+  <div className="tracking-card">
+    <h3>موقع العميل</h3>
+
+    <TrackingMap
+      courier={{
+        name: livreur?.nom,
+        vehicle: "سائق",
+        latitude: clientPosition.latitude,
+        longitude: clientPosition.longitude,
+      }}
+      clientPosition={clientPosition}
+    />
+  </div>
+)}
+
       {locationDisabled && (
   <div
     style={{
@@ -233,21 +338,57 @@ useEffect(() => {
 
 
       <div className="tracking-card">
+
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+  <img
+    src={photoPreview || livreurData?.photo || "/default-avatar.png"}
+    alt="صورة السائق"
+    style={{
+      width: "110px",
+      height: "110px",
+      borderRadius: "50%",
+      objectFit: "cover",
+      border: "4px solid white",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+    }}
+  />
+
+  <label
+    style={{
+      display: "block",
+      marginTop: "12px",
+      fontWeight: "700",
+      cursor: "pointer",
+      color: "#ea580c",
+    }}
+  >
+    <button
+ type="button"
+              className="primary-btn full"> {updatingPhoto ? "جاري تغيير الصورة..." : "تغيير الصورة"}</button>
+    <input
+      type="file"
+      accept="image/*"
+      onChange={handlePhotoChange}
+      style={{ display: "none" }}
+      disabled={updatingPhoto}
+    />
+  </label>
+</div>
         <h2
           style={{
             fontWeight: "700",
             marginBottom: "18px",
           }}
         >
-          {livreur?.nom || "السائق"}
+          {livreurData?.nom || "السائق"}
         </h2>
 
         <p>
-          <strong>رقم الهاتف:</strong> {livreur?.telephone || "غير متوفر"}
+          <strong>رقم الهاتف:</strong> {livreurData?.telephone || "غير متوفر"}
         </p>
 
         <p>
-          <strong>المدينة:</strong> {livreur?.ville || "غير متوفر"}
+          <strong>المدينة:</strong> {livreurData?.ville || "غير متوفر"}
         </p>
 
 

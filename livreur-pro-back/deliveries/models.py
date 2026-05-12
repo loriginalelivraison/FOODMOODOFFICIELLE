@@ -23,6 +23,7 @@ class Livreur(models.Model):
     ville = models.CharField(max_length=100)
     vehicule = models.CharField(max_length=30, choices=VEHICULE_CHOICES)
     disponible = models.BooleanField(default=True)
+    photo = models.ImageField(upload_to="livreurs/", blank=True, null=True)
 
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
