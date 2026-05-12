@@ -25,6 +25,8 @@ export default function Couriers() {
 
   const locationIntervalRef = useRef(null);
 
+  const [searchingLocation, setSearchingLocation] = useState(false);
+
   useEffect(() => {
     getLivreurs()
       .then((data) => {
@@ -42,6 +44,7 @@ export default function Couriers() {
           latitude: livreur.latitude,
           longitude: livreur.longitude,
           phone: livreur.telephone,
+          photo: livreur.photo,
           skills: ["Livraison rapide"],
         }));
 
@@ -62,9 +65,17 @@ export default function Couriers() {
     };
   }, []);
 
-  const vehicleOptions = useMemo(() => {
-    return [...new Set(couriers.map((c) => c.vehicle).filter(Boolean))];
-  }, [couriers]);
+ const allowedVehicles = ["moto", "velo", "voiture", "camion"];
+
+const vehicleOptions = useMemo(() => {
+  return [
+    ...new Set(
+      couriers
+        .map((c) => c.vehicle === "scooter" ? "moto" : c.vehicle)
+        .filter((vehicle) => allowedVehicles.includes(vehicle))
+    ),
+  ];
+}, [couriers]);
 
   const cityOptions = useMemo(() => {
     return [...new Set(couriers.map((c) => c.city).filter(Boolean))];
@@ -85,77 +96,93 @@ export default function Couriers() {
   }, [query, onlyAvailable, selectedVehicle, selectedCity, couriers]);
 
   function handleLocationSuccess(pos) {
-    const position = {
-      latitude: pos.coords.latitude,
-      longitude: pos.coords.longitude,
-    };
+  const position = {
+    latitude: pos.coords.latitude,
+    longitude: pos.coords.longitude,
+  };
 
-    setClientPosition(position);
-    setViewMode("map");
+  setClientPosition(position);
+  setViewMode("map");
 
-    setLocationDisabled(false);
-    setLocationEnabledMessage(true);
+  setLocationDisabled(false);
+  setLocationEnabledMessage(true);
+  setSearchingLocation(false);
 
-    if (locationIntervalRef.current) {
-      clearInterval(locationIntervalRef.current);
-      locationIntervalRef.current = null;
-    }
-
-    setTimeout(() => {
-      setLocationEnabledMessage(false);
-    }, 3000);
+  if (locationIntervalRef.current) {
+    clearInterval(locationIntervalRef.current);
+    locationIntervalRef.current = null;
   }
 
-  function handleLocationError() {
-    setLocationDisabled(true);
+  setTimeout(() => {
     setLocationEnabledMessage(false);
+  }, 3000);
+}
 
-    if (locationIntervalRef.current) return;
+function handleLocationError() {
+  setSearchingLocation(false);
+  setLocationDisabled(true);
+  setLocationEnabledMessage(false);
 
-    locationIntervalRef.current = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        handleLocationSuccess,
-        () => {
-          setLocationDisabled(true);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        }
-      );
-    }, 7000);
-  }
+  if (locationIntervalRef.current) return;
 
-  function handleFindAroundMe() {
-    if (!navigator.geolocation) {
-      setLocationDisabled(true);
-      return;
-    }
-
+  locationIntervalRef.current = setInterval(() => {
     navigator.geolocation.getCurrentPosition(
       handleLocationSuccess,
-      handleLocationError,
+      () => {
+        setLocationDisabled(true);
+        setSearchingLocation(false);
+      },
       {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0,
       }
     );
+  }, 7000);
+}
+
+function handleFindAroundMe() {
+  if (!navigator.geolocation) {
+    setLocationDisabled(true);
+    return;
   }
+
+  setSearchingLocation(true);
+  setLocationDisabled(false);
+  setLocationEnabledMessage(false);
+
+  navigator.geolocation.getCurrentPosition(
+    handleLocationSuccess,
+    handleLocationError,
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    }
+  );
+}
+  
+    const vehicleLabels = {
+  moto: "دراجة نارية",
+  velo: "دراجة هوائية",
+  voiture: "سيارة",
+  camion: "شاحنة",
+};
+  
 
   return (
     <section className="page" dir="rtl">
       <div className="page-title">
         <center>
           <div className="around-me-top">
-            <button
-              type="button"
-              className="primary-btn full"
-              onClick={handleFindAroundMe}
-            >
-              📍 السائقون حولي
-            </button>
+                    <button
+            type="button"
+            className="primary-btn full"
+            onClick={handleFindAroundMe}
+            disabled={searchingLocation}
+          >
+            {searchingLocation ? "🔎 جاري البحث عن السائقين..." : "📍 السائقون حولي"}
+          </button>
           </div>
         </center>
       </div>
@@ -211,19 +238,19 @@ export default function Couriers() {
 
         {showFilters && (
           <>
-            <select
-              className="filter-select"
-              value={selectedVehicle}
-              onChange={(e) => setSelectedVehicle(e.target.value)}
-            >
-              <option value="">كل المركبات</option>
-              {vehicleOptions.map((vehicle) => (
-                <option key={vehicle} value={vehicle}>
-                  {vehicle}
-                </option>
-              ))}
-            </select>
+                        <select
+                className="filter-select"
+                value={selectedVehicle}
+                onChange={(e) => setSelectedVehicle(e.target.value)}
+              >
+                <option value="">كل وسائل النقل</option>
 
+                {vehicleOptions.map((vehicle) => (
+                  <option key={vehicle} value={vehicle}>
+                    {vehicleLabels[vehicle] || vehicle}
+                  </option>
+                ))}
+              </select>
             <select
               className="filter-select"
               value={selectedCity}

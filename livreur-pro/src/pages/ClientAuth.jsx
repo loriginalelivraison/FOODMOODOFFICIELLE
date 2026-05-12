@@ -6,6 +6,7 @@ export default function ClientAuth() {
   const navigate = useNavigate();
 
   const [mode, setMode] = useState("register");
+
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +17,7 @@ export default function ClientAuth() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
     setError("");
     setMessage("");
     setLoading(true);
@@ -33,23 +35,26 @@ export default function ClientAuth() {
           telephone,
           password,
         });
-
-        const redirect = localStorage.getItem("redirectAfterLogin") || "/livreurs";
-        localStorage.removeItem("redirectAfterLogin");
-        navigate(redirect);
       } else {
         await loginClient({
           nom,
           telephone,
           password,
         });
-
-        const redirect = localStorage.getItem("redirectAfterLogin") || "/livreurs";
-        localStorage.removeItem("redirectAfterLogin");
-        navigate(redirect);
       }
+
+      const redirect =
+        localStorage.getItem("redirectAfterLogin") || "/livreurs";
+
+      localStorage.removeItem("redirectAfterLogin");
+
+      navigate(redirect);
     } catch (err) {
-      setError(err.message);
+      console.error(err);
+
+      setError(
+        err?.message || "حدث خطأ أثناء تسجيل الدخول أو إنشاء الحساب"
+      );
     } finally {
       setLoading(false);
     }
@@ -58,74 +63,121 @@ export default function ClientAuth() {
   return (
     <section className="page auth-page" dir="rtl">
       <div className="auth-card">
-        <h3>
-          {mode === "login"
-            ? "تسجيل الدخول"
-            : "سجّل الآن للتواصل مع السائقين"}
-        </h3>
 
-        <div className="auth-tabs">
-             <button
-            className={mode === "register" ? "active" : ""}
-            onClick={() => setMode("register")}
+        <center>
+          <h2>
+            {mode === "register"
+              ? "إنشاء حساب عميل"
+              : "تسجيل الدخول"}
+          </h2>
+
+          <h5>
+            {mode === "register"
+              ? "أنشئ حسابك للتواصل مع السائقين وتتبع الطلبات بسهولة."
+              : "قم بتسجيل الدخول للوصول إلى حسابك."}
+          </h5>
+        </center>
+
+        {/* SWITCH */}
+        <div className="auth-switch">
+          <button
             type="button"
+            className={
+              mode === "register"
+                ? "primary-btn small"
+                : "secondary-btn small"
+            }
+            onClick={() => setMode("register")}
           >
             إنشاء حساب
           </button>
+
           <button
-            className={mode === "login" ? "active" : ""}
-            onClick={() => setMode("login")}
             type="button"
+            className={
+              mode === "login"
+                ? "primary-btn small"
+                : "secondary-btn small"
+            }
+            onClick={() => setMode("login")}
           >
             تسجيل الدخول
           </button>
-
-       
         </div>
 
+        {/* FORM */}
         <form onSubmit={handleSubmit} className="auth-form">
+          {error && (
+            <p
+              style={{
+                color: "red",
+                textAlign: "center",
+                fontWeight: "bold",
+              }}
+            >
+              {error}
+            </p>
+          )}
+
+          {message && (
+            <p
+              style={{
+                color: "green",
+                textAlign: "center",
+                fontWeight: "bold",
+              }}
+            >
+              {message}
+            </p>
+          )}
+
           {mode === "register" && (
-            <>
-              <label>الاسم الكامل</label>
+            <label>
+              الاسم الكامل
               <input
                 type="text"
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
                 placeholder="عبد القادر"
-                maxLength={13}
+                maxLength={20}
                 required
               />
-            </>
+            </label>
           )}
 
-          <label>رقم الهاتف</label>
-          <input
-            type="text"
-            value={telephone}
-            onChange={(e) => setTelephone(e.target.value)}
-            placeholder="مثال: 0555555555"
-            required
-          />
+          <label>
+            رقم الهاتف
+            <input
+              type="text"
+              value={telephone}
+              onChange={(e) => setTelephone(e.target.value)}
+              placeholder="0555555555"
+              required
+            />
+          </label>
 
-          <label>كلمة المرور</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="أدخل كلمة المرور"
-            required
-          />
+          <label>
+            كلمة المرور
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="أدخل كلمة المرور"
+              required
+            />
+          </label>
 
-          <button className="primary-btn full" type="submit" disabled={loading}>
+          <button
+            className="primary-btn full"
+            type="submit"
+            disabled={loading}
+          >
             {loading
               ? "يرجى الانتظار..."
-              : mode === "login"
-              ? "تسجيل الدخول"
-              : "إنشاء الحساب"}
+              : mode === "register"
+              ? "إنشاء الحساب"
+              : "تسجيل الدخول"}
           </button>
-
-          {message && <p style={{ color: "green" }}>{message}</p>}
-          {error && <p style={{ color: "red" }}>{error}</p>}
         </form>
       </div>
     </section>

@@ -12,6 +12,7 @@ class LivreurAdmin(admin.ModelAdmin):
         "disponible",
         "note",
         "nombre_livraisons",
+        "photo",
     )
     list_filter = ("ville", "vehicule", "disponible")
     search_fields = ("nom", "telephone", "email", "ville")

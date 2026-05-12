@@ -65,6 +65,7 @@ export async function loginJWT(credentials) {
       telephone: credentials.telephone,
       ville: livreur.ville,
       vehicule: livreur.vehicule,
+      photo: livreur.photo,
     })
   );
 
@@ -75,14 +76,9 @@ export async function loginJWT(credentials) {
 export async function createLivreur(livreur) {
   const url = `${API_BASE_URL}/livreurs/register/`;
 
-  console.log("URL inscription livreur =", url);
-
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(livreur),
+    body: livreur
   });
 
   const text = await response.text();
@@ -372,6 +368,29 @@ export async function finishCourse(courseId) {
 
   if (!response.ok) {
     throw new Error(data.detail || "Erreur fin course");
+  }
+
+  return data;
+}
+
+export async function updateLivreurPhoto(id, photoFile) {
+  const token = localStorage.getItem("access");
+
+  const formData = new FormData();
+  formData.append("photo", photoFile);
+
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.photo?.[0] || data.detail || "Erreur modification photo");
   }
 
   return data;

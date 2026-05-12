@@ -9,55 +9,61 @@ export default function CourierCard({ courier }) {
 
   function handleClick() {
     if (!isAvailable) return;
-
     navigate(`/tracking/${courier.id}`);
   }
 
   return (
     <div
       className="courier-card mini-courier-card"
+      dir="rtl"
       onClick={handleClick}
       style={{
         cursor: isAvailable ? "pointer" : "not-allowed",
-        opacity: isAvailable ? 1 : 0.7,
+        opacity: isAvailable ? 1 : 0.65,
+        fontFamily: "'Tajawal', sans-serif",
       }}
     >
-      {/* PHOTO */}
       <div className="courier-avatar">
         <img
           src={courier.photo || defaultAvatar}
-          alt={courier.name}
+          alt={courier.name || "صورة السائق"}
         />
       </div>
 
       <div className="courier-top">
-        <h3>{courier.name}</h3>
+        <h3>{courier.name || "سائق توصيل"}</h3>
 
-        <span
-          className={courier.available ? "status available" : "status busy"}
-        >
-          {courier.available ? "متاح" : "مشغول"}
+        <span className={isAvailable ? "status available" : "status busy"}>
+          {isAvailable ? "متاح الآن" : "غير متاح"}
         </span>
       </div>
 
-      <p>{courier.city}</p>
-      <p>{courier.vehicle}</p>
+      <p>
+        <strong>منطقة النشاط:</strong>{" "}
+        {courier.city || "غير محددة"}
+      </p>
+
+      <p>
+        <strong>وسيلة النقل:</strong>{" "}
+        {courier.vehicle || "غير محددة"}
+      </p>
 
       <div className="courier-footer">
         <span>⭐ {courier.rating || 5}</span>
-        <span>{courier.deliveries || 0} توصيل</span>
+        <span>{courier.deliveries || 0} عملية توصيل</span>
       </div>
 
       {!isAvailable && (
         <p
           style={{
             color: "#dc2626",
-            fontSize: "12px",
-            marginTop: "8px",
-            fontWeight: "600",
+            fontSize: "13px",
+            marginTop: "10px",
+            fontWeight: "700",
+            textAlign: "center",
           }}
         >
-          {courier.name} مشغول حالياً
+          هذا السائق غير متاح حالياً لاستقبال الطلبات
         </p>
       )}
     </div>

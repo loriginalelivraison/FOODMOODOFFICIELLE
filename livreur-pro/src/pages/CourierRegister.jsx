@@ -23,6 +23,7 @@ export default function CourierRegister() {
 
   const [mode, setMode] = useState("register");
   const [error, setError] = useState("");
+  const [photoPreview, setPhotoPreview] = useState(null);
 
   const [loginForm, setLoginForm] = useState({
     telephone: "",
@@ -33,9 +34,11 @@ export default function CourierRegister() {
     nom: "",
     telephone: "",
     ville: "كل مدينة مستغانم",
-    vehicule: "دراجة نارية",
+    vehicule: "moto",
     disponible: true,
     password: "",
+    services: "",
+    photo: null,
   });
 
   async function handleSubmit(e) {
@@ -43,7 +46,21 @@ export default function CourierRegister() {
     setError("");
 
     try {
-      await createLivreur(registerForm);
+      const data = new FormData();
+
+      data.append("nom", registerForm.nom);
+      data.append("telephone", registerForm.telephone);
+      data.append("ville", registerForm.ville);
+      data.append("vehicule", registerForm.vehicule);
+      data.append("disponible", registerForm.disponible);
+      data.append("password", registerForm.password);
+      data.append("services", registerForm.services);
+
+      if (registerForm.photo) {
+        data.append("photo", registerForm.photo);
+      }
+
+      await createLivreur(data);
 
       await loginJWT({
         telephone: registerForm.telephone,
@@ -58,7 +75,7 @@ export default function CourierRegister() {
 
       navigate(`/livreur-dashboard/${livreur.id}`);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
     }
   }
 
@@ -77,53 +94,58 @@ export default function CourierRegister() {
 
       navigate(`/livreur-dashboard/${livreur.id}`);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "حدث خطأ أثناء تسجيل الدخول");
     }
   }
 
+  function handlePhotoChange(e) {
+    const file = e.target.files[0];
+
+    setRegisterForm({
+      ...registerForm,
+      photo: file || null,
+    });
+
+    setPhotoPreview(file ? URL.createObjectURL(file) : null);
+  }
+
   return (
-    <section className="page form-page" dir="rtl">
-      <div className="page-title narrow">
-        <span className="eyebrow">فضاء السائق</span>
+    <section className="page auth-page" dir="rtl">
+      <div className="auth-card">
+        <center>
+          <h2>
+            {mode === "register" ? "تسجيل سائق جديد" : "تسجيل دخول السائق"}
+          </h2>
 
-        <h1>
-          {mode === "register" ? "تسجيل سائق جديد" : "تسجيل دخول السائق"}
-        </h1>
+          <h5>
+            {mode === "register"
+              ? "انضم إلى المنصة كسائق وابدأ في استقبال طلبات التوصيل."
+              : "قم بتسجيل الدخول إذا كنت مسجلاً من قبل."}
+          </h5>
+        </center>
 
-        <p>
-          {mode === "register"
-            ? "انضم إلى المنصة كسائق وابدأ في استقبال طلبات التوصيل."
-            : "قم بتسجيل الدخول إذا كنت مسجلاً من قبل."}
-        </p>
-      </div>
+        <div className="auth-switch">
+          <button
+            type="button"
+            className={mode === "register" ? "primary-btn small" : "secondary-btn small"}
+            onClick={() => setMode("register")}
+          >
+            تسجيل جديد
+          </button>
 
-      <div className="auth-switch">
-        <button
-          type="button"
-          className={
-            mode === "register" ? "primary-btn small" : "secondary-btn small"
-          }
-          onClick={() => setMode("register")}
-        >
-          تسجيل جديد
-        </button>
+          <button
+            type="button"
+            className={mode === "login" ? "primary-btn small" : "secondary-btn small"}
+            onClick={() => setMode("login")}
+          >
+            لدي حساب بالفعل
+          </button>
+        </div>
 
-        <button
-          type="button"
-          className={
-            mode === "login" ? "primary-btn small" : "secondary-btn small"
-          }
-          onClick={() => setMode("login")}
-        >
-          لدي حساب بالفعل
-        </button>
-      </div>
+        {mode === "login" ? (
+          <form className="auth-form" onSubmit={handleLogin}>
+            {error && <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>{error}</p>}
 
-      {mode === "login" ? (
-        <form className="pro-form" onSubmit={handleLogin}>
-          {error && <p style={{ color: "red" }}>{error}</p>}
-
-          <div className="form-grid">
             <label>
               رقم الهاتف
               <input
@@ -131,10 +153,7 @@ export default function CourierRegister() {
                 placeholder="0555555555"
                 value={loginForm.telephone}
                 onChange={(e) =>
-                  setLoginForm({
-                    ...loginForm,
-                    telephone: e.target.value,
-                  })
+                  setLoginForm({ ...loginForm, telephone: e.target.value })
                 }
               />
             </label>
@@ -147,54 +166,40 @@ export default function CourierRegister() {
                 placeholder="أدخل كلمة المرور"
                 value={loginForm.password}
                 onChange={(e) =>
-                  setLoginForm({
-                    ...loginForm,
-                    password: e.target.value,
-                  })
+                  setLoginForm({ ...loginForm, password: e.target.value })
                 }
               />
             </label>
-          </div>
 
-          <button className="primary-btn full" type="submit">
-            تسجيل الدخول
-          </button>
-        </form>
-      ) : (
-        <form className="pro-form" onSubmit={handleSubmit}>
-          {error && <p style={{ color: "red" }}>{error}</p>}
+            <button className="primary-btn full" type="submit">
+              تسجيل الدخول
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={handleSubmit} encType="multipart/form-data">
+            {error && <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>{error}</p>}
 
-          <div className="form-grid">
             <label>
               الاسم الكامل
               <input
                 required
                 maxLength={20}
-                placeholder="مثال: أحمد بن علي"
+                placeholder="مثال: أمين"
                 value={registerForm.nom}
                 onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    nom: e.target.value,
-                  })
+                  setRegisterForm({ ...registerForm, nom: e.target.value })
                 }
               />
-              <small style={{ color: "#666", fontSize: "12px" }}>
-                الحد الأقصى هو 20 حرفًا
-              </small>
             </label>
 
             <label>
               رقم الهاتف
               <input
                 required
-                placeholder="0555555555"
+                placeholder=""
                 value={registerForm.telephone}
                 onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    telephone: e.target.value,
-                  })
+                  setRegisterForm({ ...registerForm, telephone: e.target.value })
                 }
               />
             </label>
@@ -205,10 +210,7 @@ export default function CourierRegister() {
                 required
                 value={registerForm.ville}
                 onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    ville: e.target.value,
-                  })
+                  setRegisterForm({ ...registerForm, ville: e.target.value })
                 }
               >
                 {quartiers.map((quartier) => (
@@ -225,13 +227,9 @@ export default function CourierRegister() {
                 required
                 value={registerForm.vehicule}
                 onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    vehicule: e.target.value,
-                  })
+                  setRegisterForm({ ...registerForm, vehicule: e.target.value })
                 }
               >
-                
                 <option value="moto">دراجة نارية</option>
                 <option value="velo">دراجة هوائية</option>
                 <option value="voiture">سيارة</option>
@@ -255,48 +253,72 @@ export default function CourierRegister() {
                 <option value="false">غير متاح</option>
               </select>
             </label>
-          </div>
 
-          <label>
-            الخدمات المقترحة
-            <textarea
-              rows="4"
-              placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، أدوية..."
-            />
-          </label>
+            <label>
+              الخدمات المقترحة
+              <textarea
+                rows="4"
+                placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، أدوية..."
+                value={registerForm.services}
+                onChange={(e) =>
+                  setRegisterForm({ ...registerForm, services: e.target.value })
+                }
+              />
+            </label>
 
-          <label>
-            كلمة المرور
-            <input
-              type="password"
-              required
-              placeholder="أدخل كلمة المرور"
-              value={registerForm.password}
-              onChange={(e) =>
-                setRegisterForm({
-                  ...registerForm,
-                  password: e.target.value,
-                })
-              }
-            />
-          </label>
+            <label>
+              كلمة المرور
+              <input
+                type="password"
+                required
+                placeholder="أدخل كلمة المرور"
+                value={registerForm.password}
+                onChange={(e) =>
+                  setRegisterForm({ ...registerForm, password: e.target.value })
+                }
+              />
+            </label>
 
-          <div className="upload-box">
-            <UploadCloud />
-            <div>
-              <strong>الوثائق المطلوبة</strong>
-              <p>
-                بطاقة الهوية، التأمين، ورخصة السياقة إذا كانت ضرورية. سيتم تفعيل
-                رفع الملفات لاحقًا.
-              </p>
-            </div>
-          </div>
+           <label>
+  إضافة صورة
 
-          <button className="primary-btn full" type="submit">
-            إنشاء حساب السائق
-          </button>
-        </form>
-      )}
+  <div
+    className="upload-box"
+    onClick={() => document.getElementById("driver-photo").click()}
+  >
+    <UploadCloud />
+    <span>صورة اختيارية للسائق</span>
+
+    <input
+      id="driver-photo"
+      type="file"
+      accept="image/*"
+      onChange={handlePhotoChange}
+    />
+  </div>
+</label>
+            {photoPreview && (
+              <center>
+                <img
+                  src={photoPreview}
+                  alt="preview"
+                  style={{
+                    width: "90px",
+                    height: "90px",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "3px solid white",
+                  }}
+                />
+              </center>
+            )}
+
+            <button className="primary-btn full" type="submit">
+              إنشاء حساب السائق
+            </button>
+          </form>
+        )}
+      </div>
     </section>
   );
 }

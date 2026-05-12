@@ -53,20 +53,69 @@ export default function Layout() {
     <div className="app-shell">
       <header className="topbar">
         <Link to="/" className="brand" onClick={() => setOpen(false)}>
-          <span className="brand-icon">
-            <img
-              src={logo}
-              alt="الشعار"
-              style={{
-                width: "50px",
-                height: "50px",
-                objectFit: "cover",
-                borderRadius: "40%",
-              }}
-            />
-          </span>
-          <span> FoodMood</span>
-        </Link>
+
+  <span
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+    }}
+  >
+    <span
+      className="brand-icon"
+      style={{
+        width: "58px",
+        height: "58px",
+        borderRadius: "18px",
+        overflow: "hidden",
+        
+        padding: "4px",
+        boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+      }}
+    >
+      <img
+        src={logo}
+        alt="الشعار"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          borderRadius: "14px",
+        }}
+      />
+    </span>
+
+    <span
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        lineHeight: "1.1",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "24px",
+          fontWeight: "900",
+          color: "#111827",
+          letterSpacing: "0.5px",
+        }}
+      >
+        WinRak
+      </span>
+
+      <span
+        style={{
+          fontSize: "11px",
+          color: "#6b7280",
+          fontWeight: "700",
+        }}
+      >
+        Delivery Platform
+      </span>
+    </span>
+  </span>
+
+</Link>
          {auth.token && auth.user && (
             <span className="eyebrow auth-status">
               <span className="online-dot"></span>
@@ -130,9 +179,9 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="footer">
+      <h5 className="footer">
         © 2026 LivreurPro — منصة لربط خدمات التوصيل المحلية.
-      </footer>
+      </h5>
     </div>
   );
 }
