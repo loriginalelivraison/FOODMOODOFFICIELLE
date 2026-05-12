@@ -1,125 +1,82 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
 import { updateLivreurPosition } from "../livreursapi.js";
 
 export default function LivreurDashboard() {
-  const { id } = useParams();
-
   const livreurStorage = localStorage.getItem("livreur");
-  const livreur = livreurStorage
-    ? JSON.parse(livreurStorage)
-    : null;
+  const livreur = livreurStorage ? JSON.parse(livreurStorage) : null;
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [position, setPosition] = useState(null);
-  const [trackingEnabled, setTrackingEnabled] =
-    useState(true);
+  const [trackingEnabled, setTrackingEnabled] = useState(true);
 
-  // TRACKING GPS TEMPS RÉEL
   useEffect(() => {
     if (!livreur?.id) return;
-
     if (!trackingEnabled) return;
 
-    const watchId =
-      navigator.geolocation.watchPosition(
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        try {
+          const newPosition = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
 
-        async (pos) => {
-          try {
-            const newPosition = {
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-            };
+          console.log("GPS TELEPHONE :", newPosition);
+          setPosition(newPosition);
 
-            console.log(
-              "Nouvelle position :",
-              newPosition
-            );
+          const result = await updateLivreurPosition(livreur.id, {
+            latitude: newPosition.latitude,
+            longitude: newPosition.longitude,
+            disponible: true,
+          });
 
-            setPosition(newPosition);
+          console.log("REPONSE API :", result);
 
-            await updateLivreurPosition(
-              livreur.id,
-              {
-                latitude: newPosition.latitude,
-                longitude: newPosition.longitude,
-                disponible: true,
-              }
-            );
-
-            setMessage(
-              "Position actualisée en temps réel."
-            );
-
-          } catch (err) {
-            console.error(err);
-
-            setError(
-              "Erreur mise à jour position."
-            );
-          }
-        },
-
-        (geoError) => {
-          console.error(geoError);
-
-          setError(
-            "Impossible d'obtenir la position GPS."
-          );
-        },
-
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 15000,
+          setMessage("Position actualisée en temps réel.");
+          setError("");
+        } catch (err) {
+          console.error(err);
+          setError("Erreur mise à jour position.");
         }
-      );
+      },
+      (geoError) => {
+        console.error(geoError);
+        setError("Impossible d'obtenir la position GPS.");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      }
+    );
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-
   }, [livreur?.id, trackingEnabled]);
 
   return (
-    <div
-      style={{
-        padding: "20px",
-      }}
-    >
-      <h2>
-        Dashboard Livreur
-      </h2>
+    <div style={{ padding: "20px" }}>
+      <h2>Dashboard Livreur</h2>
 
-      <div
+      <button
+        onClick={() => setTrackingEnabled(!trackingEnabled)}
         style={{
           marginTop: "20px",
+          padding: "12px 18px",
+          borderRadius: "12px",
+          border: "none",
+          background: trackingEnabled ? "#dc2626" : "#16a34a",
+          color: "white",
+          cursor: "pointer",
+          fontWeight: "bold",
         }}
       >
-        <button
-          onClick={() =>
-            setTrackingEnabled(
-              !trackingEnabled
-            )
-          }
-          style={{
-            padding: "12px 18px",
-            borderRadius: "12px",
-            border: "none",
-            background: trackingEnabled
-              ? "#dc2626"
-              : "#16a34a",
-            color: "white",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          {trackingEnabled
-            ? "Arrêter le partage GPS"
-            : "Activer le partage GPS"}
-        </button>
-      </div>
+        {trackingEnabled
+          ? "Arrêter le partage GPS"
+          : "Activer le partage GPS"}
+      </button>
 
       {position && (
         <div
@@ -131,38 +88,16 @@ export default function LivreurDashboard() {
           }}
         >
           <p>
-            <strong>Latitude :</strong>{" "}
-            {position.latitude}
+            <strong>Latitude :</strong> {position.latitude}
           </p>
-
           <p>
-            <strong>Longitude :</strong>{" "}
-            {position.longitude}
+            <strong>Longitude :</strong> {position.longitude}
           </p>
         </div>
       )}
 
-      {message && (
-        <p
-          style={{
-            color: "green",
-            marginTop: "15px",
-          }}
-        >
-          {message}
-        </p>
-      )}
-
-      {error && (
-        <p
-          style={{
-            color: "red",
-            marginTop: "15px",
-          }}
-        >
-          {error}
-        </p>
-      )}
+      {message && <p style={{ color: "green" }}>{message}</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
     </div>
   );
 }

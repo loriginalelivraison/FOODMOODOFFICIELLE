@@ -14,6 +14,9 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+
+
 delete L.Icon.Default.prototype._getIconUrl;
 
 L.Icon.Default.mergeOptions({
@@ -65,34 +68,47 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
     setLiveCouriers(couriers);
   }, [couriers]);
 
-  useEffect(() => {
-    async function refreshCouriers() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/livreurs/");
+ useEffect(() => {
+  async function refreshCouriers() {
+    try {
+      console.log("Actualisation carte livreurs...");
 
-        if (!response.ok) {
-          throw new Error("Erreur API livreurs");
+      const response = await fetch(
+        `${API_BASE_URL}/livreurs/?t=${Date.now()}`,
+        {
+          cache: "no-store",
         }
+      );
 
-        const data = await response.json();
-
-        if (Array.isArray(data)) {
-          setLiveCouriers(data);
-        } else if (Array.isArray(data.results)) {
-          setLiveCouriers(data.results);
-        }
-      } catch (error) {
-        console.error("Erreur actualisation livreurs :", error);
+      if (!response.ok) {
+        throw new Error("Erreur API livreurs");
       }
+
+      const data = await response.json();
+
+      console.log("Livreurs reçus :", data);
+
+      const livreurTest = data.find((l) => l.id === 5);
+      console.log("Position livreur test :", livreurTest?.latitude, livreurTest?.longitude);
+
+      if (Array.isArray(data)) {
+        setLiveCouriers(data);
+      } else if (Array.isArray(data.results)) {
+        setLiveCouriers(data.results);
+      }
+    } catch (error) {
+      console.error("Erreur actualisation livreurs :", error);
     }
+  }
 
+  refreshCouriers();
+
+  const interval = setInterval(() => {
     refreshCouriers();
+  }, 10000);
 
-    const interval = setInterval(refreshCouriers, 10000);
-
-    return () => clearInterval(interval);
-  }, []);
-
+  return () => clearInterval(interval);
+}, []);
   const availableCouriers = liveCouriers.filter((c) => {
     const isAvailable =
       c.available === true ||
