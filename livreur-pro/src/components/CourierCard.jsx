@@ -1,10 +1,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { MapPin, Bike, Star } from "lucide-react";
 import defaultAvatar from "../assets/logo2.png";
 
 export default function CourierCard({ courier }) {
   const navigate = useNavigate();
-
   const isAvailable = courier.available;
 
   function handleClick() {
@@ -14,58 +14,55 @@ export default function CourierCard({ courier }) {
 
   return (
     <div
-      className="courier-card mini-courier-card"
+      className="pro-courier-card"
       dir="rtl"
       onClick={handleClick}
       style={{
         cursor: isAvailable ? "pointer" : "not-allowed",
         opacity: isAvailable ? 1 : 0.65,
-        fontFamily: "'Tajawal', sans-serif",
       }}
     >
-      <div className="courier-avatar">
+      <span className={isAvailable ? "pro-status available" : "pro-status busy"}>
+        {isAvailable ? "متاح الآن" : "غير متاح"}
+      </span>
+
+      <div className="pro-avatar-wrap">
         <img
           src={courier.photo || defaultAvatar}
           alt={courier.name || "صورة السائق"}
+          className="pro-avatar-img"
         />
+        {isAvailable && <span className="pro-online-dot"></span>}
       </div>
 
-      <div className="courier-top">
-        <h3>{courier.name || "سائق توصيل"}</h3>
+      <h3>{courier.name || "سائق توصيل"}</h3>
 
-        <span className={isAvailable ? "status available" : "status busy"}>
-          {isAvailable ? "متاح الآن" : "غير متاح"}
+      <div className="pro-info-line">
+        <MapPin size={15} />
+        <span>{courier.city || "غير محددة"}</span>
+      </div>
+
+      <div className="pro-info-line">
+        <Bike size={15} />
+        <span>{courier.vehicle || "غير محددة"}</span>
+      </div>
+
+      <div className="pro-card-footer">
+        <span>
+          <Star size={15} fill="#facc15" color="#facc15" />
+          {courier.rating || 5}
         </span>
+
+        <span>{courier.deliveries || 0} توصيل</span>
       </div>
 
-      <p>
-        <strong>منطقة النشاط:</strong>{" "}
-        {courier.city || "غير محددة"}
-      </p>
-
-      <p>
-        <strong>وسيلة النقل:</strong>{" "}
-        {courier.vehicle || "غير محددة"}
-      </p>
-
-      <div className="courier-footer">
-        <span>⭐ {courier.rating || 5}</span>
-        <span>{courier.deliveries || 0} عملية توصيل</span>
-      </div>
-
-      {!isAvailable && (
-        <p
-          style={{
-            color: "#dc2626",
-            fontSize: "13px",
-            marginTop: "10px",
-            fontWeight: "700",
-            textAlign: "center",
-          }}
-        >
-          هذا السائق غير متاح حالياً لاستقبال الطلبات
-        </p>
-      )}
+      <button
+        type="button"
+        className="pro-details-btn"
+        disabled={!isAvailable}
+      >
+        عرض التفاصيل ‹
+      </button>
     </div>
   );
 }

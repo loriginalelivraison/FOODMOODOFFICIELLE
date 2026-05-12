@@ -7,6 +7,7 @@ import {
   deleteLivreur,getActiveCourse,updateLivreurPhoto,
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
+import logo2 from "../assets/logo2.png"
 
 export default function LivreurDashboard() {
   const { id } = useParams();
@@ -341,7 +342,7 @@ async function handlePhotoChange(e) {
 
         <div style={{ textAlign: "center", marginBottom: "20px" }}>
   <img
-    src={photoPreview || livreurData?.photo || "/default-avatar.png"}
+    src={photoPreview || livreurData?.photo || logo2 }
     alt="صورة السائق"
     style={{
       width: "110px",
@@ -383,13 +384,13 @@ async function handlePhotoChange(e) {
           {livreurData?.nom || "السائق"}
         </h2>
 
-        <p>
-          <strong>رقم الهاتف:</strong> {livreurData?.telephone || "غير متوفر"}
-        </p>
+        <h3>
+          <strong>رقم الهاتف :</strong> {livreurData?.telephone || "غير متوفر"}
+        </h3>
 
-        <p>
-          <strong>المدينة:</strong> {livreurData?.ville || "غير متوفر"}
-        </p>
+        <h3>
+          <strong>المنطقة :</strong> {livreurData?.ville || "غير متوفر"}
+        </h3>
 
 
 

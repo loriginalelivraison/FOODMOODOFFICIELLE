@@ -1,19 +1,22 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Home, Users, User, LogIn, Bike } from "lucide-react";
 import { useState, useEffect } from "react";
 import React from "react";
 import LogoutButton from "./LogoutButton";
 import logo from "../assets/logo.png";
 
 export default function Layout() {
-  const [open, setOpen] = useState(false);
   const [auth, setAuth] = useState({
     token: null,
     role: null,
     user: null,
   });
 
-  const linkClass = ({ isActive }) => `nav-link ${isActive ? "active" : ""}`;
+  const linkClass = ({ isActive }) =>
+    `nav-link ${isActive ? "active" : ""}`;
+
+  const bottomLinkClass = ({ isActive }) =>
+    `bottom-link ${isActive ? "active" : ""}`;
 
   function loadAuth() {
     const token = localStorage.getItem("access");
@@ -34,7 +37,6 @@ export default function Layout() {
 
   useEffect(() => {
     loadAuth();
-
     window.addEventListener("authChanged", loadAuth);
 
     return () => {
@@ -42,131 +44,56 @@ export default function Layout() {
     };
   }, []);
 
-  const dashboardLink =
-    !auth.token
-      ? "/connexion-client"
-      : auth.role === "livreur"
-      ? `/livreur-dashboard/${auth.user?.id}`
-      : "/client-dashboard";
+  const dashboardLink = !auth.token
+    ? "/connexion-client"
+    : auth.role === "livreur"
+    ? `/livreur-dashboard/${auth.user?.id}`
+    : "/client-dashboard";
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <Link to="/" className="brand" onClick={() => setOpen(false)}>
+      <header className="topbar pro-topbar">
+        <Link to="/" className="pro-brand">
+          <span className="pro-logo">
+            <img src={logo} alt="WinRak" />
+          </span>
 
-  <span
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-    }}
-  >
-    <span
-      className="brand-icon"
-      style={{
-        width: "58px",
-        height: "58px",
-        borderRadius: "18px",
-        overflow: "hidden",
-        
-        padding: "4px",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-      }}
-    >
-      <img
-        src={logo}
-        alt="الشعار"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          borderRadius: "14px",
-        }}
-      />
-    </span>
+          <span className="pro-brand-text">
+            <strong>WinRak</strong>
+            <small>Delivery Platform</small>
+          </span>
+        </Link>
 
-    <span
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        lineHeight: "1.1",
-      }}
-    >
-      <span
-        style={{
-          fontSize: "24px",
-          fontWeight: "900",
-          color: "#111827",
-          letterSpacing: "0.5px",
-        }}
-      >
-        WinRak
-      </span>
+        {auth.token && auth.user && (
+          <span className="pro-auth-status">
+            <span className="online-dot"></span>
+            {auth.user.nom}
+          </span>
+        )}
 
-      <span
-        style={{
-          fontSize: "11px",
-          color: "#6b7280",
-          fontWeight: "700",
-        }}
-      >
-        Delivery Platform
-      </span>
-    </span>
-  </span>
-
-</Link>
-         {auth.token && auth.user && (
-            <span className="eyebrow auth-status">
-              <span className="online-dot"></span>
-             {auth.user.nom}
-            </span>
-          )}     
-        <button
-          className="menu-btn"
-          onClick={() => setOpen(!open)}
-          aria-label="فتح القائمة"
-        >
-          <Menu />
-        </button>
-
-        <nav className={`nav ${open ? "open" : ""}`}>
-          
-
-          <NavLink to="/" className={linkClass} onClick={() => setOpen(false)}>
+        <nav className="desktop-nav">
+          <NavLink to="/" className={linkClass}>
             الرئيسية
           </NavLink>
 
-          <NavLink to="/livreurs" className={linkClass} onClick={() => setOpen(false)}>
+          <NavLink to="/livreurs" className={linkClass}>
             السائقون
           </NavLink>
 
           {!auth.token && (
-                <>
-                  <NavLink
-                    to="/inscription-livreur"
-                    className={linkClass}
-                    onClick={() => setOpen(false)}
-                  >
-                    أصبح سائق توصيل
-                  </NavLink>
+            <>
+              <NavLink to="/inscription-livreur" className={linkClass}>
+                أصبح سائق
+              </NavLink>
 
-                  <NavLink
-                    to="/connexion-client"
-                    className={linkClass}
-                    onClick={() => setOpen(false)}
-                  >
-                    تسجيل
-                  </NavLink>
-                </>
-              )}
-              
+              <NavLink to="/connexion-client" className={linkClass}>
+                تسجيل
+              </NavLink>
+            </>
+          )}
+
           {auth.token && auth.user && (
-            <NavLink
-              to={dashboardLink}
-              className={linkClass}
-              onClick={() => setOpen(false)}
-            >
+            <NavLink to={dashboardLink} className={linkClass}>
               حسابي
             </NavLink>
           )}
@@ -175,13 +102,40 @@ export default function Layout() {
         </nav>
       </header>
 
-      <main>
+      <main className="main-content">
         <Outlet />
       </main>
 
-      <h5 className="footer">
-        © 2026 LivreurPro — منصة لربط خدمات التوصيل المحلية.
-      </h5>
+      <nav className="bottom-nav">
+        <NavLink to="/" className={bottomLinkClass}>
+          <Home size={20} />
+          <span>الرئيسية</span>
+        </NavLink>
+
+        <NavLink to="/livreurs" className={bottomLinkClass}>
+          <Users size={20} />
+          <span>السائقون</span>
+        </NavLink>
+
+        {!auth.token ? (
+          <>
+            <NavLink to="/connexion-client" className={bottomLinkClass}>
+              <LogIn size={20} />
+              <span>تسجيل</span>
+            </NavLink>
+
+            <NavLink to="/inscription-livreur" className={bottomLinkClass}>
+              <Bike size={20} />
+              <span>سائق</span>
+            </NavLink>
+          </>
+        ) : (
+          <NavLink to={dashboardLink} className={bottomLinkClass}>
+            <User size={20} />
+            <span>حسابي</span>
+          </NavLink>
+        )}
+      </nav>
     </div>
   );
 }

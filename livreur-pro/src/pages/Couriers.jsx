@@ -102,7 +102,7 @@ const vehicleOptions = useMemo(() => {
   };
 
   setClientPosition(position);
-  setViewMode("map");
+  
 
   setLocationDisabled(false);
   setLocationEnabledMessage(true);
@@ -167,7 +167,23 @@ function handleFindAroundMe() {
   velo: "دراجة هوائية",
   voiture: "سيارة",
   camion: "شاحنة",
-};
+}
+    const streets = ["كل مدينة مستغانم",
+    "وسط المدينة",
+    "خروبة",
+    "صلامندر",
+    "مزغران",
+    "صيادة",
+    "بوسكي",
+    "دبدابة",
+    "عشعاشة",
+    "ستيدية",
+    "النويصي",
+    "ماسري"]
+    
+;
+
+
   
 
   return (
@@ -233,6 +249,9 @@ function handleFindAroundMe() {
               setShowFilters(true);
             }}
             placeholder="ابحث عن سائق"
+            style={{
+  width: "300px"
+}}
           />
         </label>
 
@@ -257,11 +276,11 @@ function handleFindAroundMe() {
               onChange={(e) => setSelectedCity(e.target.value)}
             >
               <option value="">كل المناطق</option>
-              {cityOptions.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
+              {streets.map((street) => (
+  <option key={street} value={street}>
+    {street}
+  </option>
+))}
             </select>
 
             <label className="toggle">
@@ -284,41 +303,48 @@ function handleFindAroundMe() {
         <p>Aucun livreur disponible pour le moment.</p>
       )}
 
-      {!loading && !error && (
-        <p
-          style={{
-            textAlign: "center",
-            margin: "15px 0",
-            fontWeight: "600",
-          }}
-        >
-          عدد السائقين : {filtered.length}
-        </p>
-      )}
-      {viewMode === "map" && (
-  <div style={{ textAlign: "center", margin: "15px 0" }}>
-    <button
-      type="button"
-      className="primary-btn full"
-      onClick={() => setViewMode("list")}
-      style={{
-        background: "#ebab22",
-        fontWeight: "700",
-      }}
-    >
-      قائمة السائقين
-    </button>
+    
+    <div
+  style={{
+    background: "#fff7ed",
+    border: "2px solid #f5bf99",
+    borderRadius: "24px",
+    padding: "10px",
+    margin: "12px 0 20px",
+    boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
+  }}
+>
+  <div
+    style={{
+      height: "260px",
+      borderRadius: "18px",
+      overflow: "hidden",
+    }}
+  >
+    <CouriersMap
+      couriers={filtered}
+      clientPosition={clientPosition}
+    />
   </div>
+</div>
+
+{!loading && !error && (
+  <p
+    style={{
+      textAlign: "center",
+      margin: "15px 0",
+      fontWeight: "600",
+    }}
+  >
+    عدد السائقين : {filtered.length}
+  </p>
 )}
-      {viewMode === "list" ? (
-        <div className="courier-grid">
-          {filtered.map((courier) => (
-            <CourierCard courier={courier} key={courier.id} />
-          ))}
-        </div>
-      ) : (
-        <CouriersMap couriers={filtered} clientPosition={clientPosition} />
-      )}
+
+<div className="courier-grid">
+  {filtered.map((courier) => (
+    <CourierCard courier={courier} key={courier.id} />
+  ))}
+</div>
     </section>
   );
 }
