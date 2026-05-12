@@ -913,3 +913,15 @@ input::placeholder {
     font-size: 13px;
   }
 }
+
+.bottom-link button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
