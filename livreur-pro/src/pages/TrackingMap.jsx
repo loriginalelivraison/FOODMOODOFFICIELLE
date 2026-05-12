@@ -66,8 +66,11 @@ export default function TrackingMap({
     async function refreshCourierPosition() {
       try {
         const response = await fetch(
-          `http://127.0.0.1:8000/api/livreurs/${courier.id}/`
-        );
+  `${API_BASE_URL}/livreurs/${courier.id}/?t=${Date.now()}`,
+  {
+    cache: "no-store",
+  }
+);
 
         if (!response.ok) {
           throw new Error("Erreur API");

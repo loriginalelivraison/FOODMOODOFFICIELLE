@@ -28,34 +28,41 @@ export default function Couriers() {
   const [searchingLocation, setSearchingLocation] = useState(false);
 
   useEffect(() => {
-    getLivreurs()
-      .then((data) => {
-        const livreurs = Array.isArray(data) ? data : data.results || [];
+  async function loadLivreurs() {
+    try {
+      const data = await getLivreurs();
+      const livreurs = Array.isArray(data) ? data : data.results || [];
 
-        const formattedCouriers = livreurs.map((livreur) => ({
-          id: livreur.id,
-          name: livreur.nom,
-          city: livreur.ville,
-          zone: livreur.ville,
-          vehicle: livreur.vehicule,
-          available: Boolean(livreur.disponible),
-          rating: livreur.note,
-          deliveries: livreur.nombre_livraisons,
-          latitude: livreur.latitude,
-          longitude: livreur.longitude,
-          phone: livreur.telephone,
-          photo: livreur.photo,
-          skills: ["Livraison rapide"],
-        }));
+      const formattedCouriers = livreurs.map((livreur) => ({
+        id: livreur.id,
+        name: livreur.nom,
+        city: livreur.ville,
+        zone: livreur.ville,
+        vehicle: livreur.vehicule,
+        available: Boolean(livreur.disponible),
+        rating: livreur.note,
+        deliveries: livreur.nombre_livraisons,
+        latitude: livreur.latitude,
+        longitude: livreur.longitude,
+        phone: livreur.telephone,
+        photo: livreur.photo,
+        skills: ["Livraison rapide"],
+      }));
 
-        setCouriers(formattedCouriers);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
+      setCouriers(formattedCouriers);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }
+
+  loadLivreurs();
+
+  const interval = setInterval(loadLivreurs, 10000);
+
+  return () => clearInterval(interval);
+}, []);
 
   useEffect(() => {
     return () => {
