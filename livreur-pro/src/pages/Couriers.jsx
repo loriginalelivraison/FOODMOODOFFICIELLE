@@ -24,6 +24,10 @@ export default function Couriers() {
 
   const locationWatchRef = useRef(null);
 
+  const hasShownLocationMessageRef = useRef(
+    sessionStorage.getItem("clientLocationMessageShown") === "true"
+  );
+
   useEffect(() => {
     async function loadLivreurs() {
       try {
@@ -56,7 +60,7 @@ export default function Couriers() {
 
     loadLivreurs();
 
-    const interval = setInterval(loadLivreurs, 10000);
+    const interval = setInterval(loadLivreurs, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -95,6 +99,12 @@ export default function Couriers() {
     });
   }, [query, onlyAvailable, selectedVehicle, selectedCity, couriers]);
 
+  const mapRefreshKey = useMemo(() => {
+    return filtered
+      .map((c) => `${c.id}-${c.latitude}-${c.longitude}-${c.available}`)
+      .join("|");
+  }, [filtered]);
+
   function handleLocationSuccess(pos) {
     const position = {
       latitude: pos.coords.latitude,
@@ -105,12 +115,18 @@ export default function Couriers() {
 
     setClientPosition(position);
     setLocationDisabled(false);
-    setLocationEnabledMessage(true);
     setSearchingLocation(false);
 
-    setTimeout(() => {
-      setLocationEnabledMessage(false);
-    }, 3000);
+    if (!hasShownLocationMessageRef.current) {
+      hasShownLocationMessageRef.current = true;
+      sessionStorage.setItem("clientLocationMessageShown", "true");
+
+      setLocationEnabledMessage(true);
+
+      setTimeout(() => {
+        setLocationEnabledMessage(false);
+      }, 3000);
+    }
   }
 
   function handleLocationError(error) {
@@ -312,7 +328,7 @@ export default function Couriers() {
           }}
         >
           <CouriersMap
-            
+            key={mapRefreshKey}
             couriers={filtered}
             clientPosition={clientPosition}
           />
