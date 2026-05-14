@@ -280,39 +280,41 @@ export default function CourierRegister() {
               />
             </label>
 
-           <label>
-  إضافة صورة
+         <div>
+  <p style={{ marginBottom: "8px", fontWeight: "600" }}>
+    إضافة صورة
+  </p>
 
-  <div
-    className="upload-box"
-    onClick={() => document.getElementById("driver-photo").click()}
-  >
+  <label htmlFor="driver-photo" className="upload-box">
     <UploadCloud />
-    <span>صورة اختيارية للسائق</span>
+    <span>
+      {registerForm.photo
+        ? "تم اختيار الصورة بنجاح"
+        : "صورة اختيارية للسائق"}
+    </span>
+  </label>
 
-    <input
-      id="driver-photo"
-      type="file"
-      accept="image/*"
-      onChange={handlePhotoChange}
-    />
-  </div>
-</label>
-            {photoPreview && (
-              <center>
-                <img
-                  src={photoPreview}
-                  alt="preview"
-                  style={{
-                    width: "90px",
-                    height: "90px",
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                    border: "3px solid white",
-                  }}
-                />
-              </center>
-            )}
+  <input
+    id="driver-photo"
+    type="file"
+    accept="image/*"
+    onChange={handlePhotoChange}
+    style={{ display: "none" }}
+  />
+  {registerForm.photo && (
+  <p
+    style={{
+      marginTop: "8px",
+      fontSize: "14px",
+      color: "#16a34a",
+      fontWeight: "600",
+      textAlign: "center",
+    }}
+  >
+    ✅ {registerForm.photo.name}
+  </p>
+)}
+</div>
 
             <button className="primary-btn full" type="submit">
               إنشاء حساب السائق

@@ -233,13 +233,6 @@ export async function loginClient(credentials) {
     throw new Error(data.detail || "Connexion client impossible");
   }
 
-  const client = await getClientByTelephone(credentials.telephone);
-
-  if (!client) {
-    localStorage.clear();
-    throw new Error("هذا الحساب ليس حساب عميل. يرجى تسجيل الدخول من فضاء السائق.");
-  }
-
   const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
 
   localStorage.clear();
@@ -252,36 +245,51 @@ export async function loginClient(credentials) {
   localStorage.setItem("refresh", data.refresh);
   localStorage.setItem("role", "client");
 
+  const client = await getClientByTelephone(credentials.telephone);
+
+  if (!client) {
+    localStorage.clear();
+    throw new Error("هذا الحساب ليس حساب عميل. يرجى تسجيل الدخول من فضاء السائق.");
+  }
+
   localStorage.setItem(
     "client",
     JSON.stringify({
       id: client.id,
       nom: client.nom || "Client",
-      telephone: credentials.telephone,
+      telephone: client.telephone,
     })
   );
 
   window.dispatchEvent(new Event("authChanged"));
+
   return data;
 }
 
 export async function getClientByTelephone(telephone) {
-  const response = await fetch(`${API_BASE_URL}/clients/?format=json`);
+  const token = localStorage.getItem("access");
 
-  if (!response.ok) {
-    throw new Error("Erreur récupération client");
-  }
+  const response = await fetch(`${API_BASE_URL}/clients/`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
   const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Erreur récupération client :", data);
+    throw new Error(data.detail || "Erreur récupération client");
+  }
+
   const clients = Array.isArray(data) ? data : data.results || [];
 
   const clean = (value) => String(value || "").replace(/\s/g, "");
 
   return clients.find(
-    (c) => clean(c.telephone) === clean(telephone)
+    (client) => clean(client.telephone) === clean(telephone)
   );
 }
-
 //supprimer un compte livreur 
 export async function deleteLivreur(id) {
   const token = localStorage.getItem("access");
@@ -319,10 +327,13 @@ export async function deleteClient(id) {
 }
 
 export async function createCourse(data) {
+  const token = localStorage.getItem("access");
+
   const response = await fetch(`${API_BASE_URL}/courses/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(data),
   });
@@ -402,8 +413,15 @@ export async function updateLivreurPhoto(id, photoFile) {
   return data;
 }
 export async function getActiveCoursesForLivreur(livreurId) {
+  const token = localStorage.getItem("access");
+
   const response = await fetch(
-    `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`
+    `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 
   const result = await response.json();
@@ -413,4 +431,22 @@ export async function getActiveCoursesForLivreur(livreurId) {
   }
 
   return result;
+}
+
+export async function getClientCourses() {
+  const token = localStorage.getItem("access");
+
+  const response = await fetch(`${API_BASE_URL}/courses/`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || "Erreur chargement historique");
+  }
+
+  return Array.isArray(data) ? data : data.results || [];
 }

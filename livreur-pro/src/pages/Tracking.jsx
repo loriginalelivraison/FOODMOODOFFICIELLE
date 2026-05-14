@@ -73,7 +73,7 @@ export default function Tracking() {
           whatsapp: livreur.telephone
             ?.replace(/\s/g, "")
             .replace("+", "")
-            .replace(/^0/, "33"),
+            .replace(/^0/, "213"),
           latitude: livreur.latitude,
           longitude: livreur.longitude,
         });
@@ -457,6 +457,7 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
                 setShowAcceptedQuestion(false);
                 setCourseFinished(true);
                 setShowCommentForm(true);
+                navigate("/livreurs");
               }}
             >
               لا
@@ -543,6 +544,7 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
     setCourseFinished(true);
     setShowCommentQuestion(true);
     setShowCommentForm(false);
+    navigate("/livreurs");
   }}
 >
   لا
