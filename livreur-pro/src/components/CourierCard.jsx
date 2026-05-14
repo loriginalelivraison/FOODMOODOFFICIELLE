@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Bike, Star } from "lucide-react";
+import { MapPin, Star } from "lucide-react";
 import defaultAvatar from "../assets/logo2.png";
 
 export default function CourierCard({ courier }) {
@@ -12,6 +12,22 @@ export default function CourierCard({ courier }) {
     navigate(`/tracking/${courier.id}`);
   }
 
+  const vehicleIcons = {
+    moto: "🛵",
+    scooter: "🛵",
+    velo: "🚴",
+    voiture: "🚘",
+    camion: "🚛",
+  };
+
+  const vehicleLabels = {
+    moto: "دراجة نارية",
+    scooter: "سكوتر",
+    velo: "دراجة هوائية",
+    voiture: "سيارة",
+    camion: "شاحنة",
+  };
+
   return (
     <div
       className="pro-courier-card"
@@ -22,7 +38,11 @@ export default function CourierCard({ courier }) {
         opacity: isAvailable ? 1 : 0.65,
       }}
     >
-      <span className={isAvailable ? "pro-status available" : "pro-status busy"}>
+      <span
+        className={
+          isAvailable ? "pro-status available" : "pro-status busy"
+        }
+      >
         {isAvailable ? "متاح الآن" : "غير متاح"}
       </span>
 
@@ -32,6 +52,7 @@ export default function CourierCard({ courier }) {
           alt={courier.name || "صورة السائق"}
           className="pro-avatar-img"
         />
+
         {isAvailable && <span className="pro-online-dot"></span>}
       </div>
 
@@ -43,8 +64,15 @@ export default function CourierCard({ courier }) {
       </div>
 
       <div className="pro-info-line">
-        <Bike size={15} />
-        <span>{courier.vehicle || "غير محددة"}</span>
+        <span style={{ fontSize: "18px" }}>
+          {vehicleIcons[courier.vehicle] || "🚚"}
+        </span>
+
+        <span>
+          {vehicleLabels[courier.vehicle] ||
+            courier.vehicle ||
+            "غير محددة"}
+        </span>
       </div>
 
       <div className="pro-card-footer">
