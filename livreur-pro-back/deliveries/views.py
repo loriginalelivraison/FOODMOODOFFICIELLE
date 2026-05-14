@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.db.models import Avg
 
 
 
@@ -126,6 +127,18 @@ class CommentaireLivreurViewSet(ModelViewSet):
 
         return queryset
 
+    def perform_create(self, serializer):
+        commentaire = serializer.save()
+
+        livreur = commentaire.livreur
+        moyenne = CommentaireLivreur.objects.filter(
+            livreur=livreur
+        ).aggregate(avg_note=Avg("note"))["avg_note"]
+
+        livreur.note = round(moyenne or 5, 1)
+        livreur.save()
+
+        
 class ClientViewSet(ModelViewSet):
     queryset = Client.objects.all().order_by("-created_at")
     serializer_class = ClientSerializer
@@ -211,7 +224,12 @@ class CourseViewSet(ModelViewSet):
         course.finished_at = timezone.now()
         course.save()
 
+        livreur = course.livreur
+        livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
+        livreur.save()
+
         return Response({
             "message": "Course terminée",
-            "active": False
-        })
+            "active": False,
+            "nombre_livraisons": livreur.nombre_livraisons
+            })

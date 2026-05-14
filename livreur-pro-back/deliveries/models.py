@@ -83,6 +83,7 @@ class CommentaireLivreur(models.Model):
     )
     nom_client = models.CharField(max_length=100, blank=True)
     message = models.TextField()
+    note = models.IntegerField(default=5)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
