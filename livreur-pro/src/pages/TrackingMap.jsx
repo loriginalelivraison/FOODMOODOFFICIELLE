@@ -61,7 +61,15 @@ function RecenterMap({ courier, clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (clientPosition?.latitude && clientPosition?.longitude) {
+    const hasClient =
+      clientPosition?.latitude &&
+      clientPosition?.longitude;
+
+    const hasLivreur =
+      courier?.latitude &&
+      courier?.longitude;
+
+    if (hasClient) {
       map.panTo(
         [
           Number(clientPosition.latitude),
@@ -72,8 +80,28 @@ function RecenterMap({ courier, clientPosition }) {
           duration: 1,
         }
       );
+      return;
     }
-  }, [clientPosition, map]);
+
+    if (hasLivreur) {
+      map.panTo(
+        [
+          Number(courier.latitude),
+          Number(courier.longitude),
+        ],
+        {
+          animate: true,
+          duration: 1,
+        }
+      );
+    }
+  }, [
+    courier?.latitude,
+    courier?.longitude,
+    clientPosition?.latitude,
+    clientPosition?.longitude,
+    map,
+  ]);
 
   useEffect(() => {
     function zoomToClient() {
@@ -113,7 +141,6 @@ function RecenterMap({ courier, clientPosition }) {
 
   return null;
 }
-
 export default function TrackingMap({ courier, clientPosition }) {
   const [currentCourier, setCurrentCourier] = useState(courier);
 
@@ -145,7 +172,7 @@ export default function TrackingMap({ courier, clientPosition }) {
 
     refreshCourier();
 
-    const interval = setInterval(refreshCourier, 5000);
+    const interval = setInterval(refreshCourier, 8000);
 
     return () => clearInterval(interval);
   }, [courier?.id]);
