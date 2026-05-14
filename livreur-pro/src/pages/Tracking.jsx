@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getLivreurById,
@@ -33,32 +33,34 @@ export default function Tracking() {
   const [activeCourseId, setActiveCourseId] = useState(null);
   const [courseMessage, setCourseMessage] = useState("");
 
-  useEffect(() => {
-    function loadCourier() {
-      getLivreurById(id)
-        .then((livreur) => {
-          setCourier({
-            id: livreur.id,
-            name: livreur.nom,
-            city: livreur.ville,
-            vehicle: livreur.vehicule,
-            available: Boolean(livreur.disponible),
-            phone: livreur.telephone,
-            photo: livreur.photo,
-            whatsapp: livreur.telephone
-              ?.replace(/\s/g, "")
-              .replace("+", "")
-              .replace(/^0/, "33"),
-            latitude: livreur.latitude,
-            longitude: livreur.longitude,
-          });
+  const clientWatchRef = useRef(null);
 
-          setLoading(false);
-        })
-        .catch((err) => {
-          setError(err.message);
-          setLoading(false);
+  useEffect(() => {
+    async function loadCourier() {
+      try {
+        const livreur = await getLivreurById(id);
+
+        setCourier({
+          id: livreur.id,
+          name: livreur.nom,
+          city: livreur.ville,
+          vehicle: livreur.vehicule,
+          available: Boolean(livreur.disponible),
+          phone: livreur.telephone,
+          photo: livreur.photo,
+          whatsapp: livreur.telephone
+            ?.replace(/\s/g, "")
+            .replace("+", "")
+            .replace(/^0/, "33"),
+          latitude: livreur.latitude,
+          longitude: livreur.longitude,
         });
+
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
     }
 
     loadCourier();
@@ -71,6 +73,18 @@ export default function Tracking() {
   useEffect(() => {
     loadComments();
   }, [id]);
+
+  useEffect(() => {
+    return () => {
+      if (clientWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(clientWatchRef.current);
+      }
+    };
+  }, []);
+
+  const mapRefreshKey = useMemo(() => {
+    return `${courier?.id}-${courier?.latitude}-${courier?.longitude}-${clientPosition?.latitude}-${clientPosition?.longitude}`;
+  }, [courier, clientPosition]);
 
   async function loadComments() {
     try {
@@ -104,7 +118,18 @@ export default function Tracking() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    if (!navigator.geolocation) {
+      setError("يجب تفعيل الموقع لمشاركة موقعك مع السائق.");
+      return;
+    }
+
+    if (clientWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(clientWatchRef.current);
+    }
+
+    let courseCreated = false;
+
+    const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const position = {
           latitude: pos.coords.latitude,
@@ -113,21 +138,25 @@ export default function Tracking() {
 
         setClientPosition(position);
 
-        try {
-          const course = await createCourse({
-            client: client.id,
-            livreur: courier.id,
-            client_latitude: position.latitude,
-            client_longitude: position.longitude,
-          });
+        if (!courseCreated) {
+          courseCreated = true;
 
-          setActiveCourseId(course.id);
-          setCourseStarted(true);
-          setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
-          setCourseFinished(false);
-          setShowAcceptedQuestion(false);
-        } catch (err) {
-          setError(err.message || "Erreur création course");
+          try {
+            const course = await createCourse({
+              client: client.id,
+              livreur: courier.id,
+              client_latitude: position.latitude,
+              client_longitude: position.longitude,
+            });
+
+            setActiveCourseId(course.id);
+            setCourseStarted(true);
+            setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
+            setCourseFinished(false);
+            setShowAcceptedQuestion(false);
+          } catch (err) {
+            setError(err.message || "Erreur création course");
+          }
         }
       },
       () => {
@@ -135,16 +164,23 @@ export default function Tracking() {
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000,
         maximumAge: 0,
       }
     );
+
+    clientWatchRef.current = watchId;
   }
 
   async function handleFinishCourse() {
     try {
       if (activeCourseId) {
         await finishCourse(activeCourseId);
+      }
+
+      if (clientWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(clientWatchRef.current);
+        clientWatchRef.current = null;
       }
 
       setClientPosition(null);
@@ -421,7 +457,11 @@ export default function Tracking() {
           border: "2px solid #fed7aa",
         }}
       >
-        <TrackingMap courier={courier} clientPosition={clientPosition} />
+        <TrackingMap
+          key={mapRefreshKey}
+          courier={courier}
+          clientPosition={clientPosition}
+        />
       </div>
 
       <div className="tracking-card">
