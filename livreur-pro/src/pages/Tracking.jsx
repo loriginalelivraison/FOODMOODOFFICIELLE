@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getLivreurById,
@@ -35,6 +35,28 @@ export default function Tracking() {
 
   const clientWatchRef = useRef(null);
 
+  const [note, setNote] = useState(5);
+  const [showCommentQuestion, setShowCommentQuestion] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`activeTrackingCourse_${id}`);
+
+    if (!saved) return;
+
+    try {
+      const data = JSON.parse(saved);
+
+      setActiveCourseId(data.courseId);
+      setCourseStarted(data.courseStarted);
+      setCourseFinished(data.courseFinished);
+      setClientPosition(data.clientPosition);
+      setCourseMessage(data.courseMessage || "");
+      setShowAcceptedQuestion(false);
+    } catch (err) {
+      console.error("Erreur restauration course :", err);
+    }
+  }, [id]);
+
   useEffect(() => {
     async function loadCourier() {
       try {
@@ -58,14 +80,14 @@ export default function Tracking() {
 
         setLoading(false);
       } catch (err) {
-        setError(err.message);
+        setError("حدث خطأ أثناء تحميل معلومات السائق.");
         setLoading(false);
       }
     }
 
     loadCourier();
 
-    const interval = setInterval(loadCourier, 5000);
+    const interval = setInterval(loadCourier, 8000);
 
     return () => clearInterval(interval);
   }, [id]);
@@ -81,10 +103,6 @@ export default function Tracking() {
       }
     };
   }, []);
-
-  const mapRefreshKey = useMemo(() => {
-    return `${courier?.id}-${courier?.latitude}-${courier?.longitude}-${clientPosition?.latitude}-${clientPosition?.longitude}`;
-  }, [courier, clientPosition]);
 
   async function loadComments() {
     try {
@@ -119,7 +137,7 @@ export default function Tracking() {
     }
 
     if (!navigator.geolocation) {
-      setError("يجب تفعيل الموقع لمشاركة موقعك مع السائق.");
+      setError("الموقع الجغرافي غير مدعوم في هذا المتصفح.");
       return;
     }
 
@@ -142,29 +160,54 @@ export default function Tracking() {
           courseCreated = true;
 
           try {
-            const course = await createCourse({
+            const payload = {
               client: client.id,
               livreur: courier.id,
               client_latitude: position.latitude,
               client_longitude: position.longitude,
-            });
+            };
+
+            const course = await createCourse(payload);
 
             setActiveCourseId(course.id);
             setCourseStarted(true);
             setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
             setCourseFinished(false);
             setShowAcceptedQuestion(false);
+
+            localStorage.setItem(
+              `activeTrackingCourse_${id}`,
+              JSON.stringify({
+                courseId: course.id,
+                courseStarted: true,
+                courseFinished: false,
+                clientPosition: position,
+                courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
+              })
+            );
           } catch (err) {
-            setError(err.message || "Erreur création course");
+            console.error("ERREUR CREATE COURSE :", err);
+            setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
           }
+        } else {
+          localStorage.setItem(
+            `activeTrackingCourse_${id}`,
+            JSON.stringify({
+              courseId: activeCourseId,
+              courseStarted: true,
+              courseFinished: false,
+              clientPosition: position,
+              courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
+            })
+          );
         }
       },
       () => {
-        setError("يجب تفعيل الموقع لمشاركة موقعك مع السائق.");
+        setError("يجب تفعيل الموقع الجغرافي لمشاركة موقعك مع السائق.");
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 10000,
         maximumAge: 0,
       }
     );
@@ -183,13 +226,16 @@ export default function Tracking() {
         clientWatchRef.current = null;
       }
 
-      setClientPosition(null);
-      setCourseStarted(false);
-      setCourseMessage("");
-      setCourseFinished(true);
-      setShowCommentForm(true);
+setClientPosition(null);
+setCourseStarted(false);
+setCourseMessage("");
+setCourseFinished(true);
+setShowCommentQuestion(true);
+setShowCommentForm(false);
+
+localStorage.removeItem(`activeTrackingCourse_${id}`);
     } catch (err) {
-      setError(err.message || "Erreur fin course");
+      setError("حدث خطأ أثناء إنهاء الرحلة.");
     }
   }
 
@@ -200,7 +246,7 @@ export default function Tracking() {
     setCommentSuccess("");
 
     if (!messageCommentaire.trim()) {
-      setCommentError("Le commentaire est obligatoire.");
+      setCommentError("التعليق إجباري.");
       return;
     }
 
@@ -209,21 +255,24 @@ export default function Tracking() {
         livreur: id,
         nom_client: nomClient,
         message: messageCommentaire,
+        note: note,
       });
 
       setMessageCommentaire("");
       setNomClient("");
       setShowCommentForm(false);
-      setCommentSuccess("Commentaire ajouté.");
+      setCommentSuccess("تمت إضافة التعليق بنجاح.");
       loadComments();
+      navigate("/livreurs");
     } catch (err) {
-      setCommentError(err.message);
+      setCommentError("حدث خطأ أثناء إضافة التعليق.");
     }
   }
 
   function getVehicleLabel(vehicle) {
     const labels = {
       moto: "🛵 دراجة نارية",
+      scooter: "🛵 سكوتر",
       velo: "🚴 دراجة هوائية",
       voiture: "🚘 سيارة",
       camion: "🚛 شاحنة",
@@ -233,11 +282,19 @@ export default function Tracking() {
   }
 
   if (loading) {
-    return <section className="page">Chargement du suivi...</section>;
+    return (
+      <section className="page" dir="rtl">
+        جاري تحميل معلومات التتبع...
+      </section>
+    );
   }
 
   if (error) {
-    return <section className="page">{error}</section>;
+    return (
+      <section className="page" dir="rtl">
+        {error}
+      </section>
+    );
   }
 
   const photoUrl = courier.photo || null;
@@ -339,7 +396,7 @@ export default function Tracking() {
             window.location.href = `tel:${courier.phone}`;
           }}
         >
-          📞 Appeler
+          📞 اتصال
         </button>
 
         <button
@@ -350,8 +407,23 @@ export default function Tracking() {
             setShowAcceptedQuestion(true);
             window.open(`https://wa.me/${courier.whatsapp}`, "_blank");
           }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            background: "#22c55e",
+          }}
         >
-          WhatsApp
+          <span
+            style={{
+              width: "9px",
+              height: "9px",
+              background: "#dcfce7",
+              borderRadius: "50%",
+              display: "inline-block",
+            }}
+          ></span>
+          واتساب
         </button>
 
         {courseFinished && (
@@ -360,14 +432,14 @@ export default function Tracking() {
             type="button"
             onClick={() => setShowCommentForm(!showCommentForm)}
           >
-            Commenter
+            إضافة تعليق
           </button>
         )}
       </div>
 
       {showAcceptedQuestion && !courseStarted && (
         <div className="tracking-card">
-          <h3>هل تم قبول الرحلة؟</h3>
+          <h3>هل قبل السائق الرحلة؟</h3>
 
           <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
             <button
@@ -381,7 +453,11 @@ export default function Tracking() {
             <button
               className="primary-btn small"
               style={{ background: "#dc2626" }}
-              onClick={() => navigate("/livreurs")}
+              onClick={() => {
+                setShowAcceptedQuestion(false);
+                setCourseFinished(true);
+                setShowCommentForm(true);
+              }}
             >
               لا
             </button>
@@ -419,33 +495,119 @@ export default function Tracking() {
         </button>
       )}
 
+    {showCommentQuestion && !showCommentForm && (
+  <div
+    className="tracking-card"
+    style={{
+      textAlign: "center",
+      padding: "22px",
+    }}
+  >
+    <h3
+      style={{
+        marginBottom: "18px",
+        color: "#111827",
+      }}
+    >
+      هل تريد ترك تعليق وتقييم للسائق؟
+    </h3>
+
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        gap: "14px",
+      }}
+    >
+      <button
+        className="primary-btn"
+        type="button"
+        style={{
+          background: "#16a34a",
+          minWidth: "120px",
+          borderRadius: "14px",
+        }}
+        onClick={() => {
+          setShowCommentForm(true);
+          setShowCommentQuestion(false);
+        }}
+      >
+        ⭐ نعم
+      </button>
+
+<button
+  className="primary-btn small"
+  style={{ background: "#dc2626" }}
+  onClick={() => {
+    setShowAcceptedQuestion(false);
+    setCourseFinished(true);
+    setShowCommentQuestion(true);
+    setShowCommentForm(false);
+  }}
+>
+  لا
+</button>
+    </div>
+  </div>
+)}
       {showCommentForm && (
         <form className="tracking-card" onSubmit={handleSubmitComment}>
-          <h3>Ajouter un commentaire</h3>
+          <h3>
+            {courseFinished
+              ? "هل تريد ترك تعليق حول السائق؟"
+              : "إضافة تعليق"}
+          </h3>
 
           <input
             type="text"
-            placeholder="Votre nom"
+            placeholder="اسمك"
             value={nomClient}
             onChange={(e) => setNomClient(e.target.value)}
           />
 
+          <div style={{ textAlign: "center", marginBottom: "14px" }}>
+  <p style={{ fontWeight: "700", marginBottom: "8px" }}>
+    تقييم السائق
+  </p>
+
+  {[1, 2, 3, 4, 5].map((star) => (
+    <button
+      key={star}
+      type="button"
+      onClick={() => setNote(star)}
+      style={{
+        fontSize: "30px",
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+        color: star <= note ? "#f59e0b" : "#d1d5db",
+      }}
+    >
+      ★
+    </button>
+  ))}
+</div>
+
           <textarea
-            placeholder="Votre commentaire"
+            placeholder="اكتب تعليقك هنا"
             value={messageCommentaire}
             onChange={(e) => setMessageCommentaire(e.target.value)}
             rows="4"
           />
 
           <button className="primary-btn small" type="submit">
-            Envoyer
+            إرسال
           </button>
 
           {commentError && <p style={{ color: "red" }}>{commentError}</p>}
         </form>
       )}
 
-      {commentSuccess && <p style={{ color: "green" }}>{commentSuccess}</p>}
+      {commentSuccess && (
+        <p style={{ color: "green", textAlign: "center", fontWeight: "600" }}>
+          {commentSuccess}
+        </p>
+      )}
 
       <div
         className="tracking-card"
@@ -457,21 +619,17 @@ export default function Tracking() {
           border: "2px solid #fed7aa",
         }}
       >
-        <TrackingMap
-          key={mapRefreshKey}
-          courier={courier}
-          clientPosition={clientPosition}
-        />
+        <TrackingMap courier={courier} clientPosition={clientPosition} />
       </div>
 
       <div className="tracking-card">
         <h3>التعليقات</h3>
 
-        {comments.length === 0 && <h5>لا يوجد بعد أي تعليق</h5>}
+        {comments.length === 0 && <h5>لا توجد تعليقات بعد</h5>}
 
         {comments.map((comment) => (
           <div key={comment.id} className="comment-card">
-            <strong>{comment.nom_client || "Client"}</strong>
+            <strong>👤 {comment.nom_client || "زبون"}</strong>
             <p>{comment.message}</p>
             <small>{new Date(comment.created_at).toLocaleString("fr-FR")}</small>
           </div>

@@ -318,28 +318,29 @@ export async function deleteClient(id) {
   return true;
 }
 
-// créer une course
-export async function createCourse(courseData) {
-  const token = localStorage.getItem("access");
-
+export async function createCourse(data) {
   const response = await fetch(`${API_BASE_URL}/courses/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(courseData),
+    body: JSON.stringify(data),
   });
 
-  const data = await response.json();
+  const result = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(data.detail || "Erreur création course");
+    console.error("ERREUR BACKEND CREATE COURSE :", result);
+    throw new Error(
+      result?.error ||
+      result?.detail ||
+      JSON.stringify(result) ||
+      "Erreur création course"
+    );
   }
 
-  return data;
+  return result;
 }
-
 // récupérer course active livreur
 export async function getActiveCourse(livreurId) {
   const response = await fetch(
@@ -399,4 +400,17 @@ export async function updateLivreurPhoto(id, photoFile) {
   }
 
   return data;
+}
+export async function getActiveCoursesForLivreur(livreurId) {
+  const response = await fetch(
+    `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result?.detail || "Erreur chargement course active");
+  }
+
+  return result;
 }
