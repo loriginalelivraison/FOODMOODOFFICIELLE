@@ -16,18 +16,9 @@ class DemandeLivraisonSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class CommentaireLivreurSerializer(serializers.ModelSerializer):
-    livreur_nom = serializers.CharField(source="livreur.nom", read_only=True)
-
     class Meta:
         model = CommentaireLivreur
-        fields = [
-            "id",
-            "livreur",
-            "livreur_nom",
-            "nom_client",
-            "message",
-            "created_at",
-        ]
+        fields = "__all__"
 
 class ClientSerializer(serializers.ModelSerializer):
     class Meta:
