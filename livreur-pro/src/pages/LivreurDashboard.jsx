@@ -112,7 +112,7 @@ export default function LivreurDashboard() {
       },
       (geoError) => {
         console.error(geoError);
-        setError("تعذر الحصول على موقعك الجغرافي.");
+        setError("الرجاء تفعيل تعقب الموقع في هاتفك");
       },
       {
         enableHighAccuracy: true,
