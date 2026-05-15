@@ -4,19 +4,31 @@ import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
 import { Search } from "lucide-react";
 
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
 export default function Couriers() {
   const [query, setQuery] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
-
   const [selectedVehicle, setSelectedVehicle] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
-
   const [couriers, setCouriers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [clientPosition, setClientPosition] = useState(null);
-
   const [locationDisabled, setLocationDisabled] = useState(false);
   const [locationEnabledMessage, setLocationEnabledMessage] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -43,8 +55,8 @@ export default function Couriers() {
           available: Boolean(livreur.disponible),
           rating: livreur.note,
           deliveries: livreur.nombre_livraisons,
-          latitude: livreur.latitude,
-          longitude: livreur.longitude,
+          latitude: livreur.latitude ? Number(livreur.latitude) : null,
+          longitude: livreur.longitude ? Number(livreur.longitude) : null,
           phone: livreur.telephone,
           photo: livreur.photo,
           skills: ["Livraison rapide"],
@@ -59,7 +71,6 @@ export default function Couriers() {
     }
 
     loadLivreurs();
-
     const interval = setInterval(loadLivreurs, 5000);
 
     return () => clearInterval(interval);
@@ -86,7 +97,7 @@ export default function Couriers() {
   }, [couriers]);
 
   const filtered = useMemo(() => {
-    return couriers.filter((c) => {
+    let list = couriers.filter((c) => {
       const searchText =
         `${c.name} ${c.city} ${c.zone} ${c.vehicle} ${c.skills.join(" ")}`.toLowerCase();
 
@@ -97,11 +108,28 @@ export default function Couriers() {
         (!selectedCity || c.city === selectedCity)
       );
     });
-  }, [query, onlyAvailable, selectedVehicle, selectedCity, couriers]);
+
+    if (clientPosition) {
+      list = list
+        .filter((c) => c.latitude !== null && c.longitude !== null)
+        .map((c) => ({
+          ...c,
+          distanceKm: getDistanceKm(
+            clientPosition.latitude,
+            clientPosition.longitude,
+            c.latitude,
+            c.longitude
+          ),
+        }))
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+    }
+
+    return list;
+  }, [query, onlyAvailable, selectedVehicle, selectedCity, couriers, clientPosition]);
 
   const mapRefreshKey = useMemo(() => {
     return filtered
-      .map((c) => `${c.id}-${c.latitude}-${c.longitude}-${c.available}`)
+      .map((c) => `${c.id}-${c.latitude}-${c.longitude}-${c.available}-${c.distanceKm}`)
       .join("|");
   }, [filtered]);
 
@@ -110,8 +138,6 @@ export default function Couriers() {
       latitude: pos.coords.latitude,
       longitude: pos.coords.longitude,
     };
-
-    console.log("GPS CLIENT :", position);
 
     setClientPosition(position);
     setLocationDisabled(false);
@@ -131,7 +157,6 @@ export default function Couriers() {
 
   function handleLocationError(error) {
     console.error("Erreur GPS client :", error);
-
     setSearchingLocation(false);
     setLocationDisabled(true);
     setLocationEnabledMessage(false);
@@ -199,43 +224,39 @@ export default function Couriers() {
             >
               {searchingLocation
                 ? "🔎 جاري البحث عن السائقين..."
-                : "⮚ السائقون حولي"}
+                : "ابحث عن سائق بقربك"}
             </button>
           </div>
         </center>
       </div>
 
       {locationDisabled && !clientPosition && (
-        <div
-          style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#b91c1c",
-            padding: "14px",
-            borderRadius: "12px",
-            marginBottom: "18px",
-            fontWeight: "600",
-            textAlign: "center",
-          }}
-        >
+        <div style={{
+          background: "#fef2f2",
+          border: "1px solid #fecaca",
+          color: "#b91c1c",
+          padding: "14px",
+          borderRadius: "12px",
+          marginBottom: "18px",
+          fontWeight: "600",
+          textAlign: "center",
+        }}>
           ⚠️ يرجى تفعيل الموقع الجغرافي لرؤية السائقين القريبين منك
         </div>
       )}
 
       {locationEnabledMessage && (
-        <div
-          style={{
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
-            color: "#15803d",
-            padding: "14px",
-            borderRadius: "12px",
-            marginBottom: "18px",
-            fontWeight: "600",
-            textAlign: "center",
-          }}
-        >
-          ✅ موقعك الجغرافي مفعل وتمت مشاركته بنجاح
+        <div style={{
+          background: "#f0fdf4",
+          border: "1px solid #bbf7d0",
+          color: "#15803d",
+          padding: "14px",
+          borderRadius: "12px",
+          marginBottom: "18px",
+          fontWeight: "600",
+          textAlign: "center",
+        }}>
+          ✅ موقعك الجغرافي مفعل وتم ترتيب السائقين حسب الأقرب إليك
         </div>
       )}
 
@@ -252,7 +273,7 @@ export default function Couriers() {
             }}
             placeholder="ابحث عن سائق"
             style={{
-              width: "300px",
+              width: "250px",
               background: "#fff7ed",
               border: "1px solid #f5bf99",
               color: "#1f2937",
@@ -268,7 +289,6 @@ export default function Couriers() {
               onChange={(e) => setSelectedVehicle(e.target.value)}
             >
               <option value="">كل وسائل النقل</option>
-
               {vehicleOptions.map((vehicle) => (
                 <option key={vehicle} value={vehicle}>
                   {vehicleLabels[vehicle] || vehicle}
@@ -282,7 +302,6 @@ export default function Couriers() {
               onChange={(e) => setSelectedCity(e.target.value)}
             >
               <option value="">كل المناطق</option>
-
               {streets.map((street) => (
                 <option key={street} value={street}>
                   {street}
@@ -303,30 +322,25 @@ export default function Couriers() {
       </div>
 
       {loading && <p>Chargement des livreurs...</p>}
-
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {!loading && !error && filtered.length === 0 && (
         <p>Aucun livreur disponible pour le moment.</p>
       )}
 
-      <div
-        style={{
-          background: "#fff7ed",
-          border: "2px solid #f5bf99",
-          borderRadius: "24px",
-          padding: "10px",
-          margin: "12px 0 20px",
-          boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
-        }}
-      >
-        <div
-          style={{
-            height: "260px",
-            borderRadius: "18px",
-            overflow: "hidden",
-          }}
-        >
+      <div style={{
+        background: "#fff7ed",
+        border: "2px solid #f5bf99",
+        borderRadius: "24px",
+        padding: "10px",
+        margin: "12px 0 20px",
+        boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
+      }}>
+        <div style={{
+          height: "260px",
+          borderRadius: "18px",
+          overflow: "hidden",
+        }}>
           <CouriersMap
             key={mapRefreshKey}
             couriers={filtered}
@@ -336,13 +350,11 @@ export default function Couriers() {
       </div>
 
       {!loading && !error && (
-        <p
-          style={{
-            textAlign: "center",
-            margin: "15px 0",
-            fontWeight: "600",
-          }}
-        >
+        <p style={{
+          textAlign: "center",
+          margin: "15px 0",
+          fontWeight: "600",
+        }}>
           عدد السائقين : {filtered.length}
         </p>
       )}

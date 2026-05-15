@@ -3,7 +3,7 @@ import { Home, Users, User, LogIn, Bike, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import React from "react";
 import LogoutButton from "./LogoutButton";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo3.png";
 
 export default function Layout() {
   const [auth, setAuth] = useState({
