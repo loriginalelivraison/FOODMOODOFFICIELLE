@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
-import logo2 from "../assets/logo2.png"
+import logo2 from "../assets/logo2.png";
 import { useNavigate } from "react-router-dom";
 
 export default function CourierRegister() {
@@ -25,6 +25,7 @@ export default function CourierRegister() {
   const [mode, setMode] = useState("register");
   const [error, setError] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [gpsError, setGpsError] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
     telephone: "",
@@ -44,9 +45,31 @@ export default function CourierRegister() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
     setError("");
+    setGpsError(false);
+
+    if (!navigator.geolocation) {
+      setGpsError(true);
+      setError("خدمة تحديد الموقع غير مدعومة في هذا الجهاز");
+      return;
+    }
 
     try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+          }
+        );
+      });
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
       const data = new FormData();
 
       data.append("nom", registerForm.nom);
@@ -57,10 +80,13 @@ export default function CourierRegister() {
       data.append("password", registerForm.password);
       data.append("services", registerForm.services);
 
+      data.append("latitude", latitude);
+      data.append("longitude", longitude);
+
       if (registerForm.photo) {
-        data.append("photo", registerForm.photo);}
- 
-      
+        data.append("photo", registerForm.photo);
+      }
+
       await createLivreur(data);
 
       await loginJWT({
@@ -76,6 +102,12 @@ export default function CourierRegister() {
 
       navigate(`/livreur-dashboard/${livreur.id}`);
     } catch (err) {
+      if (err.code === 1) {
+        setGpsError(true);
+        setError("يجب تفعيل الموقع الجغرافي لإكمال التسجيل");
+        return;
+      }
+
       setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
     }
   }
@@ -115,7 +147,9 @@ export default function CourierRegister() {
       <div className="auth-card">
         <center>
           <h2>
-            {mode === "register" ? "تسجيل سائق جديد" : "تسجيل دخول السائق"}
+            {mode === "register"
+              ? "تسجيل سائق جديد"
+              : "تسجيل دخول السائق"}
           </h2>
 
           <h5>
@@ -128,7 +162,11 @@ export default function CourierRegister() {
         <div className="auth-switch">
           <button
             type="button"
-            className={mode === "register" ? "primary-btn small" : "secondary-btn small"}
+            className={
+              mode === "register"
+                ? "primary-btn small"
+                : "secondary-btn small"
+            }
             onClick={() => setMode("register")}
           >
             تسجيل جديد
@@ -136,7 +174,11 @@ export default function CourierRegister() {
 
           <button
             type="button"
-            className={mode === "login" ? "primary-btn small" : "secondary-btn small"}
+            className={
+              mode === "login"
+                ? "primary-btn small"
+                : "secondary-btn small"
+            }
             onClick={() => setMode("login")}
           >
             لدي حساب بالفعل
@@ -145,16 +187,33 @@ export default function CourierRegister() {
 
         {mode === "login" ? (
           <form className="auth-form" onSubmit={handleLogin}>
-            {error && <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>{error}</p>}
+            {error && (
+              <p
+                style={{
+                  color: "red",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
+              >
+                {error}
+              </p>
+            )}
 
             <label>
               رقم الهاتف
               <input
                 required
                 placeholder="0555555555"
-                value={loginForm.telephone}
+                
+                 maxLength={10}
+    pattern="0[0-9]{9}"
+    title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
+    value={registerForm.telephone}
                 onChange={(e) =>
-                  setLoginForm({ ...loginForm, telephone: e.target.value })
+                  setLoginForm({
+                    ...loginForm,
+                    telephone: e.target.value,
+                  })
                 }
               />
             </label>
@@ -167,7 +226,10 @@ export default function CourierRegister() {
                 placeholder="أدخل كلمة المرور"
                 value={loginForm.password}
                 onChange={(e) =>
-                  setLoginForm({ ...loginForm, password: e.target.value })
+                  setLoginForm({
+                    ...loginForm,
+                    password: e.target.value,
+                  })
                 }
               />
             </label>
@@ -177,8 +239,22 @@ export default function CourierRegister() {
             </button>
           </form>
         ) : (
-          <form className="auth-form" onSubmit={handleSubmit} encType="multipart/form-data">
-            {error && <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>{error}</p>}
+          <form
+            className="auth-form"
+            onSubmit={handleSubmit}
+            encType="multipart/form-data"
+          >
+            {error && (
+              <p
+                style={{
+                  color: "red",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
+              >
+                {error}
+              </p>
+            )}
 
             <label>
               الاسم الكامل
@@ -188,7 +264,10 @@ export default function CourierRegister() {
                 placeholder="مثال: أمين"
                 value={registerForm.nom}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, nom: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    nom: e.target.value,
+                  })
                 }
               />
             </label>
@@ -196,11 +275,15 @@ export default function CourierRegister() {
             <label>
               رقم الهاتف
               <input
-                required
-                placeholder=""
-                value={registerForm.telephone}
+                maxLength={10}
+    pattern="0[0-9]{9}"
+    title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
+    value={registerForm.telephone}      
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, telephone: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    telephone: e.target.value,
+                  })
                 }
               />
             </label>
@@ -211,7 +294,10 @@ export default function CourierRegister() {
                 required
                 value={registerForm.ville}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, ville: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    ville: e.target.value,
+                  })
                 }
               >
                 {quartiers.map((quartier) => (
@@ -228,7 +314,10 @@ export default function CourierRegister() {
                 required
                 value={registerForm.vehicule}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, vehicule: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    vehicule: e.target.value,
+                  })
                 }
               >
                 <option value="moto">دراجة نارية</option>
@@ -262,7 +351,10 @@ export default function CourierRegister() {
                 placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، أدوية..."
                 value={registerForm.services}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, services: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    services: e.target.value,
+                  })
                 }
               />
             </label>
@@ -275,46 +367,109 @@ export default function CourierRegister() {
                 placeholder="أدخل كلمة المرور"
                 value={registerForm.password}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, password: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    password: e.target.value,
+                  })
                 }
               />
             </label>
 
-         <div>
-  <p style={{ marginBottom: "8px", fontWeight: "600" }}>
-    إضافة صورة
-  </p>
+            <div>
+              <p
+                style={{
+                  marginBottom: "8px",
+                  fontWeight: "600",
+                }}
+              >
+                إضافة صورة
+              </p>
 
-  <label htmlFor="driver-photo" className="upload-box">
-    <UploadCloud />
-    <span>
-      {registerForm.photo
-        ? "تم اختيار الصورة بنجاح"
-        : "صورة اختيارية للسائق"}
-    </span>
-  </label>
+              <label
+                htmlFor="driver-photo"
+                className="upload-box"
+              >
+                <UploadCloud />
 
-  <input
-    id="driver-photo"
-    type="file"
-    accept="image/*"
-    onChange={handlePhotoChange}
-    style={{ display: "none" }}
-  />
-  {registerForm.photo && (
-  <p
-    style={{
-      marginTop: "8px",
-      fontSize: "14px",
-      color: "#16a34a",
-      fontWeight: "600",
-      textAlign: "center",
-    }}
-  >
-    ✅ {registerForm.photo.name}
-  </p>
-)}
-</div>
+                <span>
+                  {registerForm.photo
+                    ? "تم اختيار الصورة بنجاح"
+                    : "صورة اختيارية للسائق"}
+                </span>
+              </label>
+
+              <input
+                id="driver-photo"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                style={{ display: "none" }}
+              />
+
+              {registerForm.photo && (
+                <p
+                  style={{
+                    marginTop: "8px",
+                    fontSize: "14px",
+                    color: "#16a34a",
+                    fontWeight: "600",
+                    textAlign: "center",
+                  }}
+                >
+                  ✅ {registerForm.photo.name}
+                </p>
+              )}
+            </div>
+
+            <div
+              style={{
+                background: gpsError
+                  ? "rgba(239,68,68,0.12)"
+                  : "rgba(59,130,246,0.08)",
+
+                border: gpsError
+                  ? "1px solid rgba(239,68,68,0.35)"
+                  : "1px solid rgba(59,130,246,0.25)",
+
+                color: gpsError ? "#b91c1c" : "#1e3a8a",
+
+                padding: "14px",
+                borderRadius: "14px",
+                marginTop: "18px",
+                marginBottom: "14px",
+                fontSize: "14px",
+                lineHeight: "1.8",
+                textAlign: "right",
+                fontWeight: "500",
+
+                animation: gpsError
+                  ? "shake 0.35s ease-in-out"
+                  : "none",
+
+                transition: "all 0.25s ease",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "6px",
+                  fontWeight: "700",
+                  color: gpsError
+                    ? "#dc2626"
+                    : "#1d4ed8",
+                }}
+              >
+                📍 تفعيل الموقع الجغرافي
+              </div>
+
+              <span>
+                {gpsError
+                  ? "يجب السماح بالوصول إلى موقعك لإكمال إنشاء الحساب"
+                  : "يجب تفعيل خدمة تحديد الموقع (GPS) للسماح للعملاء برؤية موقعك وإرسال طلبات التوصيل القريبة منك."}
+              </span>
+            </div>
 
             <button className="primary-btn full" type="submit">
               إنشاء حساب السائق
