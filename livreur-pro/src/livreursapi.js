@@ -450,3 +450,31 @@ export async function getClientCourses() {
 
   return Array.isArray(data) ? data : data.results || [];
 }
+
+export async function updateClientCoursePosition(courseId, position) {
+  const token = localStorage.getItem("access");
+
+  const response = await fetch(
+    `${API_BASE_URL}/courses/${courseId}/update_client_position/`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(position),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail ||
+      data.error ||
+      "Erreur mise à jour position client"
+    );
+  }
+
+  return data;
+}
