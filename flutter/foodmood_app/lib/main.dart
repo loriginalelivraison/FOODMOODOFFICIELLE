@@ -235,25 +235,42 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
       });
     },
 
-    onNavigationRequest: (NavigationRequest request) async {
-      final url = request.url;
+onNavigationRequest: (NavigationRequest request) async {
+  final url = request.url;
 
-      if (url.startsWith('tel:')) {
-        final uri = Uri.parse(url);
+  // Appel téléphone
+  if (url.startsWith('tel:')) {
+    final uri = Uri.parse(url);
 
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(
-            uri,
-            mode: LaunchMode.externalApplication,
-          );
-        }
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    }
 
-        return NavigationDecision.prevent;
-      }
+    return NavigationDecision.prevent;
+  }
 
-      return NavigationDecision.navigate;
-    },
-  ),
+  // WhatsApp
+  if (
+    url.startsWith('https://wa.me/') ||
+    url.startsWith('whatsapp://')
+  ) {
+    final uri = Uri.parse(url);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    }
+
+    return NavigationDecision.prevent;
+  }
+
+  return NavigationDecision.navigate;
+},
 )
 ..loadRequest(
   Uri.parse(

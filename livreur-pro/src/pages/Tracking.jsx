@@ -10,6 +10,23 @@ import {
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
 
+function openExternalUrl(url) {
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_self";
+    link.rel = "noopener noreferrer";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    console.error("Erreur ouverture lien :", err);
+    alert("Impossible d'ouvrir le lien.");
+  }
+}
+
+
 export default function Tracking() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -400,43 +417,48 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
 
       <div className="card-bottom">
         <button
-          className="primary-btn small"
-          type="button"
-          onClick={() => {
-            if (!requireClientAuth()) return;
-            setShowAcceptedQuestion(true);
-            window.location.href = `tel:${courier.phone}`;
-          }}
-        >
-          📞 اتصال
-        </button>
+  className="primary-btn small"
+  type="button"
+  onClick={() => {
+    if (!requireClientAuth()) return;
 
-        <button
-          className="primary-btn small"
-          type="button"
-          onClick={() => {
-            if (!requireClientAuth()) return;
-            setShowAcceptedQuestion(true);
-            window.open(`https://wa.me/${courier.whatsapp}`, "_blank");
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            background: "#22c55e",
-          }}
-        >
-          <span
-            style={{
-              width: "9px",
-              height: "9px",
-              background: "#dcfce7",
-              borderRadius: "50%",
-              display: "inline-block",
-            }}
-          ></span>
-          واتساب
-        </button>
+    setShowAcceptedQuestion(true);
+
+    openExternalUrl(`tel:${courier.phone}`);
+  }}
+>
+  📞 اتصال
+</button>
+
+       <button
+  className="primary-btn small"
+  type="button"
+  onClick={() => {
+    if (!requireClientAuth()) return;
+
+    setShowAcceptedQuestion(true);
+
+    openExternalUrl(`https://wa.me/${courier.whatsapp}`);
+  }}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    background: "#22c55e",
+  }}
+>
+  <span
+    style={{
+      width: "9px",
+      height: "9px",
+      background: "#dcfce7",
+      borderRadius: "50%",
+      display: "inline-block",
+    }}
+  ></span>
+
+  واتساب
+</button>
 
         {courseFinished && (
           <button
