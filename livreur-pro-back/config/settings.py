@@ -15,29 +15,22 @@ import os
 import dj_database_url
 from datetime import timedelta
 import cloudinary
+from dotenv import load_dotenv
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=365),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=365),
-}
+load_dotenv(BASE_DIR / ".env")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(dh!b&*0yyq_rw2edkpay8x=te#qdw92@+#@2-+mgdz3s3eckp'
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-ALLOWED_HOSTS = [
-    "*"
-]
-
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-local")
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
@@ -119,9 +112,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 CLOUDINARY_STORAGE = {
-    "CLOUD_NAME":"dzijt4xbh",
-    "API_KEY":"822486142918698",
-    "API_SECRET":"IO6vLgZrtydSQRCIbs8UalvX_7o",
+    "CLOUD_NAME": "dzijt4xbh",
+    "API_KEY": "822486142918698",
+    "API_SECRET": "IO6vLgZrtydSQRCIbs8UalvX_7o",
 }
 
 cloudinary.config(

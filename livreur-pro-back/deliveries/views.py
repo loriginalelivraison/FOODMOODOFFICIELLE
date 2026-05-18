@@ -7,7 +7,7 @@ from .serializers import (
     ClientSerializer,
     CourseSerializer,
 )
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -15,6 +15,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Avg
+from rest_framework.permissions import AllowAny
 
 
 class LivreurViewSet(ModelViewSet):
@@ -83,6 +84,7 @@ class DemandeLivraisonViewSet(ModelViewSet):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def register_livreur(request):
     nom = request.data.get("nom")
     telephone = request.data.get("telephone")
@@ -113,15 +115,24 @@ def register_livreur(request):
         password=password,
     )
 
-    livreur = Livreur.objects.create(
-        user=user,
-        nom=nom,
-        telephone=telephone,
-        ville=ville,
-        vehicule=vehicule,
-        disponible=True,
-        photo=request.FILES.get("photo"),
-    )
+    try:
+        livreur = Livreur.objects.create(
+            user=user,
+            nom=nom,
+            telephone=telephone,
+            ville=ville,
+            vehicule=vehicule,
+            disponible=True,
+            photo=request.FILES.get("photo"),
+        )
+
+    except Exception as e:
+        user.delete()
+
+        return Response(
+            {"error": f"Erreur upload photo Cloudinary: {str(e)}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     return Response({
         "message": "Livreur créé avec succès",
