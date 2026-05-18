@@ -1,4 +1,33 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+
+function getCleanToken() {
+  return localStorage.getItem("access")?.replaceAll('"', "").trim();
+}
+
+function handleInvalidToken(data) {
+  const message = JSON.stringify(data || "");
+
+  if (
+    message.includes("Given token not valid") ||
+    message.includes("token_not_valid") ||
+    message.includes("Token is invalid") ||
+    message.includes("Token is expired")
+  ) {
+    localStorage.clear();
+    window.dispatchEvent(new Event("authChanged"));
+    window.location.href = "/connexion-livreur";
+  }
+}
+
+function authHeaders(extra = {}) {
+  const token = getCleanToken();
+
+  return {
+    ...extra,
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 export async function getLivreurs() {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
@@ -74,11 +103,9 @@ export async function loginJWT(credentials) {
 }
 
 export async function createLivreur(livreur) {
-  const url = `${API_BASE_URL}/livreurs/register/`;
-
-  const response = await fetch(url, {
+  const response = await fetch(`${API_BASE_URL}/livreurs/register/`, {
     method: "POST",
-    body: livreur
+    body: livreur,
   });
 
   const text = await response.text();
@@ -94,9 +121,7 @@ export async function createLivreur(livreur) {
 
   if (!response.ok) {
     throw new Error(
-      data.error ||
-      data.telephone?.[0] ||
-      "Erreur lors de l'inscription"
+      data.error || data.telephone?.[0] || "Erreur lors de l'inscription"
     );
   }
 
@@ -104,20 +129,18 @@ export async function createLivreur(livreur) {
 }
 
 export async function updateLivreurPosition(id, position) {
-  const token = localStorage.getItem("access");
-
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/update_position/`, {
     method: "PATCH",
-    headers: {
+    headers: authHeaders({
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    }),
     body: JSON.stringify(position),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
     console.log("Erreur Django update_position :", data);
     throw new Error(data.detail || data.error || "Erreur mise à jour position");
   }
@@ -125,7 +148,6 @@ export async function updateLivreurPosition(id, position) {
   return data;
 }
 
-//recuperer l'id de livreur par phone 
 export async function getLivreurBytelephone(telephone) {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
 
@@ -134,32 +156,23 @@ export async function getLivreurBytelephone(telephone) {
   }
 
   const data = await response.json();
+  const livreurs = Array.isArray(data) ? data : data.results || [];
 
-  const livreurs = Array.isArray(data)
-    ? data
-    : data.results || [];
+  const clean = (value) => String(value || "").replace(/\s/g, "");
 
-  const clean = (value) =>
-    String(value || "").replace(/\s/g, "");
-
-  return livreurs.find(
-    (l) => clean(l.telephone) === clean(telephone)
-  );
+  return livreurs.find((l) => clean(l.telephone) === clean(telephone));
 }
-//rendre le livreur occupé
-export async function setLivreurUnavailable(id) {
-  const token = localStorage.getItem("access");
 
+export async function setLivreurUnavailable(id) {
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/set_unavailable/`, {
     method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
     throw new Error(data.detail || data.error || "Erreur désactivation livreur");
   }
 
@@ -195,7 +208,7 @@ export async function createCommentaireLivreur(commentaire) {
 
   return data;
 }
-//inscription client 
+
 export async function createClient(client) {
   const response = await fetch(`${API_BASE_URL}/clients/register/`, {
     method: "POST",
@@ -214,7 +227,6 @@ export async function createClient(client) {
   return data;
 }
 
-//login client
 export async function loginClient(credentials) {
   const response = await fetch(`${API_BASE_URL}/token/`, {
     method: "POST",
@@ -267,123 +279,107 @@ export async function loginClient(credentials) {
 }
 
 export async function getClientByTelephone(telephone) {
-  const token = localStorage.getItem("access");
-
   const response = await fetch(`${API_BASE_URL}/clients/`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
     console.error("Erreur récupération client :", data);
     throw new Error(data.detail || "Erreur récupération client");
   }
 
   const clients = Array.isArray(data) ? data : data.results || [];
-
   const clean = (value) => String(value || "").replace(/\s/g, "");
 
-  return clients.find(
-    (client) => clean(client.telephone) === clean(telephone)
-  );
+  return clients.find((client) => clean(client.telephone) === clean(telephone));
 }
-//supprimer un compte livreur 
-export async function deleteLivreur(id) {
-  const token = localStorage.getItem("access");
 
+export async function deleteLivreur(id) {
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    handleInvalidToken(error);
     throw new Error(error.detail || "Erreur suppression compte livreur");
   }
 
   return true;
 }
-//supprimer un compte client 
-export async function deleteClient(id) {
-  const token = localStorage.getItem("access");
 
+export async function deleteClient(id) {
   const response = await fetch(`${API_BASE_URL}/clients/${id}/`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error("Impossible de supprimer le compte client");
+    const error = await response.json().catch(() => ({}));
+    handleInvalidToken(error);
+    throw new Error(error.detail || "Impossible de supprimer le compte client");
   }
 
   return true;
 }
 
 export async function createCourse(data) {
-  const token = localStorage.getItem("access");
-
   const response = await fetch(`${API_BASE_URL}/courses/`, {
     method: "POST",
-    headers: {
+    headers: authHeaders({
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    }),
     body: JSON.stringify(data),
   });
 
   const result = await response.json().catch(() => null);
 
   if (!response.ok) {
+    handleInvalidToken(result);
     console.error("ERREUR BACKEND CREATE COURSE :", result);
     throw new Error(
       result?.error ||
-      result?.detail ||
-      JSON.stringify(result) ||
-      "Erreur création course"
+        result?.detail ||
+        JSON.stringify(result) ||
+        "Erreur création course"
     );
   }
 
   return result;
 }
-// récupérer course active livreur
+
 export async function getActiveCourse(livreurId) {
   const response = await fetch(
-    `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.detail || "Erreur récupération course");
-  }
-
-  return data;
-}
-
-// terminer course
-export async function finishCourse(courseId) {
-  const token = localStorage.getItem("access");
-
-  const response = await fetch(
-    `${API_BASE_URL}/courses/${courseId}/finish/`,
+    `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`,
     {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeaders(),
     }
   );
 
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(data.detail || "Erreur récupération course");
+  }
+
+  return data;
+}
+
+export async function finishCourse(courseId) {
+  const response = await fetch(`${API_BASE_URL}/courses/${courseId}/finish/`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    handleInvalidToken(data);
     throw new Error(data.detail || "Erreur fin course");
   }
 
@@ -391,42 +387,37 @@ export async function finishCourse(courseId) {
 }
 
 export async function updateLivreurPhoto(id, photoFile) {
-  const token = localStorage.getItem("access");
-
   const formData = new FormData();
   formData.append("photo", photoFile);
 
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
     method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(),
     body: formData,
   });
 
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
     throw new Error(data.photo?.[0] || data.detail || "Erreur modification photo");
   }
 
   return data;
 }
-export async function getActiveCoursesForLivreur(livreurId) {
-  const token = localStorage.getItem("access");
 
+export async function getActiveCoursesForLivreur(livreurId) {
   const response = await fetch(
     `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`,
     {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeaders(),
     }
   );
 
   const result = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(result);
     throw new Error(result?.detail || "Erreur chargement course active");
   }
 
@@ -434,17 +425,14 @@ export async function getActiveCoursesForLivreur(livreurId) {
 }
 
 export async function getClientCourses() {
-  const token = localStorage.getItem("access");
-
   const response = await fetch(`${API_BASE_URL}/courses/`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
     throw new Error(data.detail || "Erreur chargement historique");
   }
 
@@ -452,16 +440,13 @@ export async function getClientCourses() {
 }
 
 export async function updateClientCoursePosition(courseId, position) {
-  const token = localStorage.getItem("access");
-
   const response = await fetch(
     `${API_BASE_URL}/courses/${courseId}/update_client_position/`,
     {
       method: "PATCH",
-      headers: {
+      headers: authHeaders({
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      }),
       body: JSON.stringify(position),
     }
   );
@@ -469,10 +454,9 @@ export async function updateClientCoursePosition(courseId, position) {
   const data = await response.json();
 
   if (!response.ok) {
+    handleInvalidToken(data);
     throw new Error(
-      data.detail ||
-      data.error ||
-      "Erreur mise à jour position client"
+      data.detail || data.error || "Erreur mise à jour position client"
     );
   }
 
