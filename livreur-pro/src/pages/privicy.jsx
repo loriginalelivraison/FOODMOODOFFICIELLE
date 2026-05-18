@@ -117,7 +117,7 @@ export default function PrivacyPolicy() {
         </p>
 
         <p>
-          <strong>البريد الإلكتروني:</strong> tita08661@gmail.com
+          <strong>البريد الإلكتروني:</strong> winrakdz@outlook.fr
         </p>
 
         <p style={styles.footer}>

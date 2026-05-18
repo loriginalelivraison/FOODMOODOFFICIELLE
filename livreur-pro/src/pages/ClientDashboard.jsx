@@ -5,6 +5,8 @@ import {
   getCommentairesLivreur,
 } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
+import LogoutButton from "../components/LogoutButton.jsx";
+import { LogOut } from "lucide-react";
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -92,6 +94,7 @@ export default function ClientDashboard() {
     }
   }
 
+
   if (!client) {
     return (
       <section className="page" dir="rtl">
@@ -107,6 +110,23 @@ export default function ClientDashboard() {
       </section>
     );
   }
+
+
+ function logout() {
+  localStorage.removeItem("access");
+  localStorage.removeItem("refresh");
+
+  localStorage.removeItem("livreur");
+  localStorage.removeItem("client");
+  localStorage.removeItem("role");
+
+  window.dispatchEvent(new Event("authChanged"));
+  navigate("/");
+
+}
+  const isLoggedIn = localStorage.getItem("access");
+
+  if (!isLoggedIn) return null;
 
   return (
     <section className="page" dir="rtl">
@@ -130,6 +150,15 @@ export default function ClientDashboard() {
         >
           {showHistory ? "إخفاء السجل" : "السجل"}
         </button>
+
+        <button className="primary-btn full"
+          style={{
+            marginTop: "14px",
+            background: "#991b1b",
+            fontFamily: '"Cairo", sans-serif',
+            fontWeight: "700",
+            fontSize: "15px",
+          }} onClick={logout} > خروج</button>
 
         <button
           className="primary-btn full"

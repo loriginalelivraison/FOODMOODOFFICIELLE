@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
-import { Home, Users, User, LogIn, Bike, Shield } from "lucide-react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Home, Users, User, LogIn, Bike, Shield, ArrowLeft } from "lucide-react";
 
 import LogoutButton from "./LogoutButton";
 import logo from "../assets/logo3.png";
 
 export default function Layout() {
+  const navigate = useNavigate();
+
   const [auth, setAuth] = useState({
     token: null,
     role: null,
@@ -35,6 +37,14 @@ export default function Layout() {
     });
   }
 
+  function handleGoBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  }
+
   useEffect(() => {
     loadAuth();
     window.addEventListener("authChanged", loadAuth);
@@ -61,53 +71,51 @@ export default function Layout() {
           <span className="pro-brand-text">
             <strong>WinRak</strong>
             <small>Delivery Platform</small>
-            
           </span>
         </Link>
-        
 
-<div
-  style={{
-    marginLeft: "auto",
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-  }}
->
-  {auth.token && auth.user && (
-    <span className="pro-auth-status">
-      <span className="online-dot"></span>
-      {auth.user.nom}
-    </span>
-  )}
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: "14px",
+          }}
+        >
+          {auth.token && auth.user && (
+            <span className="pro-auth-status">
+              <span className="online-dot"></span>
+              {auth.user.nom}
+            </span>
+          )}
 
-  <Link
-  to="/privacy"
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    textDecoration: "none",
-    color: "orange",
-    minWidth: "55px",
-  }}
->
-  <Shield size={18} />
+          <Link
+            to="/privacy"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+              color: "orange",
+              minWidth: "55px",
+            }}
+          >
+            <Shield size={18} />
 
-  <span
-    style={{
-      fontSize: "9px",
-      marginTop: "2px",
-      opacity: 0.9,
-      lineHeight: "1",
-      textAlign: "center",
-    }}
-  >
-    سياسة الخصوصية
-  </span>
-</Link>
-</div>
+            <span
+              style={{
+                fontSize: "9px",
+                marginTop: "2px",
+                opacity: 0.9,
+                lineHeight: "1",
+                textAlign: "center",
+              }}
+            >
+              سياسة الخصوصية
+            </span>
+          </Link>
+        </div>
 
         <nav className="desktop-nav">
           <NavLink to="/" className={linkClass}>
@@ -118,7 +126,6 @@ export default function Layout() {
             السائقون
           </NavLink>
 
-        
           {!auth.token ? (
             <>
               <NavLink to="/inscription-livreur" className={linkClass}>
@@ -130,13 +137,9 @@ export default function Layout() {
               </NavLink>
             </>
           ) : (
-            <>
-              <NavLink to={dashboardLink} className={linkClass}>
-                حسابي
-              </NavLink>
-
-              <LogoutButton />
-            </>
+            <NavLink to={dashboardLink} className={linkClass}>
+              حسابي
+            </NavLink>
           )}
         </nav>
       </header>
@@ -146,6 +149,8 @@ export default function Layout() {
       </main>
 
       <nav className="bottom-nav">
+    
+
         <NavLink to="/" className={bottomLinkClass}>
           <Home size={20} />
           <span>الرئيسية</span>
@@ -156,7 +161,6 @@ export default function Layout() {
           <span>السائقون</span>
         </NavLink>
 
-       
         {!auth.token ? (
           <>
             <NavLink to="/connexion-client" className={bottomLinkClass}>
@@ -177,10 +181,38 @@ export default function Layout() {
             </NavLink>
 
             <div className="bottom-link bottom-logout">
-              <LogoutButton />
+              
             </div>
           </>
         )}
+         <button
+    type="button"
+    onClick={handleGoBack}
+    className="bottom-link"
+    style={{
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      whiteSpace: "nowrap",
+      minWidth: "58px",
+    }}
+  >
+    <ArrowLeft size={20} />
+
+    <span
+      style={{
+        fontSize: "11px",
+        marginTop: "2px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      رجوع
+    </span>
+  </button>
       </nav>
     </div>
   );

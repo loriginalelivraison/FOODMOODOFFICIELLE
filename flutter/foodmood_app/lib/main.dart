@@ -12,6 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 
 const String backendUrl =
@@ -219,24 +220,46 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFFFFFFFF))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            setState(() => isLoading = true);
-          },
-          onPageFinished: (_) async {
-            setState(() => isLoading = false);
+     ..setNavigationDelegate(
+  NavigationDelegate(
 
-            await syncAuthFromWebView();
-          },
-        ),
-      )
-      ..loadRequest(
-        Uri.parse(
-          "https://foodmoodofficielle-3f1e.vercel.app",
-        ),
-      );
+    onPageStarted: (String url) {
+      setState(() {
+        isLoading = true;
+      });
+    },
 
+    onPageFinished: (String url) {
+      setState(() {
+        isLoading = false;
+      });
+    },
+
+    onNavigationRequest: (NavigationRequest request) async {
+      final url = request.url;
+
+      if (url.startsWith('tel:')) {
+        final uri = Uri.parse(url);
+
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+        }
+
+        return NavigationDecision.prevent;
+      }
+
+      return NavigationDecision.navigate;
+    },
+  ),
+)
+..loadRequest(
+  Uri.parse(
+    "https://foodmoodofficielle-3f1e.vercel.app",
+  ),
+);
     final androidController =
         controller.platform as AndroidWebViewController;
 
