@@ -199,6 +199,22 @@ export default function LivreurDashboard() {
 
   }
 
+  function logout() {
+  localStorage.removeItem("access");
+  localStorage.removeItem("refresh");
+
+  localStorage.removeItem("livreur");
+  localStorage.removeItem("client");
+  localStorage.removeItem("role");
+
+  window.dispatchEvent(new Event("authChanged"));
+  navigate("/");
+
+}
+  const isLoggedIn = localStorage.getItem("access");
+
+  if (!isLoggedIn) return null;
+
   return (
     <section className="page" dir="rtl">
       <div
@@ -381,7 +397,14 @@ export default function LivreurDashboard() {
         
         </MapContainer>
       </div>
-      <LogoutButton />
+      <button className="primary-btn full"
+          style={{
+            marginTop: "14px",
+            background: "#991b1b",
+            fontFamily: '"Cairo", sans-serif',
+            fontWeight: "700",
+            fontSize: "15px",
+          }} onClick={logout} > خروج</button>
       <button
         onClick={handleDeleteAccount}
         style={{
