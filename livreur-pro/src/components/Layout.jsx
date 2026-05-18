@@ -173,18 +173,12 @@ export default function Layout() {
               <span>سائق</span>
             </NavLink>
           </>
-        ) : (
-          <>
-            <NavLink to={dashboardLink} className={bottomLinkClass}>
-              <User size={20} />
-              <span>حسابي</span>
-            </NavLink>
-
-            <div className="bottom-link bottom-logout">
-              
-            </div>
-          </>
-        )}
+   ) : (
+  <NavLink to={dashboardLink} className={bottomLinkClass}>
+    <User size={20} />
+    <span>حسابي</span>
+  </NavLink>
+)}
          <button
     type="button"
     onClick={handleGoBack}
