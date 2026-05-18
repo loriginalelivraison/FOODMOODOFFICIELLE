@@ -1,0 +1,48 @@
+name: foodmood_app
+description: "A new Flutter project."
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.11.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  webview_flutter: ^4.13.1
+  webview_flutter_android: ^4.10.1
+
+  image_picker: ^1.1.2
+  
+
+  geolocator: ^14.0.2
+  permission_handler: ^12.0.1
+
+  flutter_local_notifications: ^21.0.0
+
+  flutter_background_service: ^5.1.0
+  flutter_background_service_android: ^6.3.1
+
+  http: ^1.6.0
+
+  flutter_launcher_icons: ^0.14.4
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo3.png"
