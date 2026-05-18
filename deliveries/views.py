@@ -259,33 +259,28 @@ class CourseViewSet(ModelViewSet):
         return Course.objects.none()
 
     def perform_create(self, serializer):
-    client = serializer.validated_data.get("client")
-    livreur = serializer.validated_data.get("livreur")
+        client = serializer.validated_data.get("client")
+        livreur = serializer.validated_data.get("livreur")
 
-    if client.user != self.request.user:
-        raise PermissionError("Accès interdit")
+        if client.user != self.request.user:
+            raise PermissionError("Accès interdit")
 
-    existing_course = Course.objects.filter(
-        livreur=livreur,
-        active=True,
-    ).exists()
+        existing_course = Course.objects.filter(
+            livreur=livreur,
+            active=True,
+        ).exists()
 
-    if existing_course:
-        raise PermissionError("Ce livreur est déjà en livraison")
+        if existing_course:
+            raise PermissionError("Ce livreur est déjà en livraison")
 
-    Course.objects.filter(
-        client=client,
-        livreur=livreur,
-        active=True,
-    ).update(active=False, finished_at=timezone.now())
+        course = serializer.save(active=True)
 
-    course = serializer.save(active=True)
+        send_livreur_notification(
+            livreur,
+            "Nouvelle demande de livraison",
+            "Un client souhaite vous contacter. Ouvrez WinRak."
+        )
 
-    send_livreur_notification(
-        livreur,
-        "Nouvelle demande de livraison",
-        "Un client souhaite vous contacter. Ouvrez WinRak."
-    )
     @action(detail=False, methods=["get"])
     def active(self, request):
         livreur_id = request.query_params.get("livreur_id")
@@ -316,9 +311,6 @@ class CourseViewSet(ModelViewSet):
             "course": serializer.data,
         })
 
-
-
-
     @action(detail=True, methods=["patch"])
     def update_client_position(self, request, pk=None):
         course = self.get_object()
@@ -345,6 +337,7 @@ class CourseViewSet(ModelViewSet):
             "client_latitude": course.client_latitude,
             "client_longitude": course.client_longitude,
         })
+
     @action(detail=True, methods=["patch"])
     def finish(self, request, pk=None):
         course = self.get_object()
