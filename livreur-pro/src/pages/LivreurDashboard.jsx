@@ -189,7 +189,7 @@ export default function LivreurDashboard() {
 
       window.dispatchEvent(new Event("authChanged"));
 
-      navigate("/inscription-livreur");
+      navigate("/livreurs");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ أثناء حذف الحساب.");
