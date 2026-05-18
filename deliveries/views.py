@@ -16,6 +16,7 @@ from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Avg
 from rest_framework.permissions import AllowAny
+from .firebase import send_livreur_notification
 
 
 class LivreurViewSet(ModelViewSet):
@@ -98,7 +99,7 @@ class LivreurViewSet(ModelViewSet):
             "success": True,
             "message": "FCM token enregistré",
         })
-        
+
 class DemandeLivraisonViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
     queryset = DemandeLivraison.objects.all().order_by("-created_at")
@@ -258,20 +259,33 @@ class CourseViewSet(ModelViewSet):
         return Course.objects.none()
 
     def perform_create(self, serializer):
-        client = serializer.validated_data.get("client")
-        livreur = serializer.validated_data.get("livreur")
+    client = serializer.validated_data.get("client")
+    livreur = serializer.validated_data.get("livreur")
 
-        if client.user != self.request.user:
-            raise PermissionError("Accès interdit")
+    if client.user != self.request.user:
+        raise PermissionError("Accès interdit")
 
-        Course.objects.filter(
-            client=client,
-            livreur=livreur,
-            active=True,
-        ).update(active=False, finished_at=timezone.now())
+    existing_course = Course.objects.filter(
+        livreur=livreur,
+        active=True,
+    ).exists()
 
-        serializer.save(active=True)
+    if existing_course:
+        raise PermissionError("Ce livreur est déjà en livraison")
 
+    Course.objects.filter(
+        client=client,
+        livreur=livreur,
+        active=True,
+    ).update(active=False, finished_at=timezone.now())
+
+    course = serializer.save(active=True)
+
+    send_livreur_notification(
+        livreur,
+        "Nouvelle demande de livraison",
+        "Un client souhaite vous contacter. Ouvrez WinRak."
+    )
     @action(detail=False, methods=["get"])
     def active(self, request):
         livreur_id = request.query_params.get("livreur_id")
