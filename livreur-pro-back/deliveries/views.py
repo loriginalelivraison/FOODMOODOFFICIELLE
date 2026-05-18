@@ -280,6 +280,35 @@ class CourseViewSet(ModelViewSet):
             "course": serializer.data,
         })
 
+
+
+
+    @action(detail=True, methods=["patch"])
+    def update_client_position(self, request, pk=None):
+        course = self.get_object()
+
+        if course.client.user != request.user:
+            return Response({"error": "Accès interdit"}, status=403)
+
+        latitude = request.data.get("client_latitude")
+        longitude = request.data.get("client_longitude")
+
+        if latitude is None or longitude is None:
+            return Response(
+                {"error": "client_latitude et client_longitude sont obligatoires"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        course.client_latitude = latitude
+        course.client_longitude = longitude
+        course.save()
+
+        return Response({
+            "message": "Position client mise à jour",
+            "id": course.id,
+            "client_latitude": course.client_latitude,
+            "client_longitude": course.client_longitude,
+        })
     @action(detail=True, methods=["patch"])
     def finish(self, request, pk=None):
         course = self.get_object()

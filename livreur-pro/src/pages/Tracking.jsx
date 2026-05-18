@@ -6,6 +6,7 @@ import {
   createCommentaireLivreur,
   createCourse,
   finishCourse,
+  updateClientCoursePosition,
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
 
@@ -155,7 +156,18 @@ export default function Tracking() {
         };
 
         setClientPosition(position);
+                const savedCourseId =
+          activeCourseId ||
+          JSON.parse(
+            localStorage.getItem(`activeTrackingCourse_${id}`) || "{}"
+          ).courseId;
 
+        if (savedCourseId) {
+          await updateClientCoursePosition(savedCourseId, {
+            client_latitude: position.latitude,
+            client_longitude: position.longitude,
+          });
+        }
         if (!courseCreated) {
           courseCreated = true;
 
