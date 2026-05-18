@@ -123,7 +123,7 @@ def register_livreur(request):
             ville=ville,
             vehicule=vehicule,
             disponible=True,
-            photo=request.FILES.get("photo"),
+            photo=None
         )
 
     except Exception as e:

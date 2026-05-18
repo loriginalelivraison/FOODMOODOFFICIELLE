@@ -14,7 +14,6 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-
 const String backendUrl =
     "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
 
@@ -86,12 +85,9 @@ void onStart(ServiceInstance service) async {
   }
 
   Timer.periodic(const Duration(seconds: 15), (timer) async {
-    if (token == null || livreurId == null) {
-      return;
-    }
+    if (token == null || livreurId == null) return;
 
     final enabled = await Geolocator.isLocationServiceEnabled();
-
     if (!enabled) return;
 
     final permission = await Geolocator.checkPermission();
@@ -107,9 +103,7 @@ void onStart(ServiceInstance service) async {
 
     try {
       await http.patch(
-        Uri.parse(
-          "$backendUrl/livreurs/$livreurId/update_position/",
-        ),
+        Uri.parse("$backendUrl/livreurs/$livreurId/update_position/"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -144,7 +138,6 @@ class FoodMoodWebView extends StatefulWidget {
 
 class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   late final WebViewController controller;
-
   bool isLoading = true;
 
   Future<void> requestPermissions() async {
@@ -152,7 +145,6 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     await Permission.notification.request();
 
     final service = FlutterBackgroundService();
-
     final isRunning = await service.isRunning();
 
     if (!isRunning) {
@@ -177,20 +169,15 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
 ''');
 
       String token = tokenResult.toString();
-
       token = token.replaceAll('"', '');
       token = token.replaceAll(r'\"', '');
 
       String livreurRaw = livreurResult.toString();
-
       livreurRaw = livreurRaw.replaceAll(r'\"', '"');
 
-      final match =
-          RegExp(r'"id"\s*:\s*(\d+)').firstMatch(livreurRaw);
+      final match = RegExp(r'"id"\s*:\s*(\d+)').firstMatch(livreurRaw);
 
-      if (token.isNotEmpty &&
-          token != "null" &&
-          match != null) {
+      if (token.isNotEmpty && token != "null" && match != null) {
         final livreurId = match.group(1);
 
         FlutterBackgroundService().invoke(
@@ -202,6 +189,17 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
         );
       }
     } catch (_) {}
+  }
+
+  Future<void> openExternal(String url) async {
+    final uri = Uri.parse(url);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    }
   }
 
   @override
@@ -220,91 +218,66 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFFFFFFFF))
-     ..setNavigationDelegate(
-  NavigationDelegate(
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() {
+              isLoading = true;
+            });
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              isLoading = false;
+            });
+          },
+          onNavigationRequest: (NavigationRequest request) async {
+            final url = request.url;
 
-    onPageStarted: (String url) {
-      setState(() {
-        isLoading = true;
-      });
-    },
+            if (url.startsWith('tel:')) {
+              await openExternal(url);
+              return NavigationDecision.prevent;
+            }
 
-    onPageFinished: (String url) {
-      setState(() {
-        isLoading = false;
-      });
-    },
+            if (url.startsWith('https://wa.me/') ||
+                url.startsWith('http://wa.me/') ||
+                url.startsWith('whatsapp://')) {
+              await openExternal(url);
+              return NavigationDecision.prevent;
+            }
 
-onNavigationRequest: (NavigationRequest request) async {
-  final url = request.url;
-
-  // Appel téléphone
-  if (url.startsWith('tel:')) {
-    final uri = Uri.parse(url);
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(
+        Uri.parse("https://foodmoodofficielle-3f1e.vercel.app"),
       );
-    }
 
-    return NavigationDecision.prevent;
-  }
-
-  // WhatsApp
-  if (
-    url.startsWith('https://wa.me/') ||
-    url.startsWith('whatsapp://')
-  ) {
-    final uri = Uri.parse(url);
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-    }
-
-    return NavigationDecision.prevent;
-  }
-
-  return NavigationDecision.navigate;
-},
-)
-..loadRequest(
-  Uri.parse(
-    "https://foodmoodofficielle-3f1e.vercel.app",
-  ),
-);
-    final androidController =
-        controller.platform as AndroidWebViewController;
+    final androidController = controller.platform as AndroidWebViewController;
 
     androidController.setOnShowFileSelector(
-  (params) async {
-    final photoPermission = await Permission.photos.request();
+      (params) async {
+        final photoPermission = await Permission.photos.request();
 
-    if (!photoPermission.isGranted && !photoPermission.isLimited) {
-      return [];
-    }
+        if (!photoPermission.isGranted && !photoPermission.isLimited) {
+          return [];
+        }
 
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+        final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+        );
+
+        if (image == null) {
+          return [];
+        }
+
+        return [Uri.file(image.path).toString()];
+      },
     );
 
-    if (image == null) {
-      return [];
-    }
-
-    return [Uri.file(image.path).toString()];
-  },
-);
-
-    androidController
-        .setGeolocationPermissionsPromptCallbacks(
+    androidController.setGeolocationPermissionsPromptCallbacks(
       onShowPrompt: (request) async {
-        final status =
-            await Permission.location.request();
+        final status = await Permission.location.request();
 
         return GeolocationPermissionsResponse(
           allow: status.isGranted,
