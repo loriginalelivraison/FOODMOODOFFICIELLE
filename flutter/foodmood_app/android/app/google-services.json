@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "976712040060",
+    "project_id": "winrak-8144b",
+    "storage_bucket": "winrak-8144b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:976712040060:android:e6463e0221ad1e9a3713f9",
+        "android_client_info": {
+          "package_name": "com.winrak.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoXzIPw6ZtKto6RzwlMX9DHwadxVHFAnc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

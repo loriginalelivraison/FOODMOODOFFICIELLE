@@ -13,12 +13,16 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 const String backendUrl =
     "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
 
   await initializeBackgroundService();
 
@@ -140,6 +144,9 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   late final WebViewController controller;
   bool isLoading = true;
 
+  String? fcmToken;
+  bool fcmTokenSent = false;
+
   Future<void> requestPermissions() async {
     await Permission.location.request();
     await Permission.notification.request();
@@ -149,6 +156,35 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
 
     if (!isRunning) {
       await service.startService();
+    }
+  }
+
+  Future<void> sendFcmTokenToBackend({
+    required String tokenJwt,
+    required String livreurId,
+  }) async {
+    if (fcmToken == null || fcmTokenSent) return;
+
+    try {
+      final response = await http.patch(
+        Uri.parse("$backendUrl/livreurs/$livreurId/update_fcm_token/"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $tokenJwt",
+        },
+        body: jsonEncode({
+          "fcm_token": fcmToken,
+        }),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        fcmTokenSent = true;
+        debugPrint("FCM TOKEN ENVOYÉ AU BACKEND");
+      } else {
+        debugPrint("Erreur backend FCM token : ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("Erreur envoi FCM token : $e");
     }
   }
 
@@ -176,7 +212,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
       livreurRaw = livreurRaw.replaceAll(r'\"', '"');
 
       final match = RegExp(r'"id"\s*:\s*(\d+)').firstMatch(livreurRaw);
-
+      debugPrint("JWT WEBVIEW = $token");
+debugPrint("LIVREUR RAW = $livreurRaw");
+debugPrint("LIVREUR ID MATCH = ${match?.group(1)}");
+debugPrint("FCM TOKEN LOCAL = $fcmToken");
       if (token.isNotEmpty && token != "null" && match != null) {
         final livreurId = match.group(1);
 
@@ -187,28 +226,48 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
             "livreurId": livreurId,
           },
         );
+
+        if (livreurId != null) {
+          await sendFcmTokenToBackend(
+            tokenJwt: token,
+            livreurId: livreurId,
+          );
+        }
       }
     } catch (_) {}
   }
 
-Future<void> openExternal(String url) async {
-  final uri = Uri.parse(url);
+  Future<void> openExternal(String url) async {
+    final uri = Uri.parse(url);
 
-  try {
-    await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-  } catch (e) {
-    debugPrint("Impossible d'ouvrir : $url");
+    try {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      debugPrint("Impossible d'ouvrir : $url");
+    }
   }
-}
 
   @override
   void initState() {
     super.initState();
 
     requestPermissions();
+
+    FirebaseMessaging.instance.requestPermission();
+
+    FirebaseMessaging.instance.getToken().then((token) {
+      fcmToken = token;
+      debugPrint("FCM TOKEN LIVREUR = $token");
+    });
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+      fcmToken = token;
+      fcmTokenSent = false;
+      debugPrint("NOUVEAU FCM TOKEN LIVREUR = $token");
+    });
 
     Timer.periodic(
       const Duration(seconds: 5),
@@ -227,10 +286,12 @@ Future<void> openExternal(String url) async {
               isLoading = true;
             });
           },
-          onPageFinished: (String url) {
+          onPageFinished: (String url) async {
             setState(() {
               isLoading = false;
             });
+
+            await syncAuthFromWebView();
           },
           onNavigationRequest: (NavigationRequest request) async {
             final url = request.url;
