@@ -416,29 +416,33 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
       </div>
 
       <div className="card-bottom">
-        <button
+      <button
   className="primary-btn small"
   type="button"
   onClick={() => {
     if (!requireClientAuth()) return;
 
-    setShowAcceptedQuestion(true);
-
     openExternalUrl(`tel:${courier.phone}`);
+
+    setTimeout(() => {
+      setShowAcceptedQuestion(true);
+    }, 1500);
   }}
 >
   📞 اتصال
 </button>
 
-       <button
+      <button
   className="primary-btn small"
   type="button"
   onClick={() => {
     if (!requireClientAuth()) return;
 
-    setShowAcceptedQuestion(true);
-
     openExternalUrl(`https://wa.me/${courier.whatsapp}`);
+
+    setTimeout(() => {
+      setShowAcceptedQuestion(true);
+    }, 1500);
   }}
   style={{
     display: "flex",
@@ -456,7 +460,6 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
       display: "inline-block",
     }}
   ></span>
-
   واتساب
 </button>
 
