@@ -34,8 +34,6 @@ export default function Couriers() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
 
-  const locationWatchRef = useRef(null);
-
   const hasShownLocationMessageRef = useRef(
     sessionStorage.getItem("clientLocationMessageShown") === "true"
   );
@@ -74,14 +72,6 @@ export default function Couriers() {
     const interval = setInterval(loadLivreurs, 5000);
 
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (locationWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(locationWatchRef.current);
-      }
-    };
   }, []);
 
   const allowedVehicles = ["moto", "velo", "voiture", "camion"];
@@ -125,13 +115,14 @@ export default function Couriers() {
     }
 
     return list;
-  }, [query, onlyAvailable, selectedVehicle, selectedCity, couriers, clientPosition]);
-
-  const mapRefreshKey = useMemo(() => {
-    return filtered
-      .map((c) => `${c.id}-${c.latitude}-${c.longitude}-${c.available}-${c.distanceKm}`)
-      .join("|");
-  }, [filtered]);
+  }, [
+    query,
+    onlyAvailable,
+    selectedVehicle,
+    selectedCity,
+    couriers,
+    clientPosition,
+  ]);
 
   function handleLocationSuccess(pos) {
     const position = {
@@ -172,21 +163,15 @@ export default function Couriers() {
     setLocationDisabled(false);
     setLocationEnabledMessage(false);
 
-    if (locationWatchRef.current !== null) {
-      navigator.geolocation.clearWatch(locationWatchRef.current);
-    }
-
-    const watchId = navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       handleLocationSuccess,
       handleLocationError,
       {
         enableHighAccuracy: true,
-        maximumAge: 0,
+        maximumAge: 10000,
         timeout: 15000,
       }
     );
-
-    locationWatchRef.current = watchId;
   }
 
   const vehicleLabels = {
@@ -231,31 +216,35 @@ export default function Couriers() {
       </div>
 
       {locationDisabled && !clientPosition && (
-        <div style={{
-          background: "#fef2f2",
-          border: "1px solid #fecaca",
-          color: "#b91c1c",
-          padding: "14px",
-          borderRadius: "12px",
-          marginBottom: "18px",
-          fontWeight: "600",
-          textAlign: "center",
-        }}>
+        <div
+          style={{
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#b91c1c",
+            padding: "14px",
+            borderRadius: "12px",
+            marginBottom: "18px",
+            fontWeight: "600",
+            textAlign: "center",
+          }}
+        >
           ⚠️ يرجى تفعيل الموقع الجغرافي لرؤية السائقين القريبين منك
         </div>
       )}
 
       {locationEnabledMessage && (
-        <div style={{
-          background: "#f0fdf4",
-          border: "1px solid #bbf7d0",
-          color: "#15803d",
-          padding: "14px",
-          borderRadius: "12px",
-          marginBottom: "18px",
-          fontWeight: "600",
-          textAlign: "center",
-        }}>
+        <div
+          style={{
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            color: "#15803d",
+            padding: "14px",
+            borderRadius: "12px",
+            marginBottom: "18px",
+            fontWeight: "600",
+            textAlign: "center",
+          }}
+        >
           ✅ موقعك الجغرافي مفعل وتم ترتيب السائقين حسب الأقرب إليك
         </div>
       )}
@@ -328,33 +317,35 @@ export default function Couriers() {
         <p>Aucun livreur disponible pour le moment.</p>
       )}
 
-      <div style={{
-        background: "#fff7ed",
-        border: "2px solid #f5bf99",
-        borderRadius: "24px",
-        padding: "10px",
-        margin: "12px 0 20px",
-        boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
-      }}>
-        <div style={{
-          height: "260px",
-          borderRadius: "18px",
-          overflow: "hidden",
-        }}>
-          <CouriersMap
-            key={mapRefreshKey}
-            couriers={filtered}
-            clientPosition={clientPosition}
-          />
+      <div
+        style={{
+          background: "#fff7ed",
+          border: "2px solid #f5bf99",
+          borderRadius: "24px",
+          padding: "10px",
+          margin: "12px 0 20px",
+          boxShadow: "0 8px 24px rgba(249,115,22,0.12)",
+        }}
+      >
+        <div
+          style={{
+            height: "260px",
+            borderRadius: "18px",
+            overflow: "hidden",
+          }}
+        >
+          <CouriersMap couriers={filtered} clientPosition={clientPosition} />
         </div>
       </div>
 
       {!loading && !error && (
-        <p style={{
-          textAlign: "center",
-          margin: "15px 0",
-          fontWeight: "600",
-        }}>
+        <p
+          style={{
+            textAlign: "center",
+            margin: "15px 0",
+            fontWeight: "600",
+          }}
+        >
           عدد السائقين : {filtered.length}
         </p>
       )}

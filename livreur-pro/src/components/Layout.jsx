@@ -1,7 +1,7 @@
+import React, { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Home, Users, User, LogIn, Bike, LogOut } from "lucide-react";
-import { useState, useEffect } from "react";
-import React from "react";
+import { Home, Users, User, LogIn, Bike, Shield } from "lucide-react";
+
 import LogoutButton from "./LogoutButton";
 import logo from "../assets/logo3.png";
 
@@ -61,15 +61,53 @@ export default function Layout() {
           <span className="pro-brand-text">
             <strong>WinRak</strong>
             <small>Delivery Platform</small>
+            
           </span>
         </Link>
+        
 
-        {auth.token && auth.user && (
-          <span className="pro-auth-status">
-            <span className="online-dot"></span>
-            {auth.user.nom}
-          </span>
-        )}
+<div
+  style={{
+    marginLeft: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+  }}
+>
+  {auth.token && auth.user && (
+    <span className="pro-auth-status">
+      <span className="online-dot"></span>
+      {auth.user.nom}
+    </span>
+  )}
+
+  <Link
+  to="/privacy"
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    textDecoration: "none",
+    color: "orange",
+    minWidth: "55px",
+  }}
+>
+  <Shield size={18} />
+
+  <span
+    style={{
+      fontSize: "9px",
+      marginTop: "2px",
+      opacity: 0.9,
+      lineHeight: "1",
+      textAlign: "center",
+    }}
+  >
+    سياسة الخصوصية
+  </span>
+</Link>
+</div>
 
         <nav className="desktop-nav">
           <NavLink to="/" className={linkClass}>
@@ -80,7 +118,8 @@ export default function Layout() {
             السائقون
           </NavLink>
 
-          {!auth.token && (
+        
+          {!auth.token ? (
             <>
               <NavLink to="/inscription-livreur" className={linkClass}>
                 أصبح سائق
@@ -90,9 +129,7 @@ export default function Layout() {
                 تسجيل
               </NavLink>
             </>
-          )}
-
-          {auth.token && auth.user && (
+          ) : (
             <>
               <NavLink to={dashboardLink} className={linkClass}>
                 حسابي
@@ -119,6 +156,7 @@ export default function Layout() {
           <span>السائقون</span>
         </NavLink>
 
+       
         {!auth.token ? (
           <>
             <NavLink to="/connexion-client" className={bottomLinkClass}>
@@ -139,7 +177,6 @@ export default function Layout() {
             </NavLink>
 
             <div className="bottom-link bottom-logout">
-              
               <LogoutButton />
             </div>
           </>
