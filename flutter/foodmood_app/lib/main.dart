@@ -191,16 +191,18 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     } catch (_) {}
   }
 
-  Future<void> openExternal(String url) async {
-    final uri = Uri.parse(url);
+Future<void> openExternal(String url) async {
+  final uri = Uri.parse(url);
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-    }
+  try {
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+  } catch (e) {
+    debugPrint("Impossible d'ouvrir : $url");
   }
+}
 
   @override
   void initState() {
