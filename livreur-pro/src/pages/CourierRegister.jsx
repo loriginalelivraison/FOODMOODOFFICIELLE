@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
-import logo2 from "../assets/logo2.png";
 import { useNavigate } from "react-router-dom";
 
 export default function CourierRegister() {
@@ -24,8 +23,8 @@ export default function CourierRegister() {
 
   const [mode, setMode] = useState("register");
   const [error, setError] = useState("");
-  const [photoPreview, setPhotoPreview] = useState(null);
   const [gpsError, setGpsError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
     telephone: "",
@@ -46,29 +45,27 @@ export default function CourierRegister() {
   async function handleSubmit(e) {
     e.preventDefault();
 
+    if (loading) return;
+
+    setLoading(true);
     setError("");
     setGpsError(false);
 
     if (!navigator.geolocation) {
       setGpsError(true);
       setError("خدمة تحديد الموقع غير مدعومة في هذا الجهاز");
+      setLoading(false);
       return;
     }
 
     try {
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-          }
-        );
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        });
       });
-
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
 
       const data = new FormData();
 
@@ -79,9 +76,8 @@ export default function CourierRegister() {
       data.append("disponible", registerForm.disponible);
       data.append("password", registerForm.password);
       data.append("services", registerForm.services);
-
-      data.append("latitude", latitude);
-      data.append("longitude", longitude);
+      data.append("latitude", position.coords.latitude);
+      data.append("longitude", position.coords.longitude);
 
       if (registerForm.photo) {
         data.append("photo", registerForm.photo);
@@ -105,15 +101,23 @@ export default function CourierRegister() {
       if (err.code === 1) {
         setGpsError(true);
         setError("يجب تفعيل الموقع الجغرافي لإكمال التسجيل");
-        return;
+      } else if (err.code === 3) {
+        setGpsError(true);
+        setError("انتهت مهلة تحديد الموقع. تأكد من تفعيل GPS ثم أعد المحاولة.");
+      } else {
+        setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
       }
-
-      setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function handleLogin(e) {
     e.preventDefault();
+
+    if (loading) return;
+
+    setLoading(true);
     setError("");
 
     try {
@@ -128,18 +132,18 @@ export default function CourierRegister() {
       navigate(`/livreur-dashboard/${livreur.id}`);
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء تسجيل الدخول");
+    } finally {
+      setLoading(false);
     }
   }
 
   function handlePhotoChange(e) {
-    const file = e.target.files[0];
+    const file = e.target.files[0] || null;
 
     setRegisterForm({
       ...registerForm,
-      photo: file || null,
+      photo: file,
     });
-
-    setPhotoPreview(file ? URL.createObjectURL(file) : null);
   }
 
   return (
@@ -162,10 +166,9 @@ export default function CourierRegister() {
         <div className="auth-switch">
           <button
             type="button"
+            disabled={loading}
             className={
-              mode === "register"
-                ? "primary-btn small"
-                : "secondary-btn small"
+              mode === "register" ? "primary-btn small" : "secondary-btn small"
             }
             onClick={() => setMode("register")}
           >
@@ -174,10 +177,9 @@ export default function CourierRegister() {
 
           <button
             type="button"
+            disabled={loading}
             className={
-              mode === "login"
-                ? "primary-btn small"
-                : "secondary-btn small"
+              mode === "login" ? "primary-btn small" : "secondary-btn small"
             }
             onClick={() => setMode("login")}
           >
@@ -188,13 +190,7 @@ export default function CourierRegister() {
         {mode === "login" ? (
           <form className="auth-form" onSubmit={handleLogin}>
             {error && (
-              <p
-                style={{
-                  color: "red",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-              >
+              <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
                 {error}
               </p>
             )}
@@ -204,11 +200,10 @@ export default function CourierRegister() {
               <input
                 required
                 placeholder="0555555555"
-                
-                 maxLength={10}
-    pattern="0[0-9]{9}"
-    title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
-    value={registerForm.telephone}
+                maxLength={10}
+                pattern="0[0-9]{9}"
+                title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
+                value={loginForm.telephone}
                 onChange={(e) =>
                   setLoginForm({
                     ...loginForm,
@@ -234,8 +229,8 @@ export default function CourierRegister() {
               />
             </label>
 
-            <button className="primary-btn full" type="submit">
-              تسجيل الدخول
+            <button className="primary-btn full" type="submit" disabled={loading}>
+              {loading ? "⏳ جاري تسجيل الدخول..." : "تسجيل الدخول"}
             </button>
           </form>
         ) : (
@@ -245,13 +240,7 @@ export default function CourierRegister() {
             encType="multipart/form-data"
           >
             {error && (
-              <p
-                style={{
-                  color: "red",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-              >
+              <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
                 {error}
               </p>
             )}
@@ -275,10 +264,12 @@ export default function CourierRegister() {
             <label>
               رقم الهاتف
               <input
+                required
                 maxLength={10}
-    pattern="0[0-9]{9}"
-    title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
-    value={registerForm.telephone}      
+                pattern="0[0-9]{9}"
+                title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
+                placeholder="0555555555"
+                value={registerForm.telephone}
                 onChange={(e) =>
                   setRegisterForm({
                     ...registerForm,
@@ -376,19 +367,11 @@ export default function CourierRegister() {
             </label>
 
             <div>
-              <p
-                style={{
-                  marginBottom: "8px",
-                  fontWeight: "600",
-                }}
-              >
+              <p style={{ marginBottom: "8px", fontWeight: "600" }}>
                 إضافة صورة
               </p>
 
-              <label
-                htmlFor="driver-photo"
-                className="upload-box"
-              >
+              <label htmlFor="driver-photo" className="upload-box">
                 <UploadCloud />
 
                 <span>
@@ -426,13 +409,10 @@ export default function CourierRegister() {
                 background: gpsError
                   ? "rgba(239,68,68,0.12)"
                   : "rgba(59,130,246,0.08)",
-
                 border: gpsError
                   ? "1px solid rgba(239,68,68,0.35)"
                   : "1px solid rgba(59,130,246,0.25)",
-
                 color: gpsError ? "#b91c1c" : "#1e3a8a",
-
                 padding: "14px",
                 borderRadius: "14px",
                 marginTop: "18px",
@@ -441,11 +421,7 @@ export default function CourierRegister() {
                 lineHeight: "1.8",
                 textAlign: "right",
                 fontWeight: "500",
-
-                animation: gpsError
-                  ? "shake 0.35s ease-in-out"
-                  : "none",
-
+                animation: gpsError ? "shake 0.35s ease-in-out" : "none",
                 transition: "all 0.25s ease",
               }}
             >
@@ -456,9 +432,7 @@ export default function CourierRegister() {
                   gap: "8px",
                   marginBottom: "6px",
                   fontWeight: "700",
-                  color: gpsError
-                    ? "#dc2626"
-                    : "#1d4ed8",
+                  color: gpsError ? "#dc2626" : "#1d4ed8",
                 }}
               >
                 📍 تفعيل الموقع الجغرافي
@@ -471,8 +445,32 @@ export default function CourierRegister() {
               </span>
             </div>
 
-            <button className="primary-btn full" type="submit">
-              إنشاء حساب السائق
+            {loading && (
+              <div
+                style={{
+                  marginBottom: "12px",
+                  padding: "12px",
+                  borderRadius: "14px",
+                  background: "rgba(249,115,22,0.10)",
+                  color: "#c2410c",
+                  textAlign: "center",
+                  fontWeight: "700",
+                }}
+              >
+                ⏳ الرجاء الانتظار، يتم إنشاء الحساب...
+              </div>
+            )}
+
+            <button
+              className="primary-btn full"
+              type="submit"
+              disabled={loading}
+              style={{
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
+            >
+              {loading ? "جاري إنشاء الحساب..." : "إنشاء حساب السائق"}
             </button>
           </form>
         )}

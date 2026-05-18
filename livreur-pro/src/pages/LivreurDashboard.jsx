@@ -4,6 +4,7 @@ import {
   deleteLivreur,
   getActiveCoursesForLivreur,
 } from "../livreursapi.js";
+import LogoutButton from "../components/LogoutButton.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   MapContainer,
@@ -380,7 +381,7 @@ export default function LivreurDashboard() {
         
         </MapContainer>
       </div>
-
+      <LogoutButton />
       <button
         onClick={handleDeleteAccount}
         style={{

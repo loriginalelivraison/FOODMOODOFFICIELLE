@@ -958,3 +958,15 @@ input::placeholder {
   }
 }
 
+.bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 4px;
+}
+
+.bottom-link {
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+}
