@@ -19,10 +19,17 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 const String backendUrl =
     "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
+
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   await initializeBackgroundService();
 
@@ -30,11 +37,18 @@ Future<void> main() async {
 }
 
 Future<void> initializeBackgroundService() async {
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  const AndroidNotificationChannel locationChannel = AndroidNotificationChannel(
     'foodmood_location',
     'FoodMood localisation',
     description: 'Service de localisation FoodMood en arrière-plan',
     importance: Importance.low,
+  );
+
+  const AndroidNotificationChannel fcmChannel = AndroidNotificationChannel(
+    'high_importance_channel',
+    'Notifications livraisons',
+    description: 'Notifications des nouvelles demandes de livraison',
+    importance: Importance.high,
   );
 
   final FlutterLocalNotificationsPlugin notifications =
@@ -43,7 +57,12 @@ Future<void> initializeBackgroundService() async {
   await notifications
       .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
+      ?.createNotificationChannel(locationChannel);
+
+  await notifications
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(fcmChannel);
 
   final service = FlutterBackgroundService();
 
@@ -146,10 +165,19 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
 
   String? fcmToken;
   bool fcmTokenSent = false;
+  Timer? syncTimer;
 
   Future<void> requestPermissions() async {
     await Permission.location.request();
     await Permission.notification.request();
+
+    final settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    debugPrint("PERMISSION NOTIFICATION = ${settings.authorizationStatus}");
 
     final service = FlutterBackgroundService();
     final isRunning = await service.isRunning();
@@ -177,6 +205,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
         }),
       );
 
+      debugPrint("URL FCM = $backendUrl/livreurs/$livreurId/update_fcm_token/");
+      debugPrint("STATUS FCM = ${response.statusCode}");
+      debugPrint("BODY FCM = ${response.body}");
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         fcmTokenSent = true;
         debugPrint("FCM TOKEN ENVOYÉ AU BACKEND");
@@ -188,55 +220,66 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     }
   }
 
-  Future<void> syncAuthFromWebView() async {
-    try {
-      final tokenResult =
-          await controller.runJavaScriptReturningResult('''
-(() => {
-  return localStorage.getItem("access");
-})();
-''');
+Future<void> syncAuthFromWebView() async {
+  try {
+    final token = await controller.runJavaScriptReturningResult(
+      "localStorage.getItem('access');",
+    );
 
-      final livreurResult =
-          await controller.runJavaScriptReturningResult('''
-(() => {
-  return localStorage.getItem("livreur");
-})();
-''');
+    final livreurRaw = await controller.runJavaScriptReturningResult(
+      "localStorage.getItem('livreur');",
+    );
 
-      String token = tokenResult.toString();
-      token = token.replaceAll('"', '');
-      token = token.replaceAll(r'\"', '');
+    final fcmToken = await FirebaseMessaging.instance.getToken();
 
-      String livreurRaw = livreurResult.toString();
-      livreurRaw = livreurRaw.replaceAll(r'\"', '"');
+    print("JWT WEBVIEW = $token");
+    print("LIVREUR RAW = $livreurRaw");
+    print("FCM TOKEN LOCAL = $fcmToken");
 
-      final match = RegExp(r'"id"\s*:\s*(\d+)').firstMatch(livreurRaw);
-      debugPrint("JWT WEBVIEW = $token");
-debugPrint("LIVREUR RAW = $livreurRaw");
-debugPrint("LIVREUR ID MATCH = ${match?.group(1)}");
-debugPrint("FCM TOKEN LOCAL = $fcmToken");
-      if (token.isNotEmpty && token != "null" && match != null) {
-        final livreurId = match.group(1);
+    if (token == null ||
+        livreurRaw == null ||
+        fcmToken == null) {
+      return;
+    }
 
-        FlutterBackgroundService().invoke(
-          "setAuth",
-          {
-            "token": token,
-            "livreurId": livreurId,
-          },
-        );
+    final cleanToken =
+        token.toString().replaceAll('"', '');
 
-        if (livreurId != null) {
-          await sendFcmTokenToBackend(
-            tokenJwt: token,
-            livreurId: livreurId,
-          );
-        }
-      }
-    } catch (_) {}
+    String cleanLivreur = livreurRaw.toString();
+
+    if (cleanLivreur.startsWith('"')) {
+      cleanLivreur =
+          cleanLivreur.substring(1, cleanLivreur.length - 1);
+
+      cleanLivreur =
+          cleanLivreur.replaceAll(r'\"', '"');
+    }
+
+    final livreur = jsonDecode(cleanLivreur);
+
+    final livreurId = livreur["id"];
+
+    print("LIVREUR ID MATCH = $livreurId");
+
+    final response = await http.patch(
+      Uri.parse(
+        "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api/livreurs/$livreurId/update_fcm_token/",
+      ),
+      headers: {
+        "Authorization": "Bearer $cleanToken",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "fcm_token": fcmToken,
+      }),
+    );
+
+    print("STATUS FCM = ${response.statusCode}");
+    print("BODY FCM = ${response.body}");
+  } catch (e) {
+    print("Erreur syncAuthFromWebView : $e");
   }
-
+}
   Future<void> openExternal(String url) async {
     final uri = Uri.parse(url);
 
@@ -250,16 +293,10 @@ debugPrint("FCM TOKEN LOCAL = $fcmToken");
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-
-    requestPermissions();
-
-    FirebaseMessaging.instance.requestPermission();
-
+  void listenFirebaseMessages() {
     FirebaseMessaging.instance.getToken().then((token) {
       fcmToken = token;
+      fcmTokenSent = false;
       debugPrint("FCM TOKEN LIVREUR = $token");
     });
 
@@ -269,12 +306,23 @@ debugPrint("FCM TOKEN LOCAL = $fcmToken");
       debugPrint("NOUVEAU FCM TOKEN LIVREUR = $token");
     });
 
-    Timer.periodic(
-      const Duration(seconds: 5),
-      (timer) async {
-        await syncAuthFromWebView();
-      },
-    );
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint(
+        "NOTIFICATION REÇUE FOREGROUND : ${message.notification?.title}",
+      );
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint("NOTIFICATION CLIQUÉE : ${message.notification?.title}");
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    requestPermissions();
+    listenFirebaseMessages();
 
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -348,6 +396,19 @@ debugPrint("FCM TOKEN LOCAL = $fcmToken");
         );
       },
     );
+
+    syncTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (timer) async {
+        await syncAuthFromWebView();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    syncTimer?.cancel();
+    super.dispose();
   }
 
   @override
