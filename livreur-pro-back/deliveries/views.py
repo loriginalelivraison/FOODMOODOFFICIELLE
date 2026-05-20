@@ -354,4 +354,4 @@ class CourseViewSet(ModelViewSet):
             "message": "Course terminée",
             "active": False,
             "nombre_livraisons": livreur.nombre_livraisons,
-        })
+        }) 
