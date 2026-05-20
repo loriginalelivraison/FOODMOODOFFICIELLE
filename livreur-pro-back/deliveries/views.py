@@ -77,28 +77,28 @@ class LivreurViewSet(ModelViewSet):
             "disponible": livreur.disponible,
         })
 
-    @action(detail=True, methods=["patch"])
-    def update_fcm_token(self, request, pk=None):
-        livreur = self.get_object()
+        @action(detail=True, methods=["patch"])
+        def update_fcm_token(self, request, pk=None):
+            livreur = self.get_object()
 
-        if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            if livreur.user != request.user:
+                return Response({"error": "Accès interdit"}, status=403)
 
-        token = request.data.get("fcm_token")
+            token = request.data.get("fcm_token")
 
-        if not token:
-            return Response(
-                {"error": "fcm_token obligatoire"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            if not token:
+                return Response(
+                    {"error": "fcm_token obligatoire"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        livreur.fcm_token = token
-        livreur.save()
+            livreur.fcm_token = token
+            livreur.save()
 
-        return Response({
-            "success": True,
-            "message": "FCM token enregistré",
-        })
+            return Response({
+                "success": True,
+                "message": "FCM token enregistré",
+            })
 
 class DemandeLivraisonViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
