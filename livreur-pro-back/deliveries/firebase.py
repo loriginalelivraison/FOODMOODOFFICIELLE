@@ -1,4 +1,5 @@
 import os
+import json
 import firebase_admin
 
 from firebase_admin import credentials, messaging
@@ -9,9 +10,13 @@ def init_firebase():
     if firebase_admin._apps:
         return
 
-    path = os.path.join(settings.BASE_DIR, "firebase-service-account.json")
+    firebase_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
 
-    cred = credentials.Certificate(path)
+    if firebase_json:
+        cred = credentials.Certificate(json.loads(firebase_json))
+    else:
+        path = os.path.join(settings.BASE_DIR, "firebase-service-account.json")
+        cred = credentials.Certificate(path)
 
     firebase_admin.initialize_app(cred)
 
@@ -29,19 +34,12 @@ def send_livreur_notification(livreur, title, body):
                 title=title,
                 body=body,
             ),
-            android=messaging.AndroidConfig(
-                priority="high",
-                notification=messaging.AndroidNotification(
-                    sound="default",
-                ),
-            ),
+            android=messaging.AndroidConfig(priority="high"),
             token=livreur.fcm_token,
         )
 
         response = messaging.send(message)
-
         print("FCM envoyé avec succès :", response)
-
         return True
 
     except Exception as e:
