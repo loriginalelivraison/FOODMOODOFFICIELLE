@@ -50,9 +50,14 @@ class LivreurViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        has_active_course = Course.objects.filter(
+            livreur=livreur,
+            active=True,
+        ).exists()
+
         livreur.latitude = latitude
         livreur.longitude = longitude
-        livreur.disponible = True
+        livreur.disponible = not has_active_course
         livreur.save()
 
         return Response({
@@ -60,6 +65,7 @@ class LivreurViewSet(ModelViewSet):
             "id": livreur.id,
             "latitude": livreur.latitude,
             "longitude": livreur.longitude,
+            "disponible": livreur.disponible,
         })
 
     @action(detail=True, methods=["patch"])
@@ -278,6 +284,9 @@ class CourseViewSet(ModelViewSet):
 
         course = serializer.save(active=True)
 
+        livreur.disponible = False
+        livreur.save(update_fields=["disponible"])
+
         send_livreur_notification(
             livreur,
             "Nouvelle demande de livraison",
@@ -351,10 +360,12 @@ class CourseViewSet(ModelViewSet):
 
         livreur = course.livreur
         livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
-        livreur.save()
+        livreur.disponible = True
+        livreur.save(update_fields=["nombre_livraisons", "disponible"])
 
         return Response({
             "message": "Course terminée",
             "active": False,
             "nombre_livraisons": livreur.nombre_livraisons,
+            "disponible": livreur.disponible,
         })
