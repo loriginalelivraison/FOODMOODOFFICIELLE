@@ -10,7 +10,9 @@ def init_firebase():
         return
 
     path = os.path.join(settings.BASE_DIR, "firebase-service-account.json")
+
     cred = credentials.Certificate(path)
+
     firebase_admin.initialize_app(cred)
 
 
@@ -29,12 +31,17 @@ def send_livreur_notification(livreur, title, body):
             ),
             android=messaging.AndroidConfig(
                 priority="high",
+                notification=messaging.AndroidNotification(
+                    sound="default",
+                ),
             ),
             token=livreur.fcm_token,
         )
 
         response = messaging.send(message)
+
         print("FCM envoyé avec succès :", response)
+
         return True
 
     except Exception as e:
