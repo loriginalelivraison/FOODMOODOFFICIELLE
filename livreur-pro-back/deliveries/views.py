@@ -1,4 +1,14 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser
+
+from django.contrib.auth.models import User
+from django.utils import timezone
+from django.db.models import Avg
+
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
 from .serializers import (
     LivreurSerializer,
@@ -7,15 +17,6 @@ from .serializers import (
     ClientSerializer,
     CourseSerializer,
 )
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.contrib.auth.models import User
-from django.utils import timezone
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.db.models import Avg
-from rest_framework.permissions import AllowAny
 from .firebase import send_livreur_notification
 
 
@@ -77,28 +78,29 @@ class LivreurViewSet(ModelViewSet):
             "disponible": livreur.disponible,
         })
 
-        @action(detail=True, methods=["patch"])
-        def update_fcm_token(self, request, pk=None):
-            livreur = self.get_object()
+    @action(detail=True, methods=["patch"], url_path="update_fcm_token")
+    def update_fcm_token(self, request, pk=None):
+        livreur = self.get_object()
 
-            if livreur.user != request.user:
-                return Response({"error": "Accès interdit"}, status=403)
+        if livreur.user != request.user:
+            return Response({"error": "Accès interdit"}, status=403)
 
-            token = request.data.get("fcm_token")
+        token = request.data.get("fcm_token")
 
-            if not token:
-                return Response(
-                    {"error": "fcm_token obligatoire"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        if not token:
+            return Response(
+                {"error": "fcm_token obligatoire"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            livreur.fcm_token = token
-            livreur.save()
+        livreur.fcm_token = token
+        livreur.save(update_fields=["fcm_token"])
 
-            return Response({
-                "success": True,
-                "message": "FCM token enregistré",
-            })
+        return Response({
+            "success": True,
+            "message": "FCM token enregistré",
+        })
+
 
 class DemandeLivraisonViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
@@ -146,7 +148,7 @@ def register_livreur(request):
             ville=ville,
             vehicule=vehicule,
             disponible=True,
-            photo=None
+            photo=None,
         )
 
     except Exception as e:
@@ -203,6 +205,7 @@ class ClientViewSet(ModelViewSet):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def register_client(request):
     nom = request.data.get("nom")
     telephone = request.data.get("telephone")
@@ -278,7 +281,7 @@ class CourseViewSet(ModelViewSet):
         send_livreur_notification(
             livreur,
             "Nouvelle demande de livraison",
-            "Un client souhaite vous contacter. Ouvrez WinRak."
+            "Un client souhaite vous contacter. Ouvrez WinRak.",
         )
 
     @action(detail=False, methods=["get"])
@@ -354,4 +357,4 @@ class CourseViewSet(ModelViewSet):
             "message": "Course terminée",
             "active": False,
             "nombre_livraisons": livreur.nombre_livraisons,
-        }) 
+        })
