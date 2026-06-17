@@ -116,6 +116,7 @@ class DemandeLivraisonViewSet(ModelViewSet):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@parser_classes([MultiPartParser, FormParser])
 def register_livreur(request):
     nom = request.data.get("nom")
     telephone = request.data.get("telephone")
@@ -154,7 +155,7 @@ def register_livreur(request):
             ville=ville,
             vehicule=vehicule,
             disponible=True,
-            photo=None,
+            photo=request.FILES.get("photo"),
         )
 
     except Exception as e:
