@@ -199,10 +199,10 @@ export default function CourierRegister() {
               رقم الهاتف
               <input
                 required
-                placeholder="0555555555"
+                
                 maxLength={10}
-                pattern="0[0-9]{9}"
-                title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
+                pattern="0[0-9]{12}"
+                title="يجب إدخال رقم هاتف صحيح "
                 value={loginForm.telephone}
                 onChange={(e) =>
                   setLoginForm({
@@ -266,9 +266,8 @@ export default function CourierRegister() {
               <input
                 required
                 maxLength={10}
-                pattern="0[0-9]{9}"
-                title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
-                placeholder="0555555555"
+                pattern="0[0-9]{12}"
+                title="يجب إدخال رقم هاتف صحيح "
                 value={registerForm.telephone}
                 onChange={(e) =>
                   setRegisterForm({
