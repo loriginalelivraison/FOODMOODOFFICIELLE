@@ -266,9 +266,9 @@ export default function TrackingMap({ courier, clientPosition }) {
         }}
       >
         <TileLayer
-          attribution="&copy; OpenStreetMap"
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+         attribution='&copy; OpenStreetMap &copy; CARTO'
+         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+       />
 
         <RecenterMap
           courier={currentCourier}
