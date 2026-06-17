@@ -56,6 +56,8 @@ export default function Tracking() {
   const [note, setNote] = useState(5);
   const [showCommentQuestion, setShowCommentQuestion] = useState(false);
 
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+
   useEffect(() => {
     const saved = localStorage.getItem(`activeTrackingCourse_${id}`);
 
@@ -361,14 +363,16 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
           >
             {photoUrl ? (
               <img
-                src={photoUrl}
-                alt={courier.name}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-              />
+                  src={photoUrl}
+                  alt={courier.name}
+                  onClick={() => setSelectedPhoto(photoUrl)}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    cursor: "pointer",
+                  }}
+                />
             ) : (
               <div
                 style={{
@@ -674,6 +678,57 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
           </div>
         ))}
       </div>
+
+            {selectedPhoto && (
+        <div
+          onClick={() => setSelectedPhoto(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.75)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setSelectedPhoto(null)}
+            style={{
+              position: "absolute",
+              top: "18px",
+              right: "18px",
+              background: "#fff",
+              color: "#111827",
+              border: "none",
+              borderRadius: "50%",
+              width: "42px",
+              height: "42px",
+              fontSize: "24px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </button>
+
+          <img
+            src={selectedPhoto}
+            alt="صورة السائق"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "95%",
+              maxHeight: "85vh",
+              borderRadius: "22px",
+              objectFit: "contain",
+              background: "#fff",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.45)",
+            }}
+          />
+        </div>
+      )}
     </section>
   );
 }
