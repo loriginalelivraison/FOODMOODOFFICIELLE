@@ -152,8 +152,8 @@ export default function ClientAuth() {
               value={telephone}
               onChange={(e) => setTelephone(e.target.value)}
               maxLength={10}
-              pattern="0[0-9]{9}"
-              title="يجب إدخال رقم هاتف صحيح مكون من 10 أرقام ويبدأ بـ 0"
+              pattern="0[0-9]{12}"
+              title="يجب إدخال رقم هاتف صحيح "
    
               required
             />
