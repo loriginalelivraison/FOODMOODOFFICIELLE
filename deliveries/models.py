@@ -31,6 +31,8 @@ class Livreur(models.Model):
     note = models.FloatField(default=5)
     nombre_livraisons = models.PositiveIntegerField(default=0)
 
+    fcm_token = models.TextField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

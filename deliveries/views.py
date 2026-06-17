@@ -1,4 +1,14 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser
+
+from django.contrib.auth.models import User
+from django.utils import timezone
+from django.db.models import Avg
+
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
 from .serializers import (
     LivreurSerializer,
@@ -7,15 +17,7 @@ from .serializers import (
     ClientSerializer,
     CourseSerializer,
 )
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.contrib.auth.models import User
-from django.utils import timezone
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.db.models import Avg
-from rest_framework.permissions import AllowAny
+from .firebase import send_livreur_notification
 
 
 class LivreurViewSet(ModelViewSet):
@@ -48,9 +50,14 @@ class LivreurViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        has_active_course = Course.objects.filter(
+            livreur=livreur,
+            active=True,
+        ).exists()
+
         livreur.latitude = latitude
         livreur.longitude = longitude
-        livreur.disponible = True
+        livreur.disponible = not has_active_course
         livreur.save()
 
         return Response({
@@ -58,6 +65,7 @@ class LivreurViewSet(ModelViewSet):
             "id": livreur.id,
             "latitude": livreur.latitude,
             "longitude": livreur.longitude,
+            "disponible": livreur.disponible,
         })
 
     @action(detail=True, methods=["patch"])
@@ -74,6 +82,29 @@ class LivreurViewSet(ModelViewSet):
             "message": "Livreur passé en occupé",
             "id": livreur.id,
             "disponible": livreur.disponible,
+        })
+
+    @action(detail=True, methods=["patch"], url_path="update_fcm_token")
+    def update_fcm_token(self, request, pk=None):
+        livreur = self.get_object()
+
+        if livreur.user != request.user:
+            return Response({"error": "Accès interdit"}, status=403)
+
+        token = request.data.get("fcm_token")
+
+        if not token:
+            return Response(
+                {"error": "fcm_token obligatoire"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        livreur.fcm_token = token
+        livreur.save(update_fields=["fcm_token"])
+
+        return Response({
+            "success": True,
+            "message": "FCM token enregistré",
         })
 
 
@@ -123,7 +154,7 @@ def register_livreur(request):
             ville=ville,
             vehicule=vehicule,
             disponible=True,
-            photo=None
+            photo=None,
         )
 
     except Exception as e:
@@ -180,6 +211,7 @@ class ClientViewSet(ModelViewSet):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def register_client(request):
     nom = request.data.get("nom")
     telephone = request.data.get("telephone")
@@ -242,13 +274,24 @@ class CourseViewSet(ModelViewSet):
         if client.user != self.request.user:
             raise PermissionError("Accès interdit")
 
-        Course.objects.filter(
-            client=client,
+        existing_course = Course.objects.filter(
             livreur=livreur,
             active=True,
-        ).update(active=False, finished_at=timezone.now())
+        ).exists()
 
-        serializer.save(active=True)
+        if existing_course:
+            raise PermissionError("Ce livreur est déjà en livraison")
+
+        course = serializer.save(active=True)
+
+        livreur.disponible = False
+        livreur.save(update_fields=["disponible"])
+
+        send_livreur_notification(
+            livreur,
+            "Nouvelle demande de livraison",
+            "Un client souhaite vous contacter. Ouvrez WinRak.",
+        )
 
     @action(detail=False, methods=["get"])
     def active(self, request):
@@ -280,9 +323,6 @@ class CourseViewSet(ModelViewSet):
             "course": serializer.data,
         })
 
-
-
-
     @action(detail=True, methods=["patch"])
     def update_client_position(self, request, pk=None):
         course = self.get_object()
@@ -309,6 +349,7 @@ class CourseViewSet(ModelViewSet):
             "client_latitude": course.client_latitude,
             "client_longitude": course.client_longitude,
         })
+
     @action(detail=True, methods=["patch"])
     def finish(self, request, pk=None):
         course = self.get_object()
@@ -319,10 +360,12 @@ class CourseViewSet(ModelViewSet):
 
         livreur = course.livreur
         livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
-        livreur.save()
+        livreur.disponible = True
+        livreur.save(update_fields=["nombre_livraisons", "disponible"])
 
         return Response({
             "message": "Course terminée",
             "active": False,
             "nombre_livraisons": livreur.nombre_livraisons,
+            "disponible": livreur.disponible,
         })
