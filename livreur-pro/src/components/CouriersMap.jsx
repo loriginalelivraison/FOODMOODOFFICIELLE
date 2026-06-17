@@ -151,10 +151,10 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
           width: "100%",
         }}
       >
-        <TileLayer
-          attribution="&copy; OpenStreetMap"
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+       <TileLayer
+  attribution='&copy; OpenStreetMap &copy; CARTO'
+  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+/>
 
         <RecenterMap clientPosition={clientPosition} />
 
