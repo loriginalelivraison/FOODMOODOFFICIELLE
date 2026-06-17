@@ -22,6 +22,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+const ALGERIA_CENTER = [36.0339, 3.6596];
+
 const clientIcon = new L.DivIcon({
   className: "client-marker",
   html: `
@@ -43,21 +45,25 @@ function RecenterMap({ clientPosition }) {
 
   useEffect(() => {
     if (clientPosition?.latitude && clientPosition?.longitude) {
-      map.panTo(
+      map.flyTo(
         [
           Number(clientPosition.latitude),
           Number(clientPosition.longitude),
         ],
+        10,
         {
           animate: true,
-          duration: 1,
+          duration: 1.2,
         }
       );
+    } else {
+      map.setView(ALGERIA_CENTER, 7);
     }
   }, [clientPosition, map]);
 
   return null;
 }
+
 function LocateButton({ clientPosition }) {
   const map = useMap();
 
@@ -83,7 +89,7 @@ function LocateButton({ clientPosition }) {
             Number(clientPosition.latitude),
             Number(clientPosition.longitude),
           ],
-          16,
+          10,
           { duration: 1.2 }
         );
       };
@@ -101,15 +107,11 @@ function LocateButton({ clientPosition }) {
   return null;
 }
 
-export default function CouriersMap({
-  couriers = [],
-  clientPosition,
-}) {
+export default function CouriersMap({ couriers = [], clientPosition }) {
   const navigate = useNavigate();
 
   const availableCouriers = couriers.filter((c) => {
-    const isAvailable =
-      c.available === true || c.disponible === true;
+    const isAvailable = c.available === true || c.disponible === true;
 
     const hasPosition =
       c.latitude !== null &&
@@ -127,26 +129,23 @@ export default function CouriersMap({
         Number(clientPosition.latitude),
         Number(clientPosition.longitude),
       ]
-    : availableCouriers.length > 0
-    ? [
-        Number(availableCouriers[0].latitude),
-        Number(availableCouriers[0].longitude),
-      ]
-    : [36.75, 3.06];
+    : ALGERIA_CENTER;
+
+  const zoom = clientPosition ? 10 : 7;
 
   return (
-   <div
-  style={{
-    height: "100%",
-    width: "100%",
-    borderRadius: "20px",
-    overflow: "hidden",
-    position: "relative",
-  }}
->
+    <div
+      style={{
+        height: "100%",
+        width: "100%",
+        borderRadius: "20px",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
       <MapContainer
         center={center}
-        zoom={13}
+        zoom={zoom}
         style={{
           height: "100%",
           width: "100%",
@@ -186,24 +185,15 @@ export default function CouriersMap({
           >
             <Popup>
               <div style={{ textAlign: "center" }}>
-                <strong>
-                  {courier.name || courier.nom}
-                </strong>
-
+                <strong>{courier.name || courier.nom}</strong>
                 <br />
-
                 {courier.vehicle || courier.vehicule}
-
                 <br />
-
                 {courier.city || courier.ville}
-
                 <br />
 
                 <button
-                  onClick={() =>
-                    navigate(`/tracking/${courier.id}`)
-                  }
+                  onClick={() => navigate(`/tracking/${courier.id}`)}
                   style={{
                     marginTop: "8px",
                     padding: "6px 10px",

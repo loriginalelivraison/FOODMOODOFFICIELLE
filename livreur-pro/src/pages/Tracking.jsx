@@ -9,6 +9,7 @@ import {
   updateClientCoursePosition,
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
+import pasdephoto from "../assets/pasdephoto.png"
 
 function openExternalUrl(url) {
   try {
@@ -361,11 +362,10 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
               flexShrink: 0,
             }}
           >
-            {photoUrl ? (
-              <img
-                  src={photoUrl}
+                <img
+                  src={photoUrl || pasdephoto}
                   alt={courier.name}
-                  onClick={() => setSelectedPhoto(photoUrl)}
+                  onClick={() => setSelectedPhoto(photoUrl || pasdephoto)}
                   style={{
                     width: "100%",
                     height: "100%",
@@ -373,19 +373,6 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
                     cursor: "pointer",
                   }}
                 />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: "34px",
-                }}
-              >
-                🛵
-              </div>
-            )}
           </div>
 
           <div style={{ flex: 1 }}>
