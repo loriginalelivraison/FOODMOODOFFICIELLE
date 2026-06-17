@@ -101,17 +101,18 @@ export default function Couriers() {
 
     if (clientPosition) {
       list = list
-        .filter((c) => c.latitude !== null && c.longitude !== null)
-        .map((c) => ({
-          ...c,
-          distanceKm: getDistanceKm(
-            clientPosition.latitude,
-            clientPosition.longitude,
-            c.latitude,
-            c.longitude
-          ),
-        }))
-        .sort((a, b) => a.distanceKm - b.distanceKm);
+  .filter((c) => c.latitude !== null && c.longitude !== null)
+  .map((c) => ({
+    ...c,
+    distanceKm: getDistanceKm(
+      clientPosition.latitude,
+      clientPosition.longitude,
+      c.latitude,
+      c.longitude
+    ),
+  }))
+  .filter((c) => c.distanceKm <= 30) // <-- Affiche uniquement les livreurs dans un rayon de 30 km
+  .sort((a, b) => a.distanceKm - b.distanceKm);
     }
 
     return list;
