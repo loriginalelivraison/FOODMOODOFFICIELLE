@@ -2,6 +2,8 @@ import React from "react";
 import { useState, useEffect, useMemo } from "react";
 import { getLivreurs } from "../livreursapi";
 import { ClipboardList, ShieldCheck, Users, WalletCards } from 'lucide-react'
+import { useNavigate } from "react-router-dom";
+
 
 export default function AdminDashboard() {
   // AJOUT : état pour stocker les livreurs venant du backend Django
@@ -13,6 +15,17 @@ export default function AdminDashboard() {
   // AJOUT : état d'erreur API
   const [error, setError] = useState("");
 
+
+  const navigate = useNavigate();
+
+useEffect(() => {
+  const token = localStorage.getItem("access");
+  const role = localStorage.getItem("role");
+
+  if (!token || role !== "admin") {
+    navigate("/", { replace: true });
+  }
+}, [navigate]);
   // AJOUT : appel API Django au chargement du dashboard
   useEffect(() => {
     getLivreurs()

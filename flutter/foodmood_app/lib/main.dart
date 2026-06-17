@@ -361,7 +361,7 @@ Future<void> syncAuthFromWebView() async {
         ),
       )
       ..loadRequest(
-        Uri.parse("https://foodmoodofficielle-3f1e.vercel.app"),
+        Uri.parse("https://www.winrak.fr"),
       );
 final androidController =
     controller.platform as AndroidWebViewController;
