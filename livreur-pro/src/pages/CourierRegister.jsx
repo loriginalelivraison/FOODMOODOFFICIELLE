@@ -201,7 +201,7 @@ export default function CourierRegister() {
                 required
                 
                 maxLength={10}
-                pattern="0[0-9]{12}"
+                pattern="^\+213[5-7][0-9]{8}$"
                 title="يجب إدخال رقم هاتف صحيح "
                 value={loginForm.telephone}
                 onChange={(e) =>
@@ -266,7 +266,7 @@ export default function CourierRegister() {
               <input
                 required
                 maxLength={10}
-                pattern="0[0-9]{12}"
+                pattern="^\+213[5-7][0-9]{8}$"
                 title="يجب إدخال رقم هاتف صحيح "
                 value={registerForm.telephone}
                 onChange={(e) =>
