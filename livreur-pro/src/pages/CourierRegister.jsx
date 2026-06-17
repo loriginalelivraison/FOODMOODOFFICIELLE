@@ -369,10 +369,10 @@ export default function CourierRegister() {
                       <label>
             صورة السائق
             <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-            />
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                onChange={handlePhotoChange}
+              />
           </label>
 
           {registerForm.photo && (
