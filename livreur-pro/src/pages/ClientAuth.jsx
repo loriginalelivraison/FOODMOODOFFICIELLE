@@ -152,7 +152,7 @@ export default function ClientAuth() {
               value={telephone}
               onChange={(e) => setTelephone(e.target.value)}
               maxLength={10}
-              pattern="0[0-9]{12}"
+              pattern="^\+213[5-7][0-9]{8}$"
               title="يجب إدخال رقم هاتف صحيح "
    
               required
