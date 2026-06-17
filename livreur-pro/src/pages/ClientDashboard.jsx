@@ -47,11 +47,7 @@ export default function ClientDashboard() {
             ? commentaires
             : commentaires.results || [];
 
-          commentsByLivreur[livreurId] = list.filter(
-            (comment) =>
-              comment.nom_client === client?.nom ||
-              comment.nom_client === client?.telephone
-          );
+         commentsByLivreur[livreurId] = list;
         }
       }
 
