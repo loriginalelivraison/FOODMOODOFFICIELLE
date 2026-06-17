@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Star } from "lucide-react";
-import defaultAvatar from "../assets/logo2.png";
+import defaultAvatar from "../assets/pasdephoto.png";
 
 export default function CourierCard({ courier }) {
   const navigate = useNavigate();
