@@ -366,6 +366,20 @@ export default function CourierRegister() {
               />
             </label>
 
+                      <label>
+            صورة السائق
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+            />
+          </label>
+
+          {registerForm.photo && (
+            <p style={{ fontSize: "13px", color: "#15803d", fontWeight: "bold" }}>
+              ✅ تم اختيار الصورة: {registerForm.photo.name}
+            </p>
+          )}
            
             <div
               style={{
