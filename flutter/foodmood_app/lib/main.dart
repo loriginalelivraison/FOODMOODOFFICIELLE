@@ -363,28 +363,22 @@ Future<void> syncAuthFromWebView() async {
       ..loadRequest(
         Uri.parse("https://foodmoodofficielle-3f1e.vercel.app"),
       );
-
-    final androidController = controller.platform as AndroidWebViewController;
-
-    androidController.setOnShowFileSelector(
-      (params) async {
-        final photoPermission = await Permission.photos.request();
-
-        if (!photoPermission.isGranted && !photoPermission.isLimited) {
-          return [];
-        }
-
-        final image = await ImagePicker().pickImage(
-          source: ImageSource.gallery,
-        );
-
-        if (image == null) {
-          return [];
-        }
-
-        return [Uri.file(image.path).toString()];
-      },
+final androidController =
+    controller.platform as AndroidWebViewController;
+   
+androidController.setOnShowFileSelector(
+  (params) async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
     );
+
+    if (image == null) {
+      return [];
+    }
+
+    return [Uri.file(image.path).toString()];
+  },
+);
 
     androidController.setGeolocationPermissionsPromptCallbacks(
       onShowPrompt: (request) async {
