@@ -6,7 +6,6 @@ export default function ClientAuth() {
   const navigate = useNavigate();
 
   const [mode, setMode] = useState("register");
-
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +19,12 @@ export default function ClientAuth() {
 
     setError("");
     setMessage("");
+
+    if (password.trim().length < 6) {
+      setError("كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -29,32 +34,22 @@ export default function ClientAuth() {
           telephone,
           password,
         });
-
-        await loginClient({
-          nom,
-          telephone,
-          password,
-        });
-      } else {
-        await loginClient({
-          nom,
-          telephone,
-          password,
-        });
       }
+
+      await loginClient({
+        nom,
+        telephone,
+        password,
+      });
 
       const redirect =
         localStorage.getItem("redirectAfterLogin") || "/livreurs";
 
       localStorage.removeItem("redirectAfterLogin");
-
       navigate(redirect);
     } catch (err) {
       console.error(err);
-
-      setError(
-        err?.message || "حدث خطأ أثناء تسجيل الدخول أو إنشاء الحساب"
-      );
+      setError(err?.message || "حدث خطأ أثناء تسجيل الدخول أو إنشاء الحساب");
     } finally {
       setLoading(false);
     }
@@ -63,12 +58,9 @@ export default function ClientAuth() {
   return (
     <section className="page auth-page" dir="rtl">
       <div className="auth-card">
-
         <center>
           <h2>
-            {mode === "register"
-              ? "إنشاء حساب عميل"
-              : "تسجيل الدخول"}
+            {mode === "register" ? "إنشاء حساب عميل" : "تسجيل الدخول"}
           </h2>
 
           <h5>
@@ -78,55 +70,47 @@ export default function ClientAuth() {
           </h5>
         </center>
 
-        {/* SWITCH */}
         <div className="auth-switch">
           <button
             type="button"
+            disabled={loading}
             className={
-              mode === "register"
-                ? "primary-btn small"
-                : "secondary-btn small"
+              mode === "register" ? "primary-btn small" : "secondary-btn small"
             }
-            onClick={() => setMode("register")}
+            onClick={() => {
+              setMode("register");
+              setError("");
+              setMessage("");
+            }}
           >
             إنشاء حساب
           </button>
 
           <button
             type="button"
+            disabled={loading}
             className={
-              mode === "login"
-                ? "primary-btn small"
-                : "secondary-btn small"
+              mode === "login" ? "primary-btn small" : "secondary-btn small"
             }
-            onClick={() => setMode("login")}
+            onClick={() => {
+              setMode("login");
+              setError("");
+              setMessage("");
+            }}
           >
             تسجيل الدخول
           </button>
         </div>
 
-        {/* FORM */}
         <form onSubmit={handleSubmit} className="auth-form">
           {error && (
-            <p
-              style={{
-                color: "red",
-                textAlign: "center",
-                fontWeight: "bold",
-              }}
-            >
+            <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
               {error}
             </p>
           )}
 
           {message && (
-            <p
-              style={{
-                color: "green",
-                textAlign: "center",
-                fontWeight: "bold",
-              }}
-            >
+            <p style={{ color: "green", textAlign: "center", fontWeight: "bold" }}>
               {message}
             </p>
           )}
@@ -146,18 +130,19 @@ export default function ClientAuth() {
           )}
 
           <label>
-            رقم الهاتف
-            <input
-              type="text"
-              value={telephone}
-              onChange={(e) => setTelephone(e.target.value)}
-              maxLength={10}
-              pattern="^\+213[5-7][0-9]{8}$"
-              title="يجب إدخال رقم هاتف صحيح "
-   
-              required
-            />
-          </label>
+  رقم الهاتف
+  <input
+    type="text"
+    value={telephone}
+    onChange={(e) =>
+      setTelephone(e.target.value.replace(/\D/g, ""))
+    }
+    maxLength={14}
+    pattern="([0-9]{10}|[0-9]{14})"
+    title="يجب إدخال رقم هاتف صحيح مكون من 10 أو 14 رقماً فقط"
+    required
+  />
+</label>
 
           <label>
             كلمة المرور
@@ -165,16 +150,14 @@ export default function ClientAuth() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="أدخل كلمة المرور"
+              placeholder="6 أحرف على الأقل"
+              minLength={6}
+              title="كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل"
               required
             />
           </label>
 
-          <button
-            className="primary-btn full"
-            type="submit"
-            disabled={loading}
-          >
+          <button className="primary-btn full" type="submit" disabled={loading}>
             {loading
               ? "يرجى الانتظار..."
               : mode === "register"
