@@ -197,20 +197,22 @@ export default function CourierRegister() {
 
             <label>
               رقم الهاتف
-              <input
-                required
-                
-                maxLength={10}
-                pattern="^\+213[5-7][0-9]{8}$"
-                title="يجب إدخال رقم هاتف صحيح "
-                value={loginForm.telephone}
-                onChange={(e) =>
-                  setLoginForm({
-                    ...loginForm,
-                    telephone: e.target.value,
-                  })
-                }
-              />
+                              <input
+                  type="text"
+                  required
+                  value={loginForm.telephone}
+                  onChange={(e) =>
+                    setLoginForm({
+                      ...loginForm,
+                      telephone: e.target.value.replace(/\D/g, ""),
+                    })
+                  }
+                  minLength={10}
+                  maxLength={14}
+                  pattern="[0-9]{10,14}"
+                  title="يجب إدخال رقم هاتف صحيح مكون من 10 إلى 14 رقماً"
+                  style={{ direction: "ltr", textAlign: "right" }}
+                />
             </label>
 
             <label>
@@ -265,20 +267,19 @@ export default function CourierRegister() {
               رقم الهاتف
             <input
   type="text"
-  inputMode="numeric"
   required
   value={registerForm.telephone}
   onChange={(e) =>
-    setLoginForm({
-      ...loginForm,
+    setRegisterForm({
+      ...registerForm,
       telephone: e.target.value.replace(/\D/g, ""),
     })
   }
   minLength={10}
   maxLength={14}
-  pattern="([0-9]{10}|[0-9]{14})"
-  title="يجب إدخال رقم هاتف صحيح مكون من 10 أو 14 رقماً فقط"
-  style={{ direction: "rtl", textAlign: "right" }}
+  pattern="[0-9]{10,14}"
+  title="يجب إدخال رقم هاتف صحيح مكون من 10 إلى 14 رقماً"
+  style={{ direction: "ltr", textAlign: "right" }}
 />
             </label>
 
