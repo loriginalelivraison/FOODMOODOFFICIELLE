@@ -156,11 +156,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.winrak.fr",
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://foodmoodofficielle-3f1e.vercel.app",
-    "https://winrak.fr",
-    "https://www.winrak.fr",
-]
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
