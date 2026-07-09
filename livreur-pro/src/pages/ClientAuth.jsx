@@ -150,7 +150,7 @@ export default function ClientAuth() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="6 أحرف على الأقل"
+              placeholder="******"
               minLength={6}
               title="كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل"
               required
