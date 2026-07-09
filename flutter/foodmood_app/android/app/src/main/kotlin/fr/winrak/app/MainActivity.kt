@@ -1,4 +1,4 @@
-package com.example.foodmood_app
+package fr.winrak.app
 
 import io.flutter.embedding.android.FlutterActivity
 

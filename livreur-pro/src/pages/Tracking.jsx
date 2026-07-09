@@ -9,7 +9,7 @@ import {
   updateClientCoursePosition,
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
-import pasdephoto from "../assets/pasdephoto.png"
+import pasdephoto from "../assets/pasdephoto.png";
 
 function openExternalUrl(url) {
   try {
@@ -26,7 +26,6 @@ function openExternalUrl(url) {
     alert("Impossible d'ouvrir le lien.");
   }
 }
-
 
 export default function Tracking() {
   const { id } = useParams();
@@ -46,6 +45,8 @@ export default function Tracking() {
   const [commentSuccess, setCommentSuccess] = useState("");
 
   const [showAcceptedQuestion, setShowAcceptedQuestion] = useState(false);
+  const [callButtonsHidden, setCallButtonsHidden] = useState(false);
+
   const [clientPosition, setClientPosition] = useState(null);
   const [courseStarted, setCourseStarted] = useState(false);
   const [courseFinished, setCourseFinished] = useState(false);
@@ -73,6 +74,7 @@ export default function Tracking() {
       setClientPosition(data.clientPosition);
       setCourseMessage(data.courseMessage || "");
       setShowAcceptedQuestion(false);
+      setCallButtonsHidden(Boolean(data.courseStarted || data.courseFinished));
     } catch (err) {
       console.error("Erreur restauration course :", err);
     }
@@ -148,6 +150,17 @@ export default function Tracking() {
     return true;
   }
 
+  function handleCallClick(url) {
+    if (!requireClientAuth()) return;
+
+    setCallButtonsHidden(true);
+    openExternalUrl(url);
+
+    setTimeout(() => {
+      setShowAcceptedQuestion(true);
+    }, 1500);
+  }
+
   async function handleCourseAccepted() {
     const clientStorage = localStorage.getItem("client");
     const client = clientStorage ? JSON.parse(clientStorage) : null;
@@ -176,7 +189,8 @@ export default function Tracking() {
         };
 
         setClientPosition(position);
-                const savedCourseId =
+
+        const savedCourseId =
           activeCourseId ||
           JSON.parse(
             localStorage.getItem(`activeTrackingCourse_${id}`) || "{}"
@@ -188,6 +202,7 @@ export default function Tracking() {
             client_longitude: position.longitude,
           });
         }
+
         if (!courseCreated) {
           courseCreated = true;
 
@@ -203,9 +218,12 @@ export default function Tracking() {
 
             setActiveCourseId(course.id);
             setCourseStarted(true);
-            setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
+            setCourseMessage(
+              "رائع! يمكنك الآن متابعة السائق على الخريطة."
+            );
             setCourseFinished(false);
             setShowAcceptedQuestion(false);
+            setCallButtonsHidden(true);
 
             localStorage.setItem(
               `activeTrackingCourse_${id}`,
@@ -214,7 +232,8 @@ export default function Tracking() {
                 courseStarted: true,
                 courseFinished: false,
                 clientPosition: position,
-                courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
+                courseMessage:
+                  "رائع! يمكنك الآن متابعة السائق على الخريطة.",
               })
             );
           } catch (err) {
@@ -222,20 +241,29 @@ export default function Tracking() {
             setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
           }
         } else {
+          const currentCourseId =
+            activeCourseId ||
+            JSON.parse(
+              localStorage.getItem(`activeTrackingCourse_${id}`) || "{}"
+            ).courseId;
+
           localStorage.setItem(
             `activeTrackingCourse_${id}`,
             JSON.stringify({
-              courseId: activeCourseId,
+              courseId: currentCourseId,
               courseStarted: true,
               courseFinished: false,
               clientPosition: position,
-              courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
+              courseMessage:
+                "رائع! يمكنك الآن متابعة السائق على الخريطة.",
             })
           );
         }
       },
       () => {
-        setError("يجب تفعيل الموقع الجغرافي لمشاركة موقعك مع السائق.");
+        setError(
+          "يجب تفعيل الموقع الجغرافي لمشاركة موقعك مع السائق."
+        );
       },
       {
         enableHighAccuracy: true,
@@ -258,14 +286,15 @@ export default function Tracking() {
         clientWatchRef.current = null;
       }
 
-setClientPosition(null);
-setCourseStarted(false);
-setCourseMessage("");
-setCourseFinished(true);
-setShowCommentQuestion(true);
-setShowCommentForm(false);
+      setClientPosition(null);
+      setCourseStarted(false);
+      setCourseMessage("");
+      setCourseFinished(true);
+      setShowCommentQuestion(true);
+      setShowCommentForm(false);
+      setCallButtonsHidden(true);
 
-localStorage.removeItem(`activeTrackingCourse_${id}`);
+      localStorage.removeItem(`activeTrackingCourse_${id}`);
     } catch (err) {
       setError("حدث خطأ أثناء إنهاء الرحلة.");
     }
@@ -362,17 +391,17 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
               flexShrink: 0,
             }}
           >
-                <img
-                  src={photoUrl || pasdephoto}
-                  alt={courier.name}
-                  onClick={() => setSelectedPhoto(photoUrl || pasdephoto)}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    cursor: "pointer",
-                  }}
-                />
+            <img
+              src={photoUrl || pasdephoto}
+              alt={courier.name}
+              onClick={() => setSelectedPhoto(photoUrl || pasdephoto)}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                cursor: "pointer",
+              }}
+            />
           </div>
 
           <div style={{ flex: 1 }}>
@@ -380,11 +409,23 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
               {courier.name}
             </h2>
 
-            <p style={{ margin: "4px 0", color: "#6b7280", fontWeight: "600" }}>
+            <p
+              style={{
+                margin: "4px 0",
+                color: "#6b7280",
+                fontWeight: "600",
+              }}
+            >
               📍 {courier.city}
             </p>
 
-            <p style={{ margin: "4px 0", color: "#374151", fontWeight: "700" }}>
+            <p
+              style={{
+                margin: "4px 0",
+                color: "#374151",
+                fontWeight: "700",
+              }}
+            >
               {getVehicleLabel(courier.vehicle)}
             </p>
 
@@ -407,52 +448,49 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
       </div>
 
       <div className="card-bottom">
-      <button
-  className="primary-btn small"
-  type="button"
-  onClick={() => {
-    if (!requireClientAuth()) return;
+        {!callButtonsHidden &&
+          !showAcceptedQuestion &&
+          !courseStarted &&
+          !courseFinished && (
+            <>
+              <button
+                className="primary-btn small"
+                type="button"
+                onClick={() =>
+                  handleCallClick(`tel:${courier.phone}`)
+                }
+              >
+                📞 اتصال
+              </button>
 
-    openExternalUrl(`tel:${courier.phone}`);
-
-    setTimeout(() => {
-      setShowAcceptedQuestion(true);
-    }, 1500);
-  }}
->
-  📞 اتصال
-</button>
-
-      <button
-  className="primary-btn small"
-  type="button"
-  onClick={() => {
-    if (!requireClientAuth()) return;
-
-    openExternalUrl(`https://wa.me/${courier.whatsapp}`);
-
-    setTimeout(() => {
-      setShowAcceptedQuestion(true);
-    }, 1500);
-  }}
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    background: "#22c55e",
-  }}
->
-  <span
-    style={{
-      width: "9px",
-      height: "9px",
-      background: "#dcfce7",
-      borderRadius: "50%",
-      display: "inline-block",
-    }}
-  ></span>
-  واتساب
-</button>
+              <button
+                className="primary-btn small"
+                type="button"
+                onClick={() =>
+                  handleCallClick(
+                    `https://wa.me/${courier.whatsapp}`
+                  )
+                }
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "#22c55e",
+                }}
+              >
+                <span
+                  style={{
+                    width: "9px",
+                    height: "9px",
+                    background: "#dcfce7",
+                    borderRadius: "50%",
+                    display: "inline-block",
+                  }}
+                />
+                واتساب
+              </button>
+            </>
+          )}
 
         {courseFinished && (
           <button
@@ -469,9 +507,16 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
         <div className="tracking-card">
           <h3>هل قبل السائق الرحلة؟</h3>
 
-          <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              justifyContent: "center",
+            }}
+          >
             <button
               className="primary-btn small"
+              type="button"
               style={{ background: "#16a34a" }}
               onClick={handleCourseAccepted}
             >
@@ -480,11 +525,13 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
 
             <button
               className="primary-btn small"
+              type="button"
               style={{ background: "#dc2626" }}
               onClick={() => {
                 setShowAcceptedQuestion(false);
                 setCourseFinished(true);
                 setShowCommentForm(true);
+                setCallButtonsHidden(true);
                 navigate("/livreurs");
               }}
             >
@@ -514,6 +561,7 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
       {courseStarted && (
         <button
           className="primary-btn full"
+          type="button"
           style={{
             background: "#dc2626",
             marginBottom: "15px",
@@ -524,62 +572,65 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
         </button>
       )}
 
-    {showCommentQuestion && !showCommentForm && (
-  <div
-    className="tracking-card"
-    style={{
-      textAlign: "center",
-      padding: "22px",
-    }}
-  >
-    <h3
-      style={{
-        marginBottom: "18px",
-        color: "#111827",
-      }}
-    >
-      هل تريد ترك تعليق وتقييم للسائق؟
-    </h3>
+      {showCommentQuestion && !showCommentForm && (
+        <div
+          className="tracking-card"
+          style={{
+            textAlign: "center",
+            padding: "22px",
+          }}
+        >
+          <h3
+            style={{
+              marginBottom: "18px",
+              color: "#111827",
+            }}
+          >
+            هل تريد ترك تعليق وتقييم للسائق؟
+          </h3>
 
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: "14px",
-      }}
-    >
-      <button
-        className="primary-btn"
-        type="button"
-        style={{
-          background: "#16a34a",
-          minWidth: "120px",
-          borderRadius: "14px",
-        }}
-        onClick={() => {
-          setShowCommentForm(true);
-          setShowCommentQuestion(false);
-        }}
-      >
-        ⭐ نعم
-      </button>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: "14px",
+            }}
+          >
+            <button
+              className="primary-btn"
+              type="button"
+              style={{
+                background: "#16a34a",
+                minWidth: "120px",
+                borderRadius: "14px",
+              }}
+              onClick={() => {
+                setShowCommentForm(true);
+                setShowCommentQuestion(false);
+              }}
+            >
+              ⭐ نعم
+            </button>
 
-<button
-  className="primary-btn small"
-  style={{ background: "#dc2626" }}
-  onClick={() => {
-    setShowAcceptedQuestion(false);
-    setCourseFinished(true);
-    setShowCommentQuestion(true);
-    setShowCommentForm(false);
-    navigate("/livreurs");
-  }}
->
-  لا
-</button>
-    </div>
-  </div>
-)}
+            <button
+              className="primary-btn small"
+              type="button"
+              style={{ background: "#dc2626" }}
+              onClick={() => {
+                setShowAcceptedQuestion(false);
+                setCourseFinished(true);
+                setShowCommentQuestion(false);
+                setShowCommentForm(false);
+                setCallButtonsHidden(true);
+                navigate("/livreurs");
+              }}
+            >
+              لا
+            </button>
+          </div>
+        </div>
+      )}
+
       {showCommentForm && (
         <form className="tracking-card" onSubmit={handleSubmitComment}>
           <h3>
@@ -595,28 +646,38 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
             onChange={(e) => setNomClient(e.target.value)}
           />
 
-          <div style={{ textAlign: "center", marginBottom: "14px" }}>
-  <p style={{ fontWeight: "700", marginBottom: "8px" }}>
-    تقييم السائق
-  </p>
+          <div
+            style={{
+              textAlign: "center",
+              marginBottom: "14px",
+            }}
+          >
+            <p
+              style={{
+                fontWeight: "700",
+                marginBottom: "8px",
+              }}
+            >
+              تقييم السائق
+            </p>
 
-  {[1, 2, 3, 4, 5].map((star) => (
-    <button
-      key={star}
-      type="button"
-      onClick={() => setNote(star)}
-      style={{
-        fontSize: "30px",
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-        color: star <= note ? "#f59e0b" : "#d1d5db",
-      }}
-    >
-      ★
-    </button>
-  ))}
-</div>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setNote(star)}
+                style={{
+                  fontSize: "30px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: star <= note ? "#f59e0b" : "#d1d5db",
+                }}
+              >
+                ★
+              </button>
+            ))}
+          </div>
 
           <textarea
             placeholder="اكتب تعليقك هنا"
@@ -629,12 +690,20 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
             إرسال
           </button>
 
-          {commentError && <p style={{ color: "red" }}>{commentError}</p>}
+          {commentError && (
+            <p style={{ color: "red" }}>{commentError}</p>
+          )}
         </form>
       )}
 
       {commentSuccess && (
-        <p style={{ color: "green", textAlign: "center", fontWeight: "600" }}>
+        <p
+          style={{
+            color: "green",
+            textAlign: "center",
+            fontWeight: "600",
+          }}
+        >
           {commentSuccess}
         </p>
       )}
@@ -649,7 +718,10 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
           border: "2px solid #fed7aa",
         }}
       >
-        <TrackingMap courier={courier} clientPosition={clientPosition} />
+        <TrackingMap
+          courier={courier}
+          clientPosition={clientPosition}
+        />
       </div>
 
       <div className="tracking-card">
@@ -661,12 +733,14 @@ localStorage.removeItem(`activeTrackingCourse_${id}`);
           <div key={comment.id} className="comment-card">
             <strong>👤 {comment.nom_client || "زبون"}</strong>
             <p>{comment.message}</p>
-            <small>{new Date(comment.created_at).toLocaleString("fr-FR")}</small>
+            <small>
+              {new Date(comment.created_at).toLocaleString("fr-FR")}
+            </small>
           </div>
         ))}
       </div>
 
-            {selectedPhoto && (
+      {selectedPhoto && (
         <div
           onClick={() => setSelectedPhoto(null)}
           style={{
