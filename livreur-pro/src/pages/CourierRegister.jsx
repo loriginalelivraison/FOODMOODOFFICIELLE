@@ -85,14 +85,23 @@ export default function CourierRegister() {
     photo: null,
   });
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  const [locationConsent, setLocationConsent] = useState(false);
 
-    if (loading) return;
+async function handleSubmit(e) {
+  e.preventDefault();
 
-    setLoading(true);
-    setError("");
-    setGpsError(false);
+  if (loading) return;
+
+  setError("");
+  setGpsError(false);
+
+  if (!locationConsent) {
+    setGpsError(true);
+    setError("يجب الموافقة على استخدام بيانات الموقع الجغرافي للمتابعة");
+    return;
+  }
+
+  setLoading(true);
 
     if (!navigator.geolocation) {
       setGpsError(true);
@@ -465,8 +474,54 @@ export default function CourierRegister() {
               <span>
                 {gpsError
                   ? "يجب السماح بالوصول إلى موقعك لإكمال إنشاء الحساب"
-                  : "يجب تفعيل خدمة تحديد الموقع (GPS) للسماح للعملاء برؤية موقعك وإرسال طلبات التوصيل القريبة منك."}
+                  : "يجمع تطبيق WinRak بيانات الموقع الجغرافي للسائق لتتبع موقعه أثناء عملية التوصيل ومشاركة موقعه مع العميل، حتى عندما يعمل التطبيق في الخلفية أو يكون مغلقًا أو غير مستخدم."}
               </span>
+              <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: "14px",
+    gap: "12px",
+  }}
+>
+  <span style={{ fontWeight: "700", fontSize: "14px" }}>
+    أوافق على استخدام بيانات الموقع الجغرافي
+  </span>
+
+  <button
+    type="button"
+    role="switch"
+    aria-checked={locationConsent}
+    onClick={() => setLocationConsent(!locationConsent)}
+    style={{
+      width: "54px",
+      height: "30px",
+      borderRadius: "30px",
+      border: "none",
+      padding: "3px",
+      cursor: "pointer",
+      backgroundColor: locationConsent ? "#8BCF35" : "#d1d5db",
+      transition: "background-color 0.25s ease",
+      position: "relative",
+      flexShrink: 0,
+    }}
+  >
+    <span
+      style={{
+        position: "absolute",
+        top: "3px",
+        left: locationConsent ? "27px" : "3px",
+        width: "24px",
+        height: "24px",
+        borderRadius: "50%",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+        transition: "left 0.25s ease",
+      }}
+    />
+  </button>
+</div>
             </div>
 
             {loading && (
