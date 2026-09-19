@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   updateLivreurPosition,
+  setLivreurUnavailable,
   deleteLivreur,
   getActiveCoursesForLivreur,
 } from "../livreursapi.js";
@@ -199,6 +200,23 @@ export default function LivreurDashboard() {
 
   }
 
+  async function handleTrackingToggle() {
+    if (trackingEnabled) {
+      setTrackingEnabled(false);
+
+      try {
+        await setLivreurUnavailable(livreur.id);
+      } catch (err) {
+        console.error("Erreur désactivation partage localisation :", err);
+        setError("Impossible de modifier votre disponibilité.");
+      }
+
+      return;
+    }
+
+    setTrackingEnabled(true);
+  }
+
   function logout() {
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
@@ -282,7 +300,7 @@ export default function LivreurDashboard() {
         </div>
 
         <button
-          onClick={() => setTrackingEnabled(!trackingEnabled)}
+          onClick={handleTrackingToggle}
           style={{
             marginTop: "18px",
             width: "100%",

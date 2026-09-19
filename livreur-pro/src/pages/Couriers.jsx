@@ -33,6 +33,7 @@ export default function Couriers() {
   const [locationEnabledMessage, setLocationEnabledMessage] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
+  const [locationConsent, setLocationConsent] = useState(false);
 
   const hasShownLocationMessageRef = useRef(
     sessionStorage.getItem("clientLocationMessageShown") === "true"
@@ -155,6 +156,13 @@ export default function Couriers() {
   }
 
   function handleFindAroundMe() {
+    if (!locationConsent) {
+      setLocationDisabled(true);
+      setLocationEnabledMessage(false);
+      setSearchingLocation(false);
+      return;
+    }
+
     if (!navigator.geolocation) {
       setLocationDisabled(true);
       return;
@@ -244,11 +252,59 @@ export default function Couriers() {
       <div className="page-title">
         <center>
           <div className="around-me-top">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginTop: "14px",
+                gap: "12px",
+              }}
+            >
+              <span style={{ fontWeight: "700", fontSize: "14px" }}>
+                أوافق على استخدام بيانات الموقع الجغرافي
+              </span>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={locationConsent}
+                onClick={() => setLocationConsent(!locationConsent)}
+                style={{
+                  width: "54px",
+                  height: "30px",
+                  borderRadius: "30px",
+                  border: "none",
+                  padding: "3px",
+                  cursor: "pointer",
+                  backgroundColor: locationConsent ? "#8BCF35" : "#d1d5db",
+                  transition: "background-color 0.25s ease",
+                  position: "relative",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "3px",
+                    left: locationConsent ? "27px" : "3px",
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                    transition: "left 0.25s ease",
+                  }}
+                />
+              </button>
+            </div>
+
             <button
               type="button"
               className="primary-btn full"
               onClick={handleFindAroundMe}
               disabled={searchingLocation}
+              style={{ marginTop: "16px" }}
             >
               {searchingLocation
                 ? "🔎 جاري البحث عن السائقين..."
