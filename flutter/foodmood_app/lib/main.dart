@@ -174,7 +174,7 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     const settings = InitializationSettings(android: androidSettings);
 
     await localNotifications.initialize(
-      settings,
+      settings: settings,
       onDidReceiveNotificationResponse: (response) async {
         await openCourseFromNotification(response.payload);
       },
@@ -213,10 +213,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
         'Un client a confirmé la course. Ouvrez WinRak.';
 
     await localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      const NotificationDetails(android: androidDetails),
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(android: androidDetails),
       payload: jsonEncode({
         "type": message.data["type"] ?? "course_accepted",
         "course_id": message.data["course_id"],
