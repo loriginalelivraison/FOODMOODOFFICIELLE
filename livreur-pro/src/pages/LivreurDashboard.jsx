@@ -287,7 +287,7 @@ export default function LivreurDashboard() {
       navigate("/livreurs");
     } catch (err) {
       console.error(err);
-      setError("حدث خطأ أثناء حذف الحساب.");
+      setError(err.message || "حدث خطأ أثناء حذف الحساب.");
    
     }
 

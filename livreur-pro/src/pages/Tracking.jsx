@@ -564,7 +564,6 @@ export default function Tracking() {
                 setCourseFinished(true);
                 setShowCommentForm(true);
                 setCallButtonsHidden(true);
-                navigate("/livreurs");
               }}
             >
               لا

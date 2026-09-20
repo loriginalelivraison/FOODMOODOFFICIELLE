@@ -7,6 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Avg
 
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
@@ -22,6 +23,14 @@ from .firebase import send_livreur_notification
 
 class LivreurViewSet(ModelViewSet):
     serializer_class = LivreurSerializer
+
+    def perform_destroy(self, instance):
+        user = instance.user
+
+        with transaction.atomic():
+            instance.delete()
+            if user:
+                user.delete()
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
