@@ -291,7 +291,8 @@ class CourseViewSet(ModelViewSet):
         send_livreur_notification(
             livreur,
             "Nouvelle demande de livraison",
-            "Un client souhaite vous contacter. Ouvrez WinRak.",
+            "Un client a confirmé la course. Ouvrez WinRak.",
+            course_id=course.id,
         )
 
     @action(detail=False, methods=["get"])
@@ -354,12 +355,33 @@ class CourseViewSet(ModelViewSet):
     @action(detail=True, methods=["patch"])
     def finish(self, request, pk=None):
         course = self.get_object()
+        livreur = course.livreur
+        client = course.client
+
+        if not course.active:
+            return Response(self.get_serializer(course).data)
+
+        is_livreur = livreur.user == request.user
+        is_client = client.user == request.user
+
+        if not is_livreur and not is_client:
+            return Response({"error": "Accès interdit"}, status=403)
 
         course.active = False
         course.finished_at = timezone.now()
-        course.save()
+        if is_livreur:
+            course.finished_by = livreur
+        else:
+            course.finished_by_client = client
+        course.save(
+            update_fields=[
+                "active",
+                "finished_at",
+                "finished_by",
+                "finished_by_client",
+            ]
+        )
 
-        livreur = course.livreur
         livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
         livreur.disponible = True
         livreur.save(update_fields=["nombre_livraisons", "disponible"])

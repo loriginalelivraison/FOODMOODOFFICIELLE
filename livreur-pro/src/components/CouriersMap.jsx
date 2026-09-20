@@ -23,6 +23,10 @@ L.Icon.Default.mergeOptions({
 });
 
 const ALGERIA_CENTER = [36.0339, 3.6596];
+const NORTHERN_ALGERIA_BOUNDS = [
+  [34.5, -2.5],
+  [37.3, 9.0],
+];
 
 const clientIcon = new L.DivIcon({
   className: "client-marker",
@@ -40,11 +44,21 @@ const clientIcon = new L.DivIcon({
   iconAnchor: [10, 10],
 });
 
+function hasPosition(position) {
+  return (
+    position?.latitude !== null &&
+    position?.latitude !== undefined &&
+    position?.longitude !== null &&
+    position?.longitude !== undefined &&
+    !isNaN(Number(position.latitude)) &&
+    !isNaN(Number(position.longitude))
+  );
+}
 function RecenterMap({ clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (clientPosition?.latitude && clientPosition?.longitude) {
+    if (hasPosition(clientPosition)) {
       map.flyTo(
         [
           Number(clientPosition.latitude),
@@ -57,7 +71,9 @@ function RecenterMap({ clientPosition }) {
         }
       );
     } else {
-      map.setView(ALGERIA_CENTER, 7);
+      map.fitBounds(NORTHERN_ALGERIA_BOUNDS, {
+        padding: [12, 12],
+      });
     }
   }, [clientPosition, map]);
 
@@ -68,7 +84,7 @@ function LocateButton({ clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!clientPosition) return;
+    if (!hasPosition(clientPosition)) return;
 
     const control = L.control({ position: "bottomright" });
 
@@ -124,14 +140,16 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
     return isAvailable && hasPosition;
   });
 
-  const center = clientPosition
+  const hasClientPosition = hasPosition(clientPosition);
+
+  const center = hasClientPosition
     ? [
         Number(clientPosition.latitude),
         Number(clientPosition.longitude),
       ]
     : ALGERIA_CENTER;
 
-  const zoom = clientPosition ? 10 : 7;
+  const zoom = hasClientPosition ? 10 : 5;
 
   return (
     <div
@@ -151,16 +169,16 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
           width: "100%",
         }}
       >
-       <TileLayer
-  attribution='&copy; OpenStreetMap &copy; CARTO'
-  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-/>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
         <RecenterMap clientPosition={clientPosition} />
 
         <LocateButton clientPosition={clientPosition} />
 
-        {clientPosition && (
+        {hasClientPosition && (
           <Marker
             key="client-position"
             position={[

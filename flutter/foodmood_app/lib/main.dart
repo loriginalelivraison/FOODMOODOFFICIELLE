@@ -163,9 +163,66 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   late final WebViewController controller;
   bool isLoading = true;
 
+  final FlutterLocalNotificationsPlugin localNotifications =
+      FlutterLocalNotificationsPlugin();
   String? fcmToken;
   bool fcmTokenSent = false;
   Timer? syncTimer;
+
+  Future<void> initializeLocalNotifications() async {
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const settings = InitializationSettings(android: androidSettings);
+
+    await localNotifications.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (response) async {
+        await openCourseFromNotification(response.payload);
+      },
+    );
+  }
+
+  Future<void> openCourseFromNotification(String? payload) async {
+    if (payload == null || payload.isEmpty) return;
+
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final courseId = data["course_id"]?.toString();
+
+      if (courseId == null || courseId.isEmpty) return;
+
+      await controller.loadRequest(
+        Uri.parse("https://www.winrak.fr/livreur-course/$courseId"),
+      );
+    } catch (e) {
+      debugPrint("Erreur navigation notification : $e");
+    }
+  }
+
+  Future<void> showForegroundNotification(RemoteMessage message) async {
+    const androidDetails = AndroidNotificationDetails(
+      'high_importance_channel',
+      'Notifications livraisons',
+      channelDescription: 'Notifications des nouvelles demandes de livraison',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+    );
+
+    final title = message.notification?.title ?? 'Nouvelle course';
+    final body = message.notification?.body ??
+        'Un client a confirmé la course. Ouvrez WinRak.';
+
+    await localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      const NotificationDetails(android: androidDetails),
+      payload: jsonEncode({
+        "type": message.data["type"] ?? "course_accepted",
+        "course_id": message.data["course_id"],
+      }),
+    );
+  }
 
   Future<void> requestPermissions() async {
     await Permission.location.request();
@@ -310,10 +367,18 @@ Future<void> syncAuthFromWebView() async {
       debugPrint(
         "NOTIFICATION REÇUE FOREGROUND : ${message.notification?.title}",
       );
+      showForegroundNotification(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint("NOTIFICATION CLIQUÉE : ${message.notification?.title}");
+      openCourseFromNotification(jsonEncode(message.data));
+    });
+
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        openCourseFromNotification(jsonEncode(message.data));
+      }
     });
   }
 
@@ -322,7 +387,9 @@ Future<void> syncAuthFromWebView() async {
     super.initState();
 
     requestPermissions();
-    listenFirebaseMessages();
+    initializeLocalNotifications().then((_) {
+      listenFirebaseMessages();
+    });
 
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -352,6 +419,12 @@ Future<void> syncAuthFromWebView() async {
             if (url.startsWith('https://wa.me/') ||
                 url.startsWith('http://wa.me/') ||
                 url.startsWith('whatsapp://')) {
+              await openExternal(url);
+              return NavigationDecision.prevent;
+            }
+
+            if (url.startsWith('https://www.google.com/maps/') ||
+                url.startsWith('https://maps.google.com/')) {
               await openExternal(url);
               return NavigationDecision.prevent;
             }

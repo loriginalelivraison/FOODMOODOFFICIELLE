@@ -1,0 +1,23 @@
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("deliveries", "0010_livreur_fcm_token"),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name="course",
+            name="finished_by",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="courses_finies",
+                to="deliveries.livreur",
+            ),
+        ),
+    ]

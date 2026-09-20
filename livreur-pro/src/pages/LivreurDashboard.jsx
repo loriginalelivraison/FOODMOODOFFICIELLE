@@ -4,6 +4,8 @@ import {
   setLivreurUnavailable,
   deleteLivreur,
   getActiveCoursesForLivreur,
+  getLivreurCourses,
+  finishCourse,
 } from "../livreursapi.js";
 import LogoutButton from "../components/LogoutButton.jsx";
 import { useNavigate } from "react-router-dom";
@@ -44,11 +46,42 @@ const clientIcon = new L.DivIcon({
   iconAnchor: [11, 11],
 });
 
-function RecenterMap({ position }) {
+const livreurIcon = new L.DivIcon({
+  className: "livreur-marker",
+  html: `
+    <div style="
+      width:34px;
+      height:34px;
+      background:#f97316;
+      border:4px solid white;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.25);
+    ">🛵</div>
+  `,
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
+});
+
+function hasPosition(position) {
+  return (
+    position?.latitude !== null &&
+    position?.latitude !== undefined &&
+    position?.longitude !== null &&
+    position?.longitude !== undefined &&
+    !isNaN(Number(position.latitude)) &&
+    !isNaN(Number(position.longitude))
+  );
+}
+
+function RecenterMap({ position, clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (position?.latitude && position?.longitude) {
+    if (hasPosition(position)) {
       map.panTo(
         [Number(position.latitude), Number(position.longitude)],
         {
@@ -58,6 +91,36 @@ function RecenterMap({ position }) {
       );
     }
   }, [position, map]);
+
+  useEffect(() => {
+    function zoomToPosition() {
+      if (!hasPosition(position)) return;
+
+      map.flyTo(
+        [Number(position.latitude), Number(position.longitude)],
+        16,
+        { duration: 1.2 }
+      );
+    }
+
+    function zoomToClient() {
+      if (!hasPosition(clientPosition)) return;
+
+      map.flyTo(
+        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+        16,
+        { duration: 1.2 }
+      );
+    }
+
+    window.addEventListener("zoomLivreurDashboardPosition", zoomToPosition);
+    window.addEventListener("zoomLivreurDashboardClient", zoomToClient);
+
+    return () => {
+      window.removeEventListener("zoomLivreurDashboardPosition", zoomToPosition);
+      window.removeEventListener("zoomLivreurDashboardClient", zoomToClient);
+    };
+  }, [position, clientPosition, map]);
 
   return null;
 }
@@ -69,12 +132,43 @@ export default function LivreurDashboard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [position, setPosition] = useState(null);
-  const [trackingEnabled, setTrackingEnabled] = useState(true);
+  const [trackingEnabled, setTrackingEnabled] = useState(() => {
+    const saved = localStorage.getItem("livreurTrackingEnabled");
+    return saved === null ? true : saved === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("livreurTrackingEnabled", String(trackingEnabled));
+  }, [trackingEnabled]);
 
   const [activeCourse, setActiveCourse] = useState(null);
   const [courseNotification, setCourseNotification] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [courses, setCourses] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [finishingCourse, setFinishingCourse] = useState(false);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (showHistory) {
+      loadHistory();
+    }
+  }, [showHistory]);
+
+  async function loadHistory() {
+    setLoadingHistory(true);
+    setError("");
+
+    try {
+      const data = await getLivreurCourses();
+      setCourses(data);
+    } catch (err) {
+      setError(err.message || "حدث خطأ أثناء تحميل السجل");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   useEffect(() => {
     if (!livreur?.id) return;
@@ -203,6 +297,7 @@ export default function LivreurDashboard() {
   async function handleTrackingToggle() {
     if (trackingEnabled) {
       setTrackingEnabled(false);
+      localStorage.setItem("livreurTrackingEnabled", "false");
 
       try {
         await setLivreurUnavailable(livreur.id);
@@ -215,6 +310,26 @@ export default function LivreurDashboard() {
     }
 
     setTrackingEnabled(true);
+    localStorage.setItem("livreurTrackingEnabled", "true");
+  }
+
+  async function handleFinishCourse() {
+    if (!activeCourse || finishingCourse) return;
+
+    setFinishingCourse(true);
+    setError("");
+
+    try {
+      await finishCourse(activeCourse.id);
+      setActiveCourse(null);
+      setCourseNotification("");
+      setMessage("تم إنهاء الرحلة وتسجيلها في السجل.");
+      if (showHistory) loadHistory();
+    } catch (err) {
+      setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
+    } finally {
+      setFinishingCourse(false);
+    }
   }
 
   function logout() {
@@ -232,6 +347,11 @@ export default function LivreurDashboard() {
   const isLoggedIn = localStorage.getItem("access");
 
   if (!isLoggedIn) return null;
+
+  const hasClientPosition = hasPosition({
+    latitude: activeCourse?.client_latitude,
+    longitude: activeCourse?.client_longitude,
+  });
 
   return (
     <section className="page" dir="rtl">
@@ -319,6 +439,15 @@ export default function LivreurDashboard() {
 
       {courseNotification && activeCourse && (
         <div
+          className="course-notification clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate(`/livreur-course/${activeCourse.id}`)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              navigate(`/livreur-course/${activeCourse.id}`);
+            }
+          }}
           style={{
             background: "#f0fdf4",
             border: "1px solid #bbf7d0",
@@ -335,6 +464,18 @@ export default function LivreurDashboard() {
           <span style={{ color: "#374151", fontWeight: "600" }}>
             رقم الرحلة: {activeCourse.id}
           </span>
+          <button
+            className="primary-btn full"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleFinishCourse();
+            }}
+            disabled={finishingCourse}
+            style={{ marginTop: "12px", background: "#dc2626" }}
+          >
+            {finishingCourse ? "جاري إنهاء الرحلة..." : "إنهاء الرحلة"}
+          </button>
         </div>
       )}
 
@@ -356,8 +497,57 @@ export default function LivreurDashboard() {
           borderRadius: "22px",
           overflow: "hidden",
           border: "2px solid #fed7aa",
+          position: "relative",
         }}
       >
+        {hasPosition(position) && (
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new Event("zoomLivreurDashboardPosition"))
+            }
+            style={{
+              position: "absolute",
+              bottom: "14px",
+              right: "14px",
+              zIndex: 9999,
+              background: "#ffffff",
+              border: "1px solid #ddd",
+              borderRadius: "12px",
+              padding: "10px 14px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            }}
+          >
+            📍 موقعي
+          </button>
+        )}
+
+        {hasClientPosition && (
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new Event("zoomLivreurDashboardClient"))
+            }
+            style={{
+              position: "absolute",
+              bottom: "62px",
+              right: "14px",
+              zIndex: 9999,
+              background: "#ffffff",
+              border: "1px solid #ddd",
+              borderRadius: "12px",
+              padding: "10px 14px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            }}
+          >
+            📍 موقع الزبون
+          </button>
+        )}
+
         <MapContainer
           center={
             position
@@ -368,19 +558,27 @@ export default function LivreurDashboard() {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
-            attribution="&copy; OpenStreetMap"
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          <RecenterMap
+            position={position}
+            clientPosition={hasClientPosition ? {
+              latitude: activeCourse.client_latitude,
+              longitude: activeCourse.client_longitude,
+            } : null}
           />
 
           {position && (
             <>
-              <RecenterMap position={position} />
 
               <Marker
                 position={[
                   Number(position.latitude),
                   Number(position.longitude),
                 ]}
+                icon={livreurIcon}
               >
                 <Popup>
                   <strong>موقعي الحالي</strong>
@@ -391,11 +589,7 @@ export default function LivreurDashboard() {
             </>
           )}
 
-         {activeCourse &&
-  activeCourse.client_latitude !== null &&
-  activeCourse.client_longitude !== null &&
-  !isNaN(Number(activeCourse.client_latitude)) &&
-  !isNaN(Number(activeCourse.client_longitude)) && (
+          {hasClientPosition && (
     <Marker
       position={[
         Number(activeCourse.client_latitude),
@@ -415,6 +609,79 @@ export default function LivreurDashboard() {
         
         </MapContainer>
       </div>
+      <button
+        className="primary-btn full"
+        style={{ marginTop: "14px" }}
+        type="button"
+        onClick={() => setShowHistory(!showHistory)}
+      >
+        {showHistory ? "إخفاء السجل" : "السجل"}
+      </button>
+
+      {showHistory && (
+        <div className="tracking-card" style={{ marginTop: "18px" }}>
+          <h2>سجل الرحلات</h2>
+
+          {loadingHistory && <p>جاري تحميل السجل...</p>}
+
+          {!loadingHistory && courses.length === 0 && (
+            <p>لا توجد رحلات مسجلة حالياً.</p>
+          )}
+
+          {!loadingHistory &&
+            courses.map((course) => (
+              <div
+                key={course.id}
+                style={{
+                  background: "#fff7ed",
+                  border: "1px solid #fed7aa",
+                  borderRadius: "18px",
+                  padding: "14px",
+                  marginBottom: "14px",
+                }}
+              >
+                <h3 style={{ marginTop: 0 }}>رحلة رقم {course.id}</h3>
+
+                <p>
+                  <strong>رقم الزبون:</strong> {course.client}
+                </p>
+
+                <p>
+                  <strong>موقع الزبون:</strong>{" "}
+                  {course.client_latitude && course.client_longitude
+                    ? `${course.client_latitude}, ${course.client_longitude}`
+                    : "غير متوفر"}
+                </p>
+
+                <p>
+                  <strong>الحالة:</strong>{" "}
+                  {course.active ? "نشطة" : "منتهية"}
+                </p>
+
+                <p>
+                  <strong>تاريخ البداية:</strong>{" "}
+                  {course.created_at
+                    ? new Date(course.created_at).toLocaleString("ar-DZ")
+                    : "غير متوفر"}
+                </p>
+
+                <p>
+                  <strong>تاريخ النهاية:</strong>{" "}
+                  {course.finished_at
+                    ? new Date(course.finished_at).toLocaleString("ar-DZ")
+                    : "لم تنته بعد"}
+                </p>
+
+                <p>
+                  <strong>أنهى الرحلة:</strong>{" "}
+                  {course.finished_by_name
+                    ? `${course.finished_by_name} (${course.finished_by_type === "client" ? "الزبون" : "السائق"})`
+                    : "غير معروف"}
+                </p>
+              </div>
+            ))}
+        </div>
+      )}
       <button className="primary-btn full"
           style={{
             marginTop: "14px",

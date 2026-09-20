@@ -22,7 +22,7 @@ def init_firebase():
     firebase_admin.initialize_app(cred)
 
 
-def send_livreur_notification(livreur, title, body):
+def send_livreur_notification(livreur, title, body, course_id=None):
     if not livreur.fcm_token:
         print("AUCUN FCM TOKEN POUR CE LIVREUR")
         return False
@@ -35,6 +35,12 @@ def send_livreur_notification(livreur, title, body):
                 title=title,
                 body=body,
             ),
+            data={
+                "type": "course_accepted",
+                "course_id": str(course_id),
+            } if course_id is not None else {
+                "type": "course_accepted",
+            },
             android=messaging.AndroidConfig(
                 priority="high",
             ),

@@ -1,3 +1,5 @@
+import { toArabicMessage } from "./utils/messagesAr.js";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -33,7 +35,7 @@ export async function getLivreurs() {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
 
   if (!response.ok) {
-    throw new Error("Erreur lors du chargement des livreurs");
+    throw new Error(toArabicMessage(null, "حدث خطأ أثناء تحميل قائمة السائقين."));
   }
 
   return response.json();
@@ -43,7 +45,7 @@ export async function getLivreurById(id) {
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/?format=json`);
 
   if (!response.ok) {
-    throw new Error("Livreur introuvable");
+    throw new Error(toArabicMessage(null, "لم يتم العثور على السائق."));
   }
 
   return response.json();
@@ -64,7 +66,7 @@ export async function loginJWT(credentials) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.detail || "Connexion impossible");
+    throw new Error(toArabicMessage(data.detail, "تعذر تسجيل الدخول."));
   }
 
   const livreur = await getLivreurBytelephone(credentials.telephone);
@@ -116,12 +118,15 @@ export async function createLivreur(livreur) {
     data = JSON.parse(text);
   } catch {
     console.error("Réponse non JSON reçue :", text);
-    throw new Error("Le serveur a renvoyé une page HTML au lieu du JSON.");
+    throw new Error(toArabicMessage(null, "أرسل الخادم استجابة غير صالحة."));
   }
 
   if (!response.ok) {
     throw new Error(
-      data.error || data.telephone?.[0] || "Erreur lors de l'inscription"
+      toArabicMessage(
+        data.error || data.telephone,
+        "حدث خطأ أثناء إنشاء حساب السائق."
+      )
     );
   }
 
@@ -142,7 +147,9 @@ export async function updateLivreurPosition(id, position) {
   if (!response.ok) {
     handleInvalidToken(data);
     console.log("Erreur Django update_position :", data);
-    throw new Error(data.detail || data.error || "Erreur mise à jour position");
+    throw new Error(
+      toArabicMessage(data.detail || data.error, "حدث خطأ أثناء تحديث الموقع.")
+    );
   }
 
   return data;
@@ -152,7 +159,7 @@ export async function getLivreurBytelephone(telephone) {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
 
   if (!response.ok) {
-    throw new Error("Erreur récupération livreur");
+    throw new Error(toArabicMessage(null, "حدث خطأ أثناء جلب معلومات السائق."));
   }
 
   const data = await response.json();
@@ -173,7 +180,12 @@ export async function setLivreurUnavailable(id) {
 
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(data.detail || data.error || "Erreur désactivation livreur");
+    throw new Error(
+      toArabicMessage(
+        data.detail || data.error,
+        "حدث خطأ أثناء إيقاف توفر السائق."
+      )
+    );
   }
 
   return data;
@@ -185,7 +197,7 @@ export async function getCommentairesLivreur(livreurId) {
   );
 
   if (!response.ok) {
-    throw new Error("Erreur chargement commentaires");
+    throw new Error(toArabicMessage(null, "حدث خطأ أثناء تحميل التعليقات."));
   }
 
   return response.json();
@@ -203,7 +215,12 @@ export async function createCommentaireLivreur(commentaire) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.detail || data.message || "Erreur ajout commentaire");
+    throw new Error(
+      toArabicMessage(
+        data.detail || data.message,
+        "حدث خطأ أثناء إضافة التعليق."
+      )
+    );
   }
 
   return data;
@@ -221,7 +238,9 @@ export async function createClient(client) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Erreur inscription client");
+    throw new Error(
+      toArabicMessage(data.error, "حدث خطأ أثناء إنشاء حساب العميل.")
+    );
   }
 
   return data;
@@ -242,7 +261,7 @@ export async function loginClient(credentials) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.detail || "Connexion client impossible");
+    throw new Error(toArabicMessage(data.detail, "تعذر تسجيل دخول العميل."));
   }
 
   const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
@@ -288,7 +307,9 @@ export async function getClientByTelephone(telephone) {
   if (!response.ok) {
     handleInvalidToken(data);
     console.error("Erreur récupération client :", data);
-    throw new Error(data.detail || "Erreur récupération client");
+    throw new Error(
+      toArabicMessage(data.detail, "حدث خطأ أثناء جلب معلومات العميل.")
+    );
   }
 
   const clients = Array.isArray(data) ? data : data.results || [];
@@ -306,7 +327,9 @@ export async function deleteLivreur(id) {
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     handleInvalidToken(error);
-    throw new Error(error.detail || "Erreur suppression compte livreur");
+    throw new Error(
+      toArabicMessage(error.detail, "حدث خطأ أثناء حذف حساب السائق.")
+    );
   }
 
   return true;
@@ -321,7 +344,7 @@ export async function deleteClient(id) {
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     handleInvalidToken(error);
-    throw new Error(error.detail || "Impossible de supprimer le compte client");
+    throw new Error(toArabicMessage(error.detail, "تعذر حذف حساب العميل."));
   }
 
   return true;
@@ -342,10 +365,10 @@ export async function createCourse(data) {
     handleInvalidToken(result);
     console.error("ERREUR BACKEND CREATE COURSE :", result);
     throw new Error(
-      result?.error ||
-        result?.detail ||
-        JSON.stringify(result) ||
-        "Erreur création course"
+      toArabicMessage(
+        result?.error || result?.detail || result,
+        "حدث خطأ أثناء إنشاء الرحلة."
+      )
     );
   }
 
@@ -364,7 +387,22 @@ export async function getActiveCourse(livreurId) {
 
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(data.detail || "Erreur récupération course");
+    throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء جلب الرحلة."));
+  }
+
+  return data;
+}
+
+export async function getCourse(courseId) {
+  const response = await fetch(`${API_BASE_URL}/courses/${courseId}/`, {
+    headers: authHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء جلب الرحلة."));
   }
 
   return data;
@@ -380,7 +418,7 @@ export async function finishCourse(courseId) {
 
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(data.detail || "Erreur fin course");
+    throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء إنهاء الرحلة."));
   }
 
   return data;
@@ -400,7 +438,12 @@ export async function updateLivreurPhoto(id, photoFile) {
 
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(data.photo?.[0] || data.detail || "Erreur modification photo");
+    throw new Error(
+      toArabicMessage(
+        data.photo || data.detail,
+        "حدث خطأ أثناء تعديل الصورة."
+      )
+    );
   }
 
   return data;
@@ -418,7 +461,9 @@ export async function getActiveCoursesForLivreur(livreurId) {
 
   if (!response.ok) {
     handleInvalidToken(result);
-    throw new Error(result?.detail || "Erreur chargement course active");
+    throw new Error(
+      toArabicMessage(result?.detail, "حدث خطأ أثناء تحميل الرحلة النشطة.")
+    );
   }
 
   return result;
@@ -433,7 +478,22 @@ export async function getClientCourses() {
 
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(data.detail || "Erreur chargement historique");
+    throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء تحميل السجل."));
+  }
+
+  return Array.isArray(data) ? data : data.results || [];
+}
+
+export async function getLivreurCourses() {
+  const response = await fetch(`${API_BASE_URL}/courses/`, {
+    headers: authHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء تحميل السجل."));
   }
 
   return Array.isArray(data) ? data : data.results || [];
@@ -456,7 +516,10 @@ export async function updateClientCoursePosition(courseId, position) {
   if (!response.ok) {
     handleInvalidToken(data);
     throw new Error(
-      data.detail || data.error || "Erreur mise à jour position client"
+      toArabicMessage(
+        data.detail || data.error,
+        "حدث خطأ أثناء تحديث موقع العميل."
+      )
     );
   }
 

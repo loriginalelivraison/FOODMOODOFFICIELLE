@@ -33,9 +33,45 @@ class ClientSerializer(serializers.ModelSerializer):
         read_only_fields = ["user", "created_at"]
 
 class CourseSerializer(serializers.ModelSerializer):
+    finished_by_name = serializers.SerializerMethodField()
+    finished_by_type = serializers.SerializerMethodField()
+
+    def get_finished_by_name(self, obj):
+        if obj.finished_by:
+            return obj.finished_by.nom
+        if obj.finished_by_client:
+            return obj.finished_by_client.nom
+        return None
+
+    def get_finished_by_type(self, obj):
+        if obj.finished_by:
+            return "livreur"
+        if obj.finished_by_client:
+            return "client"
+        return None
+
     class Meta:
         model = Course
-        fields = "__all__"
+        fields = [
+            "id",
+            "client",
+            "livreur",
+            "finished_by",
+            "finished_by_client",
+            "finished_by_name",
+            "finished_by_type",
+            "client_latitude",
+            "client_longitude",
+            "active",
+            "created_at",
+            "finished_at",
+        ]
+        read_only_fields = [
+            "finished_by",
+            "finished_by_client",
+            "finished_by_name",
+            "finished_by_type",
+        ]
 
 class LivreurSerializer(serializers.ModelSerializer):
     class Meta:

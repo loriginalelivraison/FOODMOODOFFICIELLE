@@ -6,6 +6,7 @@ import {
   createCommentaireLivreur,
   createCourse,
   finishCourse,
+  getCourse,
   updateClientCoursePosition,
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
@@ -79,6 +80,38 @@ export default function Tracking() {
       console.error("Erreur restauration course :", err);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!activeCourseId || courseFinished) return;
+
+    async function checkCourseStatus() {
+      try {
+        const course = await getCourse(activeCourseId);
+
+        if (!course.active) {
+          if (clientWatchRef.current !== null) {
+            navigator.geolocation.clearWatch(clientWatchRef.current);
+            clientWatchRef.current = null;
+          }
+
+          setClientPosition(null);
+          setCourseStarted(false);
+          setCourseFinished(true);
+          setCourseMessage("");
+          setShowCommentQuestion(true);
+          setCallButtonsHidden(true);
+          localStorage.removeItem(`activeTrackingCourse_${id}`);
+        }
+      } catch (err) {
+        console.error("Erreur synchronisation état course :", err);
+      }
+    }
+
+    checkCourseStatus();
+    const interval = setInterval(checkCourseStatus, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeCourseId, courseFinished, id]);
 
   useEffect(() => {
     async function loadCourier() {
@@ -276,10 +309,10 @@ export default function Tracking() {
   }
 
   async function handleFinishCourse() {
+    if (!activeCourseId) return;
+
     try {
-      if (activeCourseId) {
-        await finishCourse(activeCourseId);
-      }
+      await finishCourse(activeCourseId);
 
       if (clientWatchRef.current !== null) {
         navigator.geolocation.clearWatch(clientWatchRef.current);
@@ -293,10 +326,9 @@ export default function Tracking() {
       setShowCommentQuestion(true);
       setShowCommentForm(false);
       setCallButtonsHidden(true);
-
       localStorage.removeItem(`activeTrackingCourse_${id}`);
     } catch (err) {
-      setError("حدث خطأ أثناء إنهاء الرحلة.");
+      setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
     }
   }
 
@@ -562,13 +594,10 @@ export default function Tracking() {
         <button
           className="primary-btn full"
           type="button"
-          style={{
-            background: "#dc2626",
-            marginBottom: "15px",
-          }}
+          style={{ background: "#dc2626", marginBottom: "15px" }}
           onClick={handleFinishCourse}
         >
-          عند انتهاء الرحلة اضغط هنا
+          إنهاء الرحلة
         </button>
       )}
 

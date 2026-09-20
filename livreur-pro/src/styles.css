@@ -1,3 +1,16 @@
+.course-notification.clickable {
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.course-notification.clickable:hover,
+.course-notification.clickable:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
 :root {
   --bg: #f3f2ef;
   --card: hsla(32, 82%, 74%, 0.88);

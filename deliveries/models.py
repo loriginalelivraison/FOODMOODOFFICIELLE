@@ -109,6 +109,20 @@ class Client(models.Model):
 class Course(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
     livreur = models.ForeignKey(Livreur, on_delete=models.CASCADE)
+    finished_by = models.ForeignKey(
+        Livreur,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="courses_finies",
+    )
+    finished_by_client = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="courses_finies",
+    )
 
     client_latitude = models.FloatField(null=True, blank=True)
     client_longitude = models.FloatField(null=True, blank=True)

@@ -4,6 +4,7 @@ import SplashScreen from './pages/SplashScreen.jsx'
 import Couriers from './pages/Couriers.jsx'
 import CourierRegister from './pages/CourierRegister.jsx'
 import Tracking from './pages/Tracking.jsx'
+import LivreurCourse from './pages/LivreurCourse.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import LivreurDashboard from "./pages/LivreurDashboard.jsx";
 import NotFound from './pages/NotFound.jsx'
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/inscription-livreur" element={<CourierRegister />} />
         <Route path="/livreur-dashboard/:id" element={<LivreurDashboard />} />
         <Route path="/tracking/:id" element={<Tracking />} />
+        <Route path="/livreur-course/:id" element={<LivreurCourse />} />
         <Route path="/connexion-client" element={<ClientAuth />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/client-dashboard" element={<ClientDashboard />} />

@@ -57,74 +57,68 @@ const livreurIcon = new L.DivIcon({
   iconAnchor: [17, 17],
 });
 
+function hasPosition(position) {
+  return (
+    position?.latitude !== null &&
+    position?.latitude !== undefined &&
+    position?.longitude !== null &&
+    position?.longitude !== undefined &&
+    !isNaN(Number(position.latitude)) &&
+    !isNaN(Number(position.longitude))
+  );
+}
+
 function RecenterMap({ courier, clientPosition }) {
   const map = useMap();
+  const hasClient = hasPosition(clientPosition);
+  const hasLivreur = hasPosition(courier);
 
   useEffect(() => {
-    const hasClient =
-      clientPosition?.latitude &&
-      clientPosition?.longitude;
+    if (hasClient && hasLivreur) {
+      const bounds = [
+        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+        [Number(courier.latitude), Number(courier.longitude)],
+      ];
 
-    const hasLivreur =
-      courier?.latitude &&
-      courier?.longitude;
+      map.fitBounds(bounds, {
+        padding: [40, 40],
+        maxZoom: 14,
+      });
+      return;
+    }
 
     if (hasClient) {
       map.panTo(
-        [
-          Number(clientPosition.latitude),
-          Number(clientPosition.longitude),
-        ],
-        {
-          animate: true,
-          duration: 1,
-        }
+        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+        { animate: true, duration: 1 }
       );
       return;
     }
 
     if (hasLivreur) {
       map.panTo(
-        [
-          Number(courier.latitude),
-          Number(courier.longitude),
-        ],
-        {
-          animate: true,
-          duration: 1,
-        }
+        [Number(courier.latitude), Number(courier.longitude)],
+        { animate: true, duration: 1 }
       );
     }
-  }, [
-    courier?.latitude,
-    courier?.longitude,
-    clientPosition?.latitude,
-    clientPosition?.longitude,
-    map,
-  ]);
+  }, [clientPosition, courier, hasClient, hasLivreur, map]);
 
   useEffect(() => {
     function zoomToClient() {
-      if (!clientPosition?.latitude || !clientPosition?.longitude) return;
+      if (!hasClient) return;
 
       map.flyTo(
-        [
-          Number(clientPosition.latitude),
-          Number(clientPosition.longitude),
-        ],
+        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
         16,
         { duration: 1.2 }
       );
     }
 
     function zoomToLivreur() {
-      if (!courier?.latitude || !courier?.longitude) return;
+      if (!hasLivreur) return;
 
       map.flyTo(
-        [
-          Number(courier.latitude),
-          Number(courier.longitude),
-        ],
+        [Number(courier.latitude), Number(courier.longitude)],
         16,
         { duration: 1.2 }
       );
@@ -137,7 +131,7 @@ function RecenterMap({ courier, clientPosition }) {
       window.removeEventListener("zoomClientPosition", zoomToClient);
       window.removeEventListener("zoomLivreurPosition", zoomToLivreur);
     };
-  }, [clientPosition, courier, map]);
+  }, [clientPosition, courier, hasClient, hasLivreur, map]);
 
   return null;
 }
@@ -177,18 +171,8 @@ export default function TrackingMap({ courier, clientPosition }) {
     return () => clearInterval(interval);
   }, [courier?.id]);
 
-  const hasLivreurPosition =
-    currentCourier?.latitude !== null &&
-    currentCourier?.latitude !== undefined &&
-    currentCourier?.longitude !== null &&
-    currentCourier?.longitude !== undefined &&
-    !isNaN(Number(currentCourier.latitude)) &&
-    !isNaN(Number(currentCourier.longitude));
-
-  const hasClientPosition =
-    clientPosition?.latitude &&
-    clientPosition?.longitude;
-
+  const hasLivreurPosition = hasPosition(currentCourier);
+  const hasClientPosition = hasPosition(clientPosition);
   const center = hasClientPosition
     ? [
         Number(clientPosition.latitude),
@@ -266,9 +250,9 @@ export default function TrackingMap({ courier, clientPosition }) {
         }}
       >
         <TileLayer
-         attribution='&copy; OpenStreetMap &copy; CARTO'
-         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-       />
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
         <RecenterMap
           courier={currentCourier}

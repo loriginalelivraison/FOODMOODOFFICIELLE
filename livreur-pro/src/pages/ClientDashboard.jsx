@@ -234,6 +234,13 @@ export default function ClientDashboard() {
                     : "لم تنته بعد"}
                 </p>
 
+                <p>
+                  <strong>أنهى الرحلة:</strong>{" "}
+                  {course.finished_by_name
+                    ? `${course.finished_by_name} (${course.finished_by_type === "client" ? "الزبون" : "السائق"})`
+                    : "غير معروف"}
+                </p>
+
                 <div style={{ marginTop: "12px" }}>
                   <strong>تعليقاتك على هذا السائق:</strong>
 
