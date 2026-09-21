@@ -7,3 +7,19 @@ db.sqlite3
 staticfiles/
 firebase-service-account.json
 winrak-8144b-firebase-adminsdk-fbsvc-c161d7a0e9.json
+# Java crash dumps
+*.hprof
+replay_pid*.log
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+
+# Flutter / Gradle generated files
+.gradle/
+**/.gradle/
+**/build/
+
+# Frontend build
+dist/
