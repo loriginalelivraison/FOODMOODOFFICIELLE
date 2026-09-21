@@ -76,10 +76,12 @@ export default function CourierCard({ courier }) {
       </div>
 
       <div className="pro-card-footer">
-        <span>
-          <Star size={15} fill="#facc15" color="#facc15" />
-          {courier.rating || 5}
-        </span>
+        {courier.rating !== null && courier.rating !== undefined && (
+          <span>
+            <Star size={15} fill="#facc15" color="#facc15" />
+            {courier.rating}
+          </span>
+        )}
 
         <span>{courier.deliveries || 0} توصيل</span>
       </div>

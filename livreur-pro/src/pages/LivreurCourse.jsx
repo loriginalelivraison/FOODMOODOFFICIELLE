@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { finishCourse, getCourse } from "../livreursapi.js";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 function getGoogleMapsUrl(latitude, longitude) {
   const destination = `${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
@@ -72,7 +73,7 @@ export default function LivreurCourse() {
   if (!course) {
     return (
       <section className="page" dir="rtl">
-        جاري تحميل معلومات الرحلة...
+        <LoadingSpinner label="جاري تحميل معلومات الرحلة..." fullPage />
       </section>
     );
   }
@@ -122,7 +123,7 @@ export default function LivreurCourse() {
           disabled={finishing}
           style={{ marginTop: "14px", background: "#dc2626" }}
         >
-          {finishing ? "جاري إنهاء الرحلة..." : "إنهاء الرحلة"}
+          {finishing ? <LoadingSpinner label="جاري إنهاء الرحلة..." size={20} /> : "إنهاء الرحلة"}
         </button>
       )}
     </section>

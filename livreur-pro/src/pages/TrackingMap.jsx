@@ -68,6 +68,14 @@ function hasPosition(position) {
   );
 }
 
+const vehicleLabels = {
+  moto: "دراجة نارية",
+  scooter: "سكوتر",
+  velo: "دراجة هوائية",
+  voiture: "سيارة",
+  camion: "شاحنة",
+};
+
 function RecenterMap({ courier, clientPosition }) {
   const map = useMap();
   const hasClient = hasPosition(clientPosition);
@@ -286,7 +294,7 @@ export default function TrackingMap({ courier, clientPosition }) {
             <Popup>
               <strong>{currentCourier.name}</strong>
               <br />
-              {currentCourier.vehicle}
+              {vehicleLabels[currentCourier.vehicle] || currentCourier.vehicle}
               <br />
               موقع السائق
             </Popup>

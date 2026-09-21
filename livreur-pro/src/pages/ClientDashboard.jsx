@@ -7,6 +7,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import LogoutButton from "../components/LogoutButton.jsx";
 import { LogOut } from "lucide-react";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -168,7 +169,7 @@ export default function ClientDashboard() {
           onClick={handleDeleteClientAccount}
           disabled={deleting}
         >
-          {deleting ? "جاري حذف الحساب..." : "حذف حسابي نهائياً"}
+          {deleting ? <LoadingSpinner label="جاري حذف الحساب..." size={20} /> : "حذف حسابي نهائياً"}
         </button>
 
         {message && (
@@ -184,7 +185,7 @@ export default function ClientDashboard() {
         <div className="tracking-card">
           <h2>سجل الرحلات</h2>
 
-          {loadingHistory && <p>جاري تحميل السجل...</p>}
+          {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
 
           {!loadingHistory && courses.length === 0 && (
             <p>لا توجد رحلات مسجلة حالياً.</p>

@@ -3,6 +3,7 @@ import { getLivreurs } from "../livreursapi.js";
 import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
 import { Search } from "lucide-react";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -52,7 +53,7 @@ export default function Couriers() {
           zone: livreur.ville,
           vehicle: livreur.vehicule === "scooter" ? "moto" : livreur.vehicule,
           available: Boolean(livreur.disponible),
-          rating: livreur.note,
+          rating: livreur.note ?? null,
           deliveries: livreur.nombre_livraisons,
           latitude: livreur.latitude ? Number(livreur.latitude) : null,
           longitude: livreur.longitude ? Number(livreur.longitude) : null,
@@ -307,7 +308,7 @@ export default function Couriers() {
               style={{ marginTop: "16px" }}
             >
               {searchingLocation
-                ? "🔎 جاري البحث عن السائقين..."
+                ? <LoadingSpinner label="جاري البحث عن السائقين..." size={20} />
                 : "ابحث عن سائق بقربك"}
             </button>
           </div>
@@ -409,7 +410,7 @@ export default function Couriers() {
         )}
       </div>
 
-      {loading && <p>Chargement des livreurs...</p>}
+      {loading && <LoadingSpinner label="Chargement des livreurs..." />}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {!loading && !error && filtered.length === 0 && (

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { getLivreurs } from "../livreursapi";
 import { ClipboardList, ShieldCheck, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from "react-router-dom";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 
 export default function AdminDashboard() {
@@ -62,7 +63,7 @@ useEffect(() => {
   if (loading) {
     return (
       <section className="page">
-        <p>Chargement du dashboard...</p>
+        <LoadingSpinner label="Chargement du dashboard..." fullPage />
       </section>
     );
   }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createClient, loginClient } from "../livreursapi.js";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 export default function ClientAuth() {
   const navigate = useNavigate();
@@ -159,7 +160,7 @@ export default function ClientAuth() {
 
           <button className="primary-btn full" type="submit" disabled={loading}>
             {loading
-              ? "يرجى الانتظار..."
+              ? <LoadingSpinner label="يرجى الانتظار..." size={20} />
               : mode === "register"
               ? "إنشاء الحساب"
               : "تسجيل الدخول"}

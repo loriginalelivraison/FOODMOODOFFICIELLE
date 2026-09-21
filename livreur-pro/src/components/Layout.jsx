@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate, useNavigation } from "react-router-dom";
 import { Home, Users, User, LogIn, Bike, Shield, ArrowLeft } from "lucide-react";
 
 import LogoutButton from "./LogoutButton";
+import LoadingSpinner from "./LoadingSpinner";
 import logo from "../assets/logo3.png";
 
 export default function Layout() {
   const navigate = useNavigate();
+  const navigation = useNavigation();
 
   const [auth, setAuth] = useState({
     token: null,
@@ -145,6 +147,9 @@ export default function Layout() {
       </header>
 
       <main className="main-content">
+        {navigation.state === "loading" && (
+          <LoadingSpinner label="Chargement de la page..." fullPage />
+        )}
         <Outlet />
       </main>
 

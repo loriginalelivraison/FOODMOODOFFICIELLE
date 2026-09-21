@@ -62,6 +62,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "finished_by_type",
             "client_latitude",
             "client_longitude",
+            "client_confirmed",
             "active",
             "created_at",
             "finished_at",
@@ -71,6 +72,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "finished_by_client",
             "finished_by_name",
             "finished_by_type",
+            "client_confirmed",
         ]
 
 class LivreurSerializer(serializers.ModelSerializer):

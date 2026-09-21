@@ -207,8 +207,8 @@ class CommentaireLivreurViewSet(ModelViewSet):
             livreur=livreur
         ).aggregate(avg_note=Avg("note"))["avg_note"]
 
-        livreur.note = round(moyenne or 5, 1)
-        livreur.save()
+        livreur.note = round(moyenne, 1) if moyenne is not None else None
+        livreur.save(update_fields=["note"])
 
 
 class ClientViewSet(ModelViewSet):
@@ -291,7 +291,7 @@ class CourseViewSet(ModelViewSet):
         if existing_course:
             raise PermissionError("Ce livreur est déjà en livraison")
 
-        course = serializer.save(active=True)
+        course = serializer.save(active=True, client_confirmed=True)
 
         livreur.disponible = False
         livreur.save(update_fields=["disponible"])
@@ -390,7 +390,8 @@ class CourseViewSet(ModelViewSet):
             ]
         )
 
-        livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
+        if course.client_confirmed:
+            livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
         livreur.disponible = True
         livreur.save(update_fields=["nombre_livraisons", "disponible"])
 

@@ -11,6 +11,7 @@ import {
 } from "../livreursapi.js";
 import TrackingMap from "./TrackingMap.jsx";
 import pasdephoto from "../assets/pasdephoto.png";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 function openExternalUrl(url) {
   try {
@@ -80,6 +81,27 @@ export default function Tracking() {
       console.error("Erreur restauration course :", err);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!navigator.geolocation || clientPosition) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setClientPosition({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+      },
+      () => {
+        // The map remains usable if the client refuses location access.
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, [clientPosition]);
 
   useEffect(() => {
     if (!activeCourseId || courseFinished) return;
@@ -377,7 +399,7 @@ export default function Tracking() {
   if (loading) {
     return (
       <section className="page" dir="rtl">
-        جاري تحميل معلومات التتبع...
+        <LoadingSpinner label="جاري تحميل معلومات التتبع..." fullPage />
       </section>
     );
   }

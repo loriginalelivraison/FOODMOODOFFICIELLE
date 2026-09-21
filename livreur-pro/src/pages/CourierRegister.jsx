@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 export default function CourierRegister() {
   const navigate = useNavigate();
@@ -284,7 +285,7 @@ async function handleSubmit(e) {
             </label>
 
             <button className="primary-btn full" type="submit" disabled={loading}>
-              {loading ? "⏳ جاري تسجيل الدخول..." : "تسجيل الدخول"}
+              {loading ? <LoadingSpinner label="جاري تسجيل الدخول..." size={20} /> : "تسجيل الدخول"}
             </button>
           </form>
         ) : (
@@ -347,6 +348,9 @@ async function handleSubmit(e) {
                   })
                 }
               >
+                <option value="" disabled>
+                  اختر منطقة العمل
+                </option>
                 {quartiers.map((quartier) => (
                   <option key={quartier} value={quartier}>
                     {quartier}
@@ -367,6 +371,9 @@ async function handleSubmit(e) {
                   })
                 }
               >
+                <option value="" disabled>
+                  اختر نوع المركبة
+                </option>
                 <option value="moto">دراجة نارية</option>
                 <option value="velo">دراجة هوائية</option>
                 <option value="voiture">سيارة</option>
@@ -536,7 +543,7 @@ async function handleSubmit(e) {
                   fontWeight: "700",
                 }}
               >
-                ⏳ الرجاء الانتظار، يتم إنشاء الحساب...
+                <LoadingSpinner label="الرجاء الانتظار، يتم إنشاء الحساب..." size={20} />
               </div>
             )}
 
@@ -549,7 +556,7 @@ async function handleSubmit(e) {
                 cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "جاري إنشاء الحساب..." : "إنشاء حساب السائق"}
+              {loading ? <LoadingSpinner label="جاري إنشاء الحساب..." size={20} /> : "إنشاء حساب السائق"}
             </button>
           </form>
         )}

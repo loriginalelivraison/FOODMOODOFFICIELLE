@@ -8,6 +8,7 @@ import {
   finishCourse,
 } from "../livreursapi.js";
 import LogoutButton from "../components/LogoutButton.jsx";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   MapContainer,
@@ -147,6 +148,7 @@ export default function LivreurDashboard() {
   const [courses, setCourses] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [finishingCourse, setFinishingCourse] = useState(false);
+  const [updatingTracking, setUpdatingTracking] = useState(false);
 
   const navigate = useNavigate();
 
@@ -295,7 +297,10 @@ export default function LivreurDashboard() {
   }
 
   async function handleTrackingToggle() {
+    if (updatingTracking) return;
+
     if (trackingEnabled) {
+      setUpdatingTracking(true);
       setTrackingEnabled(false);
       localStorage.setItem("livreurTrackingEnabled", "false");
 
@@ -304,6 +309,8 @@ export default function LivreurDashboard() {
       } catch (err) {
         console.error("Erreur désactivation partage localisation :", err);
         setError("Impossible de modifier votre disponibilité.");
+      } finally {
+        setUpdatingTracking(false);
       }
 
       return;
@@ -433,7 +440,9 @@ export default function LivreurDashboard() {
             cursor: "pointer",
           }}
         >
-          {trackingEnabled ? "إيقاف مشاركة الموقع" : "تشغيل مشاركة الموقع"}
+          {updatingTracking ? (
+            <LoadingSpinner label="جاري تحديث الموقع..." size={20} />
+          ) : trackingEnabled ? "إيقاف مشاركة الموقع" : "تشغيل مشاركة الموقع"}
         </button>
       </div>
 
@@ -474,7 +483,7 @@ export default function LivreurDashboard() {
             disabled={finishingCourse}
             style={{ marginTop: "12px", background: "#dc2626" }}
           >
-            {finishingCourse ? "جاري إنهاء الرحلة..." : "إنهاء الرحلة"}
+            {finishingCourse ? <LoadingSpinner label="جاري إنهاء الرحلة..." size={20} /> : "إنهاء الرحلة"}
           </button>
         </div>
       )}
@@ -622,7 +631,7 @@ export default function LivreurDashboard() {
         <div className="tracking-card" style={{ marginTop: "18px" }}>
           <h2>سجل الرحلات</h2>
 
-          {loadingHistory && <p>جاري تحميل السجل...</p>}
+          {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
 
           {!loadingHistory && courses.length === 0 && (
             <p>لا توجد رحلات مسجلة حالياً.</p>

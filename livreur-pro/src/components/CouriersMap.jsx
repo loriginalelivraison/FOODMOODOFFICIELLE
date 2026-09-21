@@ -54,6 +54,15 @@ function hasPosition(position) {
     !isNaN(Number(position.longitude))
   );
 }
+
+const vehicleLabels = {
+  moto: "دراجة نارية",
+  scooter: "سكوتر",
+  velo: "دراجة هوائية",
+  voiture: "سيارة",
+  camion: "شاحنة",
+};
+
 function RecenterMap({ clientPosition }) {
   const map = useMap();
 
@@ -205,7 +214,9 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
               <div style={{ textAlign: "center" }}>
                 <strong>{courier.name || courier.nom}</strong>
                 <br />
-                {courier.vehicle || courier.vehicule}
+                {vehicleLabels[courier.vehicle || courier.vehicule] ||
+                  courier.vehicle ||
+                  courier.vehicule}
                 <br />
                 {courier.city || courier.ville}
                 <br />

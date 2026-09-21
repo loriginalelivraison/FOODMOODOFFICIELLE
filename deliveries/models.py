@@ -28,7 +28,7 @@ class Livreur(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
 
-    note = models.FloatField(default=5)
+    note = models.FloatField(null=True, blank=True, default=None)
     nombre_livraisons = models.PositiveIntegerField(default=0)
 
     fcm_token = models.TextField(blank=True, null=True)
@@ -127,6 +127,7 @@ class Course(models.Model):
     client_latitude = models.FloatField(null=True, blank=True)
     client_longitude = models.FloatField(null=True, blank=True)
 
+    client_confirmed = models.BooleanField(default=False)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
