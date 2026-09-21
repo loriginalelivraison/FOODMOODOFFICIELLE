@@ -109,6 +109,22 @@ function LocateButton({ clientPosition, onRequestClientPosition }) {
   return null;
 }
 
+function RecenterOnClient({ clientPosition }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!hasPosition(clientPosition)) return;
+
+    map.flyTo(
+      [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+      13,
+      { duration: 1.2 }
+    );
+  }, [map, clientPosition]);
+
+  return null;
+}
+
 export default function CouriersMap({
   couriers = [],
   clientPosition,
@@ -168,6 +184,8 @@ export default function CouriersMap({
           clientPosition={clientPosition}
           onRequestClientPosition={onRequestClientPosition}
         />
+
+        <RecenterOnClient clientPosition={clientPosition} />
 
         {hasClientPosition && (
           <Marker

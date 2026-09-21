@@ -5,6 +5,8 @@ import CouriersMap from "../components/CouriersMap.jsx";
 import { Search } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
+const LOCATION_CONSENT_KEY = "clientLocationConsent";
+
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -34,7 +36,9 @@ export default function Couriers() {
   const [locationEnabledMessage, setLocationEnabledMessage] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
-  const [locationConsent, setLocationConsent] = useState(false);
+  const [locationConsent, setLocationConsent] = useState(() => {
+    return localStorage.getItem(LOCATION_CONSENT_KEY) === "true";
+  });
 
   const hasShownLocationMessageRef = useRef(
     sessionStorage.getItem("clientLocationMessageShown") === "true"
@@ -184,6 +188,20 @@ export default function Couriers() {
     );
   }
 
+  function handleLocationConsentChange() {
+    setLocationConsent((currentConsent) => {
+      const nextConsent = !currentConsent;
+      localStorage.setItem(LOCATION_CONSENT_KEY, String(nextConsent));
+
+      if (!nextConsent) {
+        setClientPosition(null);
+        setLocationDisabled(false);
+      }
+
+      return nextConsent;
+    });
+  }
+
   useEffect(() => {
     if (locationConsent && !clientPosition && !searchingLocation) {
       handleFindAroundMe();
@@ -276,7 +294,7 @@ export default function Couriers() {
                 type="button"
                 role="switch"
                 aria-checked={locationConsent}
-                onClick={() => setLocationConsent(!locationConsent)}
+                onClick={handleLocationConsentChange}
                 style={{
                   width: "54px",
                   height: "30px",
@@ -308,7 +326,7 @@ export default function Couriers() {
 
             <button
               type="button"
-              className="primary-btn full"
+              className="primary-btn full location-search-button"
               onClick={handleFindAroundMe}
               disabled={searchingLocation}
               style={{ marginTop: "16px" }}
