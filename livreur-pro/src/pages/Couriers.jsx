@@ -440,7 +440,11 @@ export default function Couriers() {
             overflow: "hidden",
           }}
         >
-          <CouriersMap couriers={filtered} clientPosition={clientPosition} />
+          <CouriersMap
+            couriers={filtered}
+            clientPosition={clientPosition}
+            onRequestClientPosition={handleFindAroundMe}
+          />
         </div>
       </div>
 

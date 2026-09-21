@@ -63,12 +63,10 @@ const vehicleLabels = {
   camion: "شاحنة",
 };
 
-function LocateButton({ clientPosition }) {
+function LocateButton({ clientPosition, onRequestClientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!hasPosition(clientPosition)) return;
-
     const control = L.control({ position: "bottomright" });
 
     control.onAdd = function () {
@@ -83,6 +81,11 @@ function LocateButton({ clientPosition }) {
       L.DomEvent.disableClickPropagation(button);
 
       button.onclick = () => {
+        if (!hasPosition(clientPosition)) {
+          onRequestClientPosition?.();
+          return;
+        }
+
         map.flyTo(
           [
             Number(clientPosition.latitude),
@@ -101,12 +104,16 @@ function LocateButton({ clientPosition }) {
     return () => {
       control.remove();
     };
-  }, [map, clientPosition]);
+  }, [map, clientPosition, onRequestClientPosition]);
 
   return null;
 }
 
-export default function CouriersMap({ couriers = [], clientPosition }) {
+export default function CouriersMap({
+  couriers = [],
+  clientPosition,
+  onRequestClientPosition,
+}) {
   const navigate = useNavigate();
 
   const availableCouriers = couriers.filter((c) => {
@@ -157,7 +164,10 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <LocateButton clientPosition={clientPosition} />
+        <LocateButton
+          clientPosition={clientPosition}
+          onRequestClientPosition={onRequestClientPosition}
+        />
 
         {hasClientPosition && (
           <Marker
