@@ -184,6 +184,12 @@ export default function Couriers() {
     );
   }
 
+  useEffect(() => {
+    if (locationConsent && !clientPosition && !searchingLocation) {
+      handleFindAroundMe();
+    }
+  }, [locationConsent]);
+
   const vehicleLabels = {
     moto: "دراجة نارية",
     velo: "دراجة هوائية",

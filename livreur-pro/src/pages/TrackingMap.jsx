@@ -261,24 +261,6 @@ export default function TrackingMap({
           clientPosition={clientPosition}
         />
 
-        <div
-          style={{
-            position: "absolute",
-            top: "12px",
-            left: "12px",
-            zIndex: 999,
-            background: "rgba(255,255,255,0.95)",
-            borderRadius: "10px",
-            padding: "8px 10px",
-            fontSize: "12px",
-            lineHeight: 1.7,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
-          }}
-        >
-          <div><span style={{ color: "#16a34a" }}>●</span> موقعي</div>
-          <div><span style={{ color: "#f97316" }}>●</span> موقع السائق</div>
-        </div>
-
         {hasClientPosition && (
           <Marker
             key="client-position"

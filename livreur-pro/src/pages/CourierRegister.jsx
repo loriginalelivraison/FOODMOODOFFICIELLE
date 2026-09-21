@@ -402,7 +402,7 @@ async function handleSubmit(e) {
               الخدمات المقترحة
               <textarea
                 rows="4"
-                placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، أدوية..."
+                placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، ..."
                 value={registerForm.services}
                 onChange={(e) =>
                   setRegisterForm({
