@@ -63,32 +63,6 @@ const vehicleLabels = {
   camion: "شاحنة",
 };
 
-function RecenterMap({ clientPosition }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (hasPosition(clientPosition)) {
-      map.flyTo(
-        [
-          Number(clientPosition.latitude),
-          Number(clientPosition.longitude),
-        ],
-        10,
-        {
-          animate: true,
-          duration: 1.2,
-        }
-      );
-    } else {
-      map.fitBounds(NORTHERN_ALGERIA_BOUNDS, {
-        padding: [12, 12],
-      });
-    }
-  }, [clientPosition, map]);
-
-  return null;
-}
-
 function LocateButton({ clientPosition }) {
   const map = useMap();
 
@@ -182,8 +156,6 @@ export default function CouriersMap({ couriers = [], clientPosition }) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-
-        <RecenterMap clientPosition={clientPosition} />
 
         <LocateButton clientPosition={clientPosition} />
 

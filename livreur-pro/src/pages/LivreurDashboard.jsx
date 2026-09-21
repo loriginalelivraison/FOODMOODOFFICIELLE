@@ -82,18 +82,6 @@ function RecenterMap({ position, clientPosition }) {
   const map = useMap();
 
   useEffect(() => {
-    if (hasPosition(position)) {
-      map.panTo(
-        [Number(position.latitude), Number(position.longitude)],
-        {
-          animate: true,
-          duration: 1,
-        }
-      );
-    }
-  }, [position, map]);
-
-  useEffect(() => {
     function zoomToPosition() {
       if (!hasPosition(position)) return;
 

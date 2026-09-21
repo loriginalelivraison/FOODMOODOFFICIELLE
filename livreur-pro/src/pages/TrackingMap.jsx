@@ -4,6 +4,7 @@ import {
   TileLayer,
   Marker,
   Popup,
+  useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import { getLivreurById } from "../livreursapi.js";
@@ -74,6 +75,42 @@ const vehicleLabels = {
   voiture: "سيارة",
   camion: "شاحنة",
 };
+
+function MapZoomButtons({ courier, clientPosition }) {
+  const map = useMap();
+  const hasClient = hasPosition(clientPosition);
+  const hasLivreur = hasPosition(courier);
+
+  useEffect(() => {
+    function zoomToClient() {
+      if (!hasClient) return;
+      map.flyTo(
+        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+        16,
+        { duration: 1.2 }
+      );
+    }
+
+    function zoomToLivreur() {
+      if (!hasLivreur) return;
+      map.flyTo(
+        [Number(courier.latitude), Number(courier.longitude)],
+        16,
+        { duration: 1.2 }
+      );
+    }
+
+    window.addEventListener("zoomClientPosition", zoomToClient);
+    window.addEventListener("zoomLivreurPosition", zoomToLivreur);
+
+    return () => {
+      window.removeEventListener("zoomClientPosition", zoomToClient);
+      window.removeEventListener("zoomLivreurPosition", zoomToLivreur);
+    };
+  }, [clientPosition, courier, hasClient, hasLivreur, map]);
+
+  return null;
+}
 
 export default function TrackingMap({
   courier,
@@ -217,6 +254,11 @@ export default function TrackingMap({
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+
+        <MapZoomButtons
+          courier={currentCourier}
+          clientPosition={clientPosition}
         />
 
         <div
