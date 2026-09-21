@@ -4,7 +4,6 @@ import {
   TileLayer,
   Marker,
   Popup,
-  useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import { getLivreurById } from "../livreursapi.js";
@@ -76,73 +75,6 @@ const vehicleLabels = {
   camion: "شاحنة",
 };
 
-function RecenterMap({ courier, clientPosition }) {
-  const map = useMap();
-  const hasClient = hasPosition(clientPosition);
-  const hasLivreur = hasPosition(courier);
-
-  useEffect(() => {
-    if (hasClient && hasLivreur) {
-      const bounds = [
-        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
-        [Number(courier.latitude), Number(courier.longitude)],
-      ];
-
-      map.fitBounds(bounds, {
-        padding: [40, 40],
-        maxZoom: 14,
-      });
-      return;
-    }
-
-    if (hasClient) {
-      map.panTo(
-        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
-        { animate: true, duration: 1 }
-      );
-      return;
-    }
-
-    if (hasLivreur) {
-      map.panTo(
-        [Number(courier.latitude), Number(courier.longitude)],
-        { animate: true, duration: 1 }
-      );
-    }
-  }, [clientPosition, courier, hasClient, hasLivreur, map]);
-
-  useEffect(() => {
-    function zoomToClient() {
-      if (!hasClient) return;
-
-      map.flyTo(
-        [Number(clientPosition.latitude), Number(clientPosition.longitude)],
-        16,
-        { duration: 1.2 }
-      );
-    }
-
-    function zoomToLivreur() {
-      if (!hasLivreur) return;
-
-      map.flyTo(
-        [Number(courier.latitude), Number(courier.longitude)],
-        16,
-        { duration: 1.2 }
-      );
-    }
-
-    window.addEventListener("zoomClientPosition", zoomToClient);
-    window.addEventListener("zoomLivreurPosition", zoomToLivreur);
-
-    return () => {
-      window.removeEventListener("zoomClientPosition", zoomToClient);
-      window.removeEventListener("zoomLivreurPosition", zoomToLivreur);
-    };
-  }, [clientPosition, courier, hasClient, hasLivreur, map]);
-
-  return null;
-}
 export default function TrackingMap({
   courier,
   clientPosition,
@@ -304,11 +236,6 @@ export default function TrackingMap({
           <div><span style={{ color: "#16a34a" }}>●</span> موقعي</div>
           <div><span style={{ color: "#f97316" }}>●</span> موقع السائق</div>
         </div>
-
-        <RecenterMap
-          courier={currentCourier}
-          clientPosition={clientPosition}
-        />
 
         {hasClientPosition && (
           <Marker
