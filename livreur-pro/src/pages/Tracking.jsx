@@ -396,6 +396,31 @@ export default function Tracking() {
     return labels[vehicle] || vehicle || "غير محدد";
   }
 
+  function requestClientPosition() {
+    if (!navigator.geolocation) {
+      setError("الموقع الجغرافي غير مدعوم في هذا المتصفح.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setClientPosition({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        setError("");
+      },
+      () => {
+        setError("يجب السماح بالوصول إلى موقعك لرؤية موقعك على الخريطة.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }
+
   if (loading) {
     return (
       <section className="page" dir="rtl">
@@ -771,6 +796,7 @@ export default function Tracking() {
         <TrackingMap
           courier={courier}
           clientPosition={clientPosition}
+          onRequestClientPosition={requestClientPosition}
         />
       </div>
 

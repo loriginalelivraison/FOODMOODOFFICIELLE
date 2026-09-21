@@ -143,7 +143,11 @@ function RecenterMap({ courier, clientPosition }) {
 
   return null;
 }
-export default function TrackingMap({ courier, clientPosition }) {
+export default function TrackingMap({
+  courier,
+  clientPosition,
+  onRequestClientPosition,
+}) {
   const [currentCourier, setCurrentCourier] = useState(courier);
 
   useEffect(() => {
@@ -226,6 +230,27 @@ export default function TrackingMap({ courier, clientPosition }) {
         </button>
       )}
 
+      {!hasClientPosition && onRequestClientPosition && (
+        <button
+          onClick={onRequestClientPosition}
+          style={{
+            position: "absolute",
+            bottom: "14px",
+            right: "14px",
+            zIndex: 9999,
+            background: "#ffffff",
+            border: "1px solid #ddd",
+            borderRadius: "12px",
+            padding: "10px 14px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          }}
+        >
+          📍 afficher ma position
+        </button>
+      )}
+
       {hasLivreurPosition && (
         <button
           onClick={() =>
@@ -261,6 +286,24 @@ export default function TrackingMap({ courier, clientPosition }) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            left: "12px",
+            zIndex: 999,
+            background: "rgba(255,255,255,0.95)",
+            borderRadius: "10px",
+            padding: "8px 10px",
+            fontSize: "12px",
+            lineHeight: 1.7,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+          }}
+        >
+          <div><span style={{ color: "#16a34a" }}>●</span> موقعي</div>
+          <div><span style={{ color: "#f97316" }}>●</span> موقع السائق</div>
+        </div>
 
         <RecenterMap
           courier={currentCourier}
