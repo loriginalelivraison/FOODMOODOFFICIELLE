@@ -386,11 +386,11 @@ export default function Tracking() {
 
   function getVehicleLabel(vehicle) {
     const labels = {
-      moto: "moto",
-      scooter: "moto",
-      velo: "vélo",
-      voiture: "voiture",
-      camion: "camion",
+      moto: "دراجة نارية",
+      scooter: "دراجة نارية",
+      velo: "دراجة",
+      voiture: "سيارة",
+      camion: "شاحنة",
     };
 
     return labels[vehicle] || vehicle || "غير محدد";

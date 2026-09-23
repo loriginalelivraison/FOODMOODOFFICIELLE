@@ -88,11 +88,11 @@ function hasPosition(position) {
 }
 
 const vehicleLabels = {
-  moto: "moto",
-  scooter: "moto",
-  velo: "vélo",
-  voiture: "voiture",
-  camion: "camion",
+  moto: "دراجة نارية",
+  scooter: "دراجة نارية",
+  velo: "دراجة",
+  voiture: "سيارة",
+  camion: "شاحنة",
 };
 
 function LocateButton({ clientPosition, onRequestClientPosition }) {

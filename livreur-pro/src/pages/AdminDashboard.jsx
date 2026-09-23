@@ -115,7 +115,7 @@ useEffect(() => {
               <tr>
                 <th>Nom</th>
                 <th>Ville</th>
-                <th>Véhicule</th>
+                <th>نوع النقل</th>
                 <th>Disponibilité</th>
                 <th>Note</th>
                 <th>Livraisons</th>
