@@ -37,7 +37,8 @@ export default function Couriers() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
   const [locationConsent, setLocationConsent] = useState(() => {
-    return localStorage.getItem(LOCATION_CONSENT_KEY) === "true";
+    const saved = localStorage.getItem(LOCATION_CONSENT_KEY);
+    return saved === null ? true : saved === "true";
   });
 
   const hasShownLocationMessageRef = useRef(
@@ -209,10 +210,11 @@ export default function Couriers() {
   }, [locationConsent]);
 
   const vehicleLabels = {
-    moto: "دراجة نارية",
-    velo: "دراجة هوائية",
-    voiture: "سيارة",
-    camion: "شاحنة",
+    moto: "moto",
+    scooter: "moto",
+    velo: "vélo",
+    voiture: "voiture",
+    camion: "camion",
   };
 
   const streets = [
@@ -272,6 +274,8 @@ export default function Couriers() {
   "جانت",
   ];
 
+  const hasNearbyResults = Boolean(clientPosition) && filtered.length > 0;
+
   return (
     <section className="page" dir="rtl">
       <div className="page-title">
@@ -324,17 +328,19 @@ export default function Couriers() {
               </button>
             </div>
 
-            <button
-              type="button"
-              className="primary-btn full location-search-button"
-              onClick={handleFindAroundMe}
-              disabled={searchingLocation}
-              style={{ marginTop: "16px" }}
-            >
-              {searchingLocation
-                ? <LoadingSpinner label="جاري البحث عن السائقين..." size={20} />
-                : "ابحث عن سائق بقربك"}
-            </button>
+            {!clientPosition && (
+              <button
+                type="button"
+                className="primary-btn full location-search-button"
+                onClick={handleFindAroundMe}
+                disabled={searchingLocation}
+                style={{ marginTop: "16px" }}
+              >
+                {searchingLocation
+                  ? <LoadingSpinner label="جاري البحث عن السائقين..." size={20} />
+                  : "ابحث عن سائق بقربك"}
+              </button>
+            )}
           </div>
         </center>
       </div>
@@ -356,7 +362,7 @@ export default function Couriers() {
         </div>
       )}
 
-      {locationEnabledMessage && (
+      {(locationEnabledMessage || hasNearbyResults) && (
         <div
           style={{
             background: "#f0fdf4",
@@ -365,11 +371,11 @@ export default function Couriers() {
             padding: "14px",
             borderRadius: "12px",
             marginBottom: "18px",
-            fontWeight: "600",
+            fontWeight: "700",
             textAlign: "center",
           }}
         >
-          ✅ موقعك الجغرافي مفعل وتم ترتيب السائقين حسب الأقرب إليك
+             قائمة السائقين 
         </div>
       )}
 
@@ -434,7 +440,7 @@ export default function Couriers() {
         )}
       </div>
 
-      {loading && <LoadingSpinner label="Chargement des livreurs..." />}
+      {loading && <LoadingSpinner label="جاري تحميل قائمة السائقين..." />}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {!loading && !error && filtered.length === 0 && (

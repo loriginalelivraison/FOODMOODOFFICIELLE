@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  deleteLivreur,
   updateLivreurPosition,
   setLivreurUnavailable,
-  deleteLivreur,
-  getActiveCoursesForLivreur,
   getLivreurCourses,
   finishCourse,
 } from "../livreursapi.js";
 import LogoutButton from "../components/LogoutButton.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import MapActionButton from "../components/MapActionButton.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   MapContainer,
@@ -47,25 +47,36 @@ const clientIcon = new L.DivIcon({
   iconAnchor: [11, 11],
 });
 
-const livreurIcon = new L.DivIcon({
-  className: "livreur-marker",
-  html: `
-    <div style="
-      width:34px;
-      height:34px;
-      background:#f97316;
-      border:4px solid white;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:18px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.25);
-    ">🛵</div>
-  `,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-});
+function getVehicleMarkerIcon(vehicle) {
+  const map = {
+    moto: { emoji: "🛵", bg: "#f97316" },
+    scooter: { emoji: "🛵", bg: "#f97316" },
+    velo: { emoji: "🚴", bg: "#10b981" },
+    voiture: { emoji: "🚘", bg: "#2563eb" },
+    camion: { emoji: "🚚", bg: "#f59e0b" },
+  };
+
+  const config = map[vehicle] || map.moto;
+
+  return new L.DivIcon({
+    className: "vehicle-marker",
+    html: `
+      <div style="
+        width:34px;
+        height:34px;
+        background:${config.bg};
+        border:4px solid white;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:18px;
+      ">${config.emoji}</div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
 
 function hasPosition(position) {
   return (
@@ -110,6 +121,24 @@ function RecenterMap({ position, clientPosition }) {
       window.removeEventListener("zoomLivreurDashboardClient", zoomToClient);
     };
   }, [position, clientPosition, map]);
+
+  return null;
+}
+
+function CenterOnInitialPosition({ position }) {
+  const map = useMap();
+  const hasCentered = useRef(false);
+
+  useEffect(() => {
+    if (!hasPosition(position) || hasCentered.current) return;
+
+    hasCentered.current = true;
+    map.flyTo(
+      [Number(position.latitude), Number(position.longitude)],
+      16,
+      { duration: 1.2 }
+    );
+  }, [position, map]);
 
   return null;
 }
@@ -251,11 +280,12 @@ export default function LivreurDashboard() {
 
   const photoUrl = livreur.photo || livreur.image || null;
   const vehicleLabels = {
-  moto: "🛵 دراجة نارية",
-  velo: "🚴 دراجة هوائية",
-  voiture: "🚘 سيارة",
-  camion: "🚛 شاحنة",
-};
+    moto: "moto",
+    scooter: "moto",
+    velo: "vélo",
+    voiture: "voiture",
+    camion: "camion",
+  };
 
   async function handleDeleteAccount() {
     const confirmDelete = window.confirm(
@@ -497,53 +527,29 @@ export default function LivreurDashboard() {
           position: "relative",
         }}
       >
-        {hasPosition(position) && (
-          <button
-            type="button"
-            onClick={() =>
-              window.dispatchEvent(new Event("zoomLivreurDashboardPosition"))
-            }
-            style={{
-              position: "absolute",
-              bottom: "14px",
-              right: "14px",
-              zIndex: 9999,
-              background: "#ffffff",
-              border: "1px solid #ddd",
-              borderRadius: "12px",
-              padding: "10px 14px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-            }}
-          >
-            📍 موقعي
-          </button>
-        )}
+        <div className="map-action-buttons">
+          {hasPosition(position) && (
+            <MapActionButton
+              onClick={() =>
+                window.dispatchEvent(new Event("zoomLivreurDashboardPosition"))
+              }
+            >
+              📍 موقعي
+            </MapActionButton>
+          )}
 
-        {hasClientPosition && (
-          <button
-            type="button"
-            onClick={() =>
-              window.dispatchEvent(new Event("zoomLivreurDashboardClient"))
-            }
-            style={{
-              position: "absolute",
-              bottom: "62px",
-              right: "14px",
-              zIndex: 9999,
-              background: "#ffffff",
-              border: "1px solid #ddd",
-              borderRadius: "12px",
-              padding: "10px 14px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-            }}
-          >
-            📍 موقع الزبون
-          </button>
-        )}
+          {hasClientPosition && (
+            <button
+              type="button"
+              className="map-action-button"
+              onClick={() =>
+                window.dispatchEvent(new Event("zoomLivreurDashboardClient"))
+              }
+            >
+              📍 موقع الزبون
+            </button>
+          )}
+        </div>
 
         <MapContainer
           center={
@@ -567,6 +573,8 @@ export default function LivreurDashboard() {
             } : null}
           />
 
+          <CenterOnInitialPosition position={position} />
+
           {position && (
             <>
 
@@ -575,7 +583,7 @@ export default function LivreurDashboard() {
                   Number(position.latitude),
                   Number(position.longitude),
                 ]}
-                icon={livreurIcon}
+                icon={getVehicleMarkerIcon(livreur.vehicule || "moto")}
               >
                 <Popup>
                   <strong>موقعي الحالي</strong>

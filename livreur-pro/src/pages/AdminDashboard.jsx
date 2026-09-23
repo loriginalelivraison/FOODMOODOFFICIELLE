@@ -63,7 +63,7 @@ useEffect(() => {
   if (loading) {
     return (
       <section className="page">
-        <LoadingSpinner label="Chargement du dashboard..." fullPage />
+        <LoadingSpinner label="جاري تحميل لوحة التحكم..." fullPage />
       </section>
     );
   }

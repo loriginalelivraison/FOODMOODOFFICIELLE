@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -37,25 +37,36 @@ const clientIcon = new L.DivIcon({
   iconAnchor: [10, 10],
 });
 
-const livreurIcon = new L.DivIcon({
-  className: "livreur-marker",
-  html: `
-    <div style="
-      width:34px;
-      height:34px;
-      background:#f97316;
-      border:4px solid white;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:18px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.25);
-    ">🛵</div>
-  `,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-});
+function getVehicleMarkerIcon(vehicle) {
+  const map = {
+    moto: { emoji: "🛵", bg: "#f97316" },
+    scooter: { emoji: "🛵", bg: "#f97316" },
+    velo: { emoji: "🚴", bg: "#10b981" },
+    voiture: { emoji: "🚘", bg: "#2563eb" },
+    camion: { emoji: "🚚", bg: "#f59e0b" },
+  };
+
+  const config = map[vehicle] || map.moto;
+
+  return new L.DivIcon({
+    className: "vehicle-marker",
+    html: `
+      <div style="
+        width:34px;
+        height:34px;
+        background:${config.bg};
+        border:4px solid white;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:18px;
+      ">${config.emoji}</div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
 
 function hasPosition(position) {
   return (
@@ -69,11 +80,11 @@ function hasPosition(position) {
 }
 
 const vehicleLabels = {
-  moto: "دراجة نارية",
-  scooter: "سكوتر",
-  velo: "دراجة هوائية",
-  voiture: "سيارة",
-  camion: "شاحنة",
+  moto: "moto",
+  scooter: "moto",
+  velo: "vélo",
+  voiture: "voiture",
+  camion: "camion",
 };
 
 function MapZoomButtons({ courier, clientPosition }) {
@@ -108,6 +119,27 @@ function MapZoomButtons({ courier, clientPosition }) {
       window.removeEventListener("zoomLivreurPosition", zoomToLivreur);
     };
   }, [clientPosition, courier, hasClient, hasLivreur, map]);
+
+  return null;
+}
+
+function CenterOnCourier({ courier }) {
+  const map = useMap();
+  const centeredCourierId = useRef(null);
+
+  useEffect(() => {
+    if (!hasPosition(courier) || centeredCourierId.current === courier.id) {
+      return;
+    }
+
+    centeredCourierId.current = courier.id;
+
+    map.flyTo(
+      [Number(courier.latitude), Number(courier.longitude)],
+      16,
+      { duration: 1.2 }
+    );
+  }, [courier, map]);
 
   return null;
 }
@@ -154,15 +186,15 @@ export default function TrackingMap({
 
   const hasLivreurPosition = hasPosition(currentCourier);
   const hasClientPosition = hasPosition(clientPosition);
-  const center = hasClientPosition
-    ? [
-        Number(clientPosition.latitude),
-        Number(clientPosition.longitude),
-      ]
-    : hasLivreurPosition
+  const center = hasLivreurPosition
     ? [
         Number(currentCourier.latitude),
         Number(currentCourier.longitude),
+      ]
+    : hasClientPosition
+    ? [
+        Number(clientPosition.latitude),
+        Number(clientPosition.longitude),
       ]
     : [36.75, 3.06];
 
@@ -176,72 +208,49 @@ export default function TrackingMap({
         position: "relative",
       }}
     >
-      {hasClientPosition && (
-        <button
-          onClick={() =>
-            window.dispatchEvent(new Event("zoomClientPosition"))
-          }
-          style={{
-            position: "absolute",
-            bottom: "14px",
-            right: "14px",
-            zIndex: 9999,
-            background: "#ffffff",
-            border: "1px solid #ddd",
-            borderRadius: "12px",
-            padding: "10px 14px",
-            fontWeight: "bold",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-          }}
-        >
-          📍 موقعي
-        </button>
-      )}
+      <div className="map-action-buttons">
+        {hasClientPosition && (
+          <button
+            className="map-action-button"
+            onClick={() =>
+              window.dispatchEvent(new Event("zoomClientPosition"))
+            }
+          >
+            📍 موقعي
+          </button>
+        )}
 
-      {!hasClientPosition && onRequestClientPosition && (
-        <button
-          onClick={onRequestClientPosition}
-          style={{
-            position: "absolute",
-            bottom: "14px",
-            right: "14px",
-            zIndex: 9999,
-            background: "#ffffff",
-            border: "1px solid #ddd",
-            borderRadius: "12px",
-            padding: "10px 14px",
-            fontWeight: "bold",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-          }}
-        >
-          📍 afficher ma position
-        </button>
-      )}
+        {!hasClientPosition && onRequestClientPosition && (
+          <button className="map-action-button" onClick={onRequestClientPosition}>
+            📍 إظهار موقعي
+          </button>
+        )}
 
-      {hasLivreurPosition && (
-        <button
-          onClick={() =>
-            window.dispatchEvent(new Event("zoomLivreurPosition"))
-          }
-          style={{
-            position: "absolute",
-            bottom: "62px",
-            right: "14px",
-            zIndex: 9999,
-            background: "#ffffff",
-            border: "1px solid #ddd",
-            borderRadius: "12px",
-            padding: "10px 14px",
-            fontWeight: "bold",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-          }}
-        >
-          🛵 السائق
-        </button>
-      )}
+        {hasLivreurPosition && (
+          <button
+            className="map-action-button"
+            onClick={() =>
+              window.dispatchEvent(new Event("zoomLivreurPosition"))
+            }
+          >
+            {(() => {
+              const v = currentCourier?.vehicle || currentCourier?.vehicule || "moto";
+              const label = vehicleLabels[v] || "moto";
+              const emoji =
+                label === "moto"
+                  ? "🛵"
+                  : label === "vélo"
+                  ? "🚴"
+                  : label === "voiture"
+                  ? "🚘"
+                  : label === "camion"
+                  ? "🚚"
+                  : "🚗";
+              return `${emoji} السائق`;
+            })()}
+          </button>
+        )}
+      </div>
 
       <MapContainer
         center={center}
@@ -260,6 +269,8 @@ export default function TrackingMap({
           courier={currentCourier}
           clientPosition={clientPosition}
         />
+
+        <CenterOnCourier courier={currentCourier} />
 
         {hasClientPosition && (
           <Marker
@@ -283,7 +294,9 @@ export default function TrackingMap({
               Number(currentCourier.latitude),
               Number(currentCourier.longitude),
             ]}
-            icon={livreurIcon}
+            icon={getVehicleMarkerIcon(
+              currentCourier.vehicle || currentCourier.vehicule || "moto"
+            )}
           >
             <Popup>
               <strong>{currentCourier.name}</strong>

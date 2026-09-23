@@ -9,6 +9,7 @@ import {
 
 import { useNavigate } from "react-router-dom";
 import L from "leaflet";
+import MapActionButton from "./MapActionButton.jsx";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -44,6 +45,37 @@ const clientIcon = new L.DivIcon({
   iconAnchor: [10, 10],
 });
 
+function getVehicleMarkerIcon(vehicle) {
+  const map = {
+    moto: { emoji: "🛵", bg: "#f97316" },
+    scooter: { emoji: "🛵", bg: "#f97316" },
+    velo: { emoji: "🚴", bg: "#10b981" },
+    voiture: { emoji: "🚘", bg: "#2563eb" },
+    camion: { emoji: "🚚", bg: "#f59e0b" },
+  };
+
+  const config = map[vehicle] || map.moto;
+
+  return new L.DivIcon({
+    className: "vehicle-marker",
+    html: `
+      <div style="
+        width:32px;
+        height:32px;
+        background:${config.bg};
+        border:4px solid white;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:16px;
+      ">${config.emoji}</div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
 function hasPosition(position) {
   return (
     position?.latitude !== null &&
@@ -56,57 +88,34 @@ function hasPosition(position) {
 }
 
 const vehicleLabels = {
-  moto: "دراجة نارية",
-  scooter: "سكوتر",
-  velo: "دراجة هوائية",
-  voiture: "سيارة",
-  camion: "شاحنة",
+  moto: "moto",
+  scooter: "moto",
+  velo: "vélo",
+  voiture: "voiture",
+  camion: "camion",
 };
 
 function LocateButton({ clientPosition, onRequestClientPosition }) {
   const map = useMap();
 
-  useEffect(() => {
-    const control = L.control({ position: "bottomright" });
+  function handleClick() {
+    if (!hasPosition(clientPosition)) {
+      onRequestClientPosition?.();
+      return;
+    }
 
-    control.onAdd = function () {
-      const button = L.DomUtil.create("button", "leaflet-bar");
-      button.innerHTML = "📍 موقعي";
-      button.style.padding = "8px 12px";
-      button.style.background = "white";
-      button.style.border = "none";
-      button.style.cursor = "pointer";
-      button.style.fontWeight = "bold";
+    map.flyTo(
+      [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+      10,
+      { duration: 1.2 }
+    );
+  }
 
-      L.DomEvent.disableClickPropagation(button);
-
-      button.onclick = () => {
-        if (!hasPosition(clientPosition)) {
-          onRequestClientPosition?.();
-          return;
-        }
-
-        map.flyTo(
-          [
-            Number(clientPosition.latitude),
-            Number(clientPosition.longitude),
-          ],
-          10,
-          { duration: 1.2 }
-        );
-      };
-
-      return button;
-    };
-
-    control.addTo(map);
-
-    return () => {
-      control.remove();
-    };
-  }, [map, clientPosition, onRequestClientPosition]);
-
-  return null;
+  return (
+    <div className="map-action-buttons">
+      <MapActionButton onClick={handleClick}>📍 موقعي</MapActionButton>
+    </div>
+  );
 }
 
 function RecenterOnClient({ clientPosition }) {
@@ -209,6 +218,7 @@ export default function CouriersMap({
               Number(courier.latitude),
               Number(courier.longitude),
             ]}
+            icon={getVehicleMarkerIcon(courier.vehicle || courier.vehicule || "moto")}
           >
             <Popup>
               <div style={{ textAlign: "center" }}>

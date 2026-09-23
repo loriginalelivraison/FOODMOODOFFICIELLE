@@ -148,7 +148,7 @@ export default function Layout() {
 
       <main className="main-content">
         {navigation.state === "loading" && (
-          <LoadingSpinner label="Chargement de la page..." fullPage />
+          <LoadingSpinner label="جاري تحميل الصفحة..." fullPage />
         )}
         <Outlet />
       </main>

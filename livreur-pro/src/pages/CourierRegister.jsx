@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +6,7 @@ import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 export default function CourierRegister() {
   const navigate = useNavigate();
+  const formRef = useRef(null);
 
   const quartiers = [
     "الجزائر العاصمة",
@@ -88,6 +89,29 @@ export default function CourierRegister() {
 
   const [locationConsent, setLocationConsent] = useState(false);
 
+  function focusErrorField(element) {
+    if (!element) return;
+
+    element.focus?.();
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.scrollTo({
+      top: window.scrollY - 80,
+      behavior: "smooth",
+    });
+  }
+
+  function handleInvalidField(e) {
+    if (e.target.validity.valueMissing) {
+      e.target.setCustomValidity("يرجى ملء هذه الخانة");
+    }
+
+    focusErrorField(e.target);
+  }
+
+  function clearInvalidMessage(e) {
+    e.target.setCustomValidity("");
+  }
+
 async function handleSubmit(e) {
   e.preventDefault();
 
@@ -99,71 +123,78 @@ async function handleSubmit(e) {
   if (!locationConsent) {
     setGpsError(true);
     setError("يجب الموافقة على استخدام بيانات الموقع الجغرافي للمتابعة");
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
     return;
   }
 
   setLoading(true);
 
-    if (!navigator.geolocation) {
-      setGpsError(true);
-      setError("خدمة تحديد الموقع غير مدعومة في هذا الجهاز");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0,
-        });
-      });
-
-      const data = new FormData();
-
-      data.append("nom", registerForm.nom);
-      data.append("telephone", registerForm.telephone);
-      data.append("ville", registerForm.ville);
-      data.append("vehicule", registerForm.vehicule);
-      data.append("disponible", registerForm.disponible);
-      data.append("password", registerForm.password);
-      data.append("services", registerForm.services);
-      data.append("latitude", position.coords.latitude);
-      data.append("longitude", position.coords.longitude);
-
-      if (registerForm.photo) {
-        data.append("photo", registerForm.photo);
-      }
-
-      await createLivreur(data);
-
-      await loginJWT({
-        telephone: registerForm.telephone,
-        password: registerForm.password,
-      });
-
-      const livreur = JSON.parse(localStorage.getItem("livreur"));
-
-      if (!livreur?.id) {
-        throw new Error("تعذر العثور على حساب السائق بعد التسجيل");
-      }
-
-      navigate(`/livreur-dashboard/${livreur.id}`);
-    } catch (err) {
-      if (err.code === 1) {
-        setGpsError(true);
-        setError("يجب تفعيل الموقع الجغرافي لإكمال التسجيل");
-      } else if (err.code === 3) {
-        setGpsError(true);
-        setError("انتهت مهلة تحديد الموقع. تأكد من تفعيل GPS ثم أعد المحاولة.");
-      } else {
-        setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
-      }
-    } finally {
-      setLoading(false);
-    }
+  if (!navigator.geolocation) {
+    setGpsError(true);
+    setError("خدمة تحديد الموقع غير مدعومة في هذا الجهاز");
+    setLoading(false);
+    return;
   }
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      });
+    });
+
+    const data = new FormData();
+
+    data.append("nom", registerForm.nom);
+    data.append("telephone", registerForm.telephone);
+    data.append("ville", registerForm.ville);
+    data.append("vehicule", registerForm.vehicule);
+    data.append("disponible", registerForm.disponible);
+    data.append("password", registerForm.password);
+    data.append("services", registerForm.services);
+    data.append("latitude", position.coords.latitude);
+    data.append("longitude", position.coords.longitude);
+
+    if (registerForm.photo) {
+      data.append("photo", registerForm.photo);
+    }
+
+    await createLivreur(data);
+
+    await loginJWT({
+      telephone: registerForm.telephone,
+      password: registerForm.password,
+    });
+
+    const livreur = JSON.parse(localStorage.getItem("livreur"));
+
+    if (!livreur?.id) {
+      throw new Error("تعذر العثور على حساب السائق بعد التسجيل");
+    }
+
+    navigate(`/livreur-dashboard/${livreur.id}`);
+  } catch (err) {
+    if (err.code === 1) {
+      setGpsError(true);
+      setError("يجب تفعيل الموقع الجغرافي لإكمال التسجيل");
+    } else if (err.code === 3) {
+      setGpsError(true);
+      setError("انتهت مهلة تحديد الموقع. تأكد من تفعيل GPS ثم أعد المحاولة.");
+    } else {
+      setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
+    }
+
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  } finally {
+    setLoading(false);
+  }
+}
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -241,7 +272,13 @@ async function handleSubmit(e) {
         </div>
 
         {mode === "login" ? (
-          <form className="auth-form" onSubmit={handleLogin}>
+          <form
+            ref={formRef}
+            className="auth-form"
+            onSubmit={handleLogin}
+            onInvalid={handleInvalidField}
+            onInput={clearInvalidMessage}
+          >
             {error && (
               <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
                 {error}
@@ -290,9 +327,12 @@ async function handleSubmit(e) {
           </form>
         ) : (
           <form
+            ref={formRef}
             className="auth-form"
             onSubmit={handleSubmit}
             encType="multipart/form-data"
+            onInvalid={handleInvalidField}
+            onInput={clearInvalidMessage}
           >
             {error && (
               <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
@@ -530,22 +570,6 @@ async function handleSubmit(e) {
   </button>
 </div>
             </div>
-
-            {loading && (
-              <div
-                style={{
-                  marginBottom: "12px",
-                  padding: "12px",
-                  borderRadius: "14px",
-                  background: "rgba(249,115,22,0.10)",
-                  color: "#c2410c",
-                  textAlign: "center",
-                  fontWeight: "700",
-                }}
-              >
-                <LoadingSpinner label="الرجاء الانتظار، يتم إنشاء الحساب..." size={20} />
-              </div>
-            )}
 
             <button
               className="primary-btn full"

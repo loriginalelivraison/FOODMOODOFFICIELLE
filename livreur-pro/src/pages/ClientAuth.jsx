@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createClient, loginClient } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 
 export default function ClientAuth() {
   const navigate = useNavigate();
+  const formRef = useRef(null);
 
   const [mode, setMode] = useState("register");
   const [nom, setNom] = useState("");
@@ -15,6 +16,29 @@ export default function ClientAuth() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  function focusErrorField(element) {
+    if (!element) return;
+
+    element.focus?.();
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.scrollTo({
+      top: window.scrollY - 80,
+      behavior: "smooth",
+    });
+  }
+
+  function handleInvalidField(e) {
+    if (e.target.validity.valueMissing) {
+      e.target.setCustomValidity("يرجى ملء هذه الخانة");
+    }
+
+    focusErrorField(e.target);
+  }
+
+  function clearInvalidMessage(e) {
+    e.target.setCustomValidity("");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -23,6 +47,9 @@ export default function ClientAuth() {
 
     if (password.trim().length < 6) {
       setError("كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل");
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
       return;
     }
 
@@ -51,6 +78,9 @@ export default function ClientAuth() {
     } catch (err) {
       console.error(err);
       setError(err?.message || "حدث خطأ أثناء تسجيل الدخول أو إنشاء الحساب");
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -103,7 +133,13 @@ export default function ClientAuth() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="auth-form"
+          onInvalid={handleInvalidField}
+          onInput={clearInvalidMessage}
+        >
           {error && (
             <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
               {error}
