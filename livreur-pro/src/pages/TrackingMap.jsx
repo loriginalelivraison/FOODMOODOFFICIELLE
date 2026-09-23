@@ -179,7 +179,7 @@ export default function TrackingMap({
 
     refreshCourier();
 
-    const interval = setInterval(refreshCourier, 8000);
+    const interval = setInterval(refreshCourier, 5000);
 
     return () => clearInterval(interval);
   }, [courier?.id]);

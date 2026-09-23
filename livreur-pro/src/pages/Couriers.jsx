@@ -31,6 +31,7 @@ export default function Couriers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const clientWatchRef = useRef(null);
   const [clientPosition, setClientPosition] = useState(null);
   const [locationDisabled, setLocationDisabled] = useState(false);
   const [locationEnabledMessage, setLocationEnabledMessage] = useState(false);
@@ -174,11 +175,15 @@ export default function Couriers() {
       return;
     }
 
+    if (clientWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(clientWatchRef.current);
+    }
+
     setSearchingLocation(true);
     setLocationDisabled(false);
     setLocationEnabledMessage(false);
 
-    navigator.geolocation.getCurrentPosition(
+    clientWatchRef.current = navigator.geolocation.watchPosition(
       handleLocationSuccess,
       handleLocationError,
       {
@@ -194,6 +199,11 @@ export default function Couriers() {
       const nextConsent = !currentConsent;
       localStorage.setItem(LOCATION_CONSENT_KEY, String(nextConsent));
 
+      if (clientWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(clientWatchRef.current);
+        clientWatchRef.current = null;
+      }
+
       if (!nextConsent) {
         setClientPosition(null);
         setLocationDisabled(false);
@@ -202,6 +212,14 @@ export default function Couriers() {
       return nextConsent;
     });
   }
+
+  useEffect(() => {
+    return () => {
+      if (clientWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(clientWatchRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (locationConsent && !clientPosition && !searchingLocation) {

@@ -83,9 +83,11 @@ export default function Tracking() {
   }, [id]);
 
   useEffect(() => {
-    if (!navigator.geolocation || clientPosition) return;
+    if (!navigator.geolocation) return;
 
-    navigator.geolocation.getCurrentPosition(
+    if (clientWatchRef.current !== null) return;
+
+    clientWatchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         setClientPosition({
           latitude: pos.coords.latitude,
@@ -101,7 +103,14 @@ export default function Tracking() {
         maximumAge: 60000,
       }
     );
-  }, [clientPosition]);
+
+    return () => {
+      if (clientWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(clientWatchRef.current);
+        clientWatchRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeCourseId || courseFinished) return;
