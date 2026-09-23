@@ -280,11 +280,11 @@ export default function LivreurDashboard() {
 
   const photoUrl = livreur.photo || livreur.image || null;
   const vehicleLabels = {
-    moto: "moto",
-    scooter: "moto",
-    velo: "vélo",
-    voiture: "voiture",
-    camion: "camion",
+    moto: "دراجة نارية",
+    scooter: "دراجة نارية",
+    velo: "دراجة",
+    voiture: "سيارة",
+    camion: "شاحنة",
   };
 
   async function handleDeleteAccount() {
