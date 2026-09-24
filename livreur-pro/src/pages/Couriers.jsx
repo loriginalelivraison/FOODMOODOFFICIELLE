@@ -255,10 +255,10 @@ export default function Couriers() {
   }
 
   useEffect(() => {
-    if (locationConsent) {
-      handleFindAroundMe(true);
-    }
-  }, [locationConsent]);
+    localStorage.setItem(LOCATION_CONSENT_KEY, "true");
+    setLocationConsent(true);
+    handleFindAroundMe(true);
+  }, []);
 
   useEffect(() => {
     return () => {

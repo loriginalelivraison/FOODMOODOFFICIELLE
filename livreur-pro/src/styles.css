@@ -325,8 +325,8 @@ th { color: var(--muted); }
 
 .map-action-buttons {
   position: absolute;
-  right: 14px;
-  bottom: 42px;
+  right: 50px;
+  bottom: 72px;
   z-index: 500;
   display: flex;
   flex-direction: column;
@@ -336,24 +336,25 @@ th { color: var(--muted); }
 }
 
 .map-action-button {
-  min-height: 42px;
-  padding: 10px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  min-height: 46px;
+  padding: 12px 16px;
+  border: 1px solid rgba(251, 146, 60, 0.45);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #111827;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
-  font-weight: 700;
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.28);
+  font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
   pointer-events: auto;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 
 .map-action-button:hover {
-  background: #fff7ed;
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(249, 115, 22, 0.32);
+  filter: brightness(1.03);
 }
 
 .map-action-button:focus-visible {
@@ -1047,8 +1048,8 @@ input::placeholder {
   }
 
   .map-action-buttons {
-    right: 10px;
-    bottom: 12px;
+    right: 16px;
+    bottom: 26px;
   }
 }
 
