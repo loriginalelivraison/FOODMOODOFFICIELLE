@@ -198,32 +198,51 @@ export default function LivreurDashboard() {
       return;
     }
 
-    const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        try {
-          const newPosition = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          };
+    let cancelled = false;
 
-          console.log("GPS LIVREUR :", newPosition);
+    const sendPosition = async (coords) => {
+      try {
+        const newPosition = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        };
 
+        if (!cancelled) {
           setPosition(newPosition);
-
-          const result = await updateLivreurPosition(livreur.id, {
-            latitude: newPosition.latitude,
-            longitude: newPosition.longitude,
-            disponible: true,
-          });
-
-          console.log("REPONSE API :", result);
-
-          setError("");
-        } catch (err) {
-  console.error("ERREUR CREATE COURSE :", err);
-  setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
-
         }
+
+        const result = await updateLivreurPosition(livreur.id, {
+          latitude: newPosition.latitude,
+          longitude: newPosition.longitude,
+          disponible: true,
+        });
+
+        console.log("REPONSE API :", result);
+        setError("");
+      } catch (err) {
+        console.error("ERREUR CREATE COURSE :", err);
+        setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        sendPosition(pos.coords);
+      },
+      (geoError) => {
+        console.error(geoError);
+        setError("الرجاء تفعيل تعقب الموقع في هاتفك");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      }
+    );
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        sendPosition(pos.coords);
       },
       (geoError) => {
         console.error(geoError);
@@ -237,6 +256,7 @@ export default function LivreurDashboard() {
     );
 
     return () => {
+      cancelled = true;
       navigator.geolocation.clearWatch(watchId);
     };
   }, [livreur?.id, trackingEnabled]);

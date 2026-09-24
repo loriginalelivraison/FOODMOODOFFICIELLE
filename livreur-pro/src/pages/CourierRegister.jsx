@@ -3,6 +3,12 @@ import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import {
+  getLocationErrorMessage,
+  isIOSDevice,
+  openLocationSettings,
+  requestUserPosition,
+} from "../utils/geolocation.js";
 
 export default function CourierRegister() {
   const navigate = useNavigate();
@@ -69,6 +75,8 @@ export default function CourierRegister() {
   const [mode, setMode] = useState("register");
   const [error, setError] = useState("");
   const [gpsError, setGpsError] = useState(false);
+  const [locationSettingsMessage, setLocationSettingsMessage] = useState("");
+  const [showLocationSettingsButton, setShowLocationSettingsButton] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
@@ -139,12 +147,10 @@ async function handleSubmit(e) {
   }
 
   try {
-    const position = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      });
+    const position = await requestUserPosition({
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0,
     });
 
     const data = new FormData();
@@ -178,15 +184,13 @@ async function handleSubmit(e) {
 
     navigate(`/livreur-dashboard/${livreur.id}`);
   } catch (err) {
-    if (err.code === 1) {
-      setGpsError(true);
-      setError("يجب تفعيل الموقع الجغرافي لإكمال التسجيل");
-    } else if (err.code === 3) {
-      setGpsError(true);
-      setError("انتهت مهلة تحديد الموقع. تأكد من تفعيل GPS ثم أعد المحاولة.");
-    } else {
-      setError(err.message || "حدث خطأ أثناء إنشاء الحساب");
-    }
+    const isIOS = isIOSDevice();
+    const message = getLocationErrorMessage(err, isIOS);
+
+    setGpsError(true);
+    setLocationSettingsMessage(message);
+    setShowLocationSettingsButton(err.code === 1 && isIOS);
+    setError(message);
 
     setTimeout(() => {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });

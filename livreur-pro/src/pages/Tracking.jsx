@@ -12,6 +12,12 @@ import {
 import TrackingMap from "./TrackingMap.jsx";
 import pasdephoto from "../assets/pasdephoto.png";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import {
+  getLocationErrorMessage,
+  isIOSDevice,
+  openLocationSettings,
+  requestUserPosition,
+} from "../utils/geolocation.js";
 
 function openExternalUrl(url) {
   try {
@@ -48,6 +54,8 @@ export default function Tracking() {
 
   const [showAcceptedQuestion, setShowAcceptedQuestion] = useState(false);
   const [callButtonsHidden, setCallButtonsHidden] = useState(false);
+  const [locationSettingsMessage, setLocationSettingsMessage] = useState("");
+  const [showLocationSettingsButton, setShowLocationSettingsButton] = useState(false);
 
   const [clientPosition, setClientPosition] = useState(null);
   const [courseStarted, setCourseStarted] = useState(false);
@@ -81,36 +89,6 @@ export default function Tracking() {
       console.error("Erreur restauration course :", err);
     }
   }, [id]);
-
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    if (clientWatchRef.current !== null) return;
-
-    clientWatchRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setClientPosition({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-      },
-      () => {
-        // The map remains usable if the client refuses location access.
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
-
-    return () => {
-      if (clientWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(clientWatchRef.current);
-        clientWatchRef.current = null;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!activeCourseId || courseFinished) return;
@@ -245,6 +223,95 @@ export default function Tracking() {
 
     let courseCreated = false;
 
+    try {
+      const initialPosition = await requestUserPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      });
+
+      const position = {
+        latitude: initialPosition.coords.latitude,
+        longitude: initialPosition.coords.longitude,
+      };
+
+      setClientPosition(position);
+      setLocationSettingsMessage("");
+      setShowLocationSettingsButton(false);
+
+      const savedCourseId =
+        activeCourseId ||
+        JSON.parse(
+          localStorage.getItem(`activeTrackingCourse_${id}`) || "{}"
+        ).courseId;
+
+      if (savedCourseId) {
+        await updateClientCoursePosition(savedCourseId, {
+          client_latitude: position.latitude,
+          client_longitude: position.longitude,
+        });
+      }
+
+      if (!courseCreated) {
+        courseCreated = true;
+
+        try {
+          const payload = {
+            client: client.id,
+            livreur: courier.id,
+            client_latitude: position.latitude,
+            client_longitude: position.longitude,
+          };
+
+          const course = await createCourse(payload);
+
+          setActiveCourseId(course.id);
+          setCourseStarted(true);
+          setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
+          setCourseFinished(false);
+          setShowAcceptedQuestion(false);
+          setCallButtonsHidden(true);
+
+          localStorage.setItem(
+            `activeTrackingCourse_${id}`,
+            JSON.stringify({
+              courseId: course.id,
+              courseStarted: true,
+              courseFinished: false,
+              clientPosition: position,
+              courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
+            })
+          );
+        } catch (err) {
+          console.error("ERREUR CREATE COURSE :", err);
+          setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
+        }
+      } else {
+        const currentCourseId =
+          activeCourseId ||
+          JSON.parse(
+            localStorage.getItem(`activeTrackingCourse_${id}`) || "{}"
+          ).courseId;
+
+        localStorage.setItem(
+          `activeTrackingCourse_${id}`,
+          JSON.stringify({
+            courseId: currentCourseId,
+            courseStarted: true,
+            courseFinished: false,
+            clientPosition: position,
+            courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
+          })
+        );
+      }
+    } catch (geoError) {
+      const isIOS = isIOSDevice();
+      setLocationSettingsMessage(getLocationErrorMessage(geoError, isIOS));
+      setShowLocationSettingsButton(geoError.code === 1 && isIOS);
+      setError(getLocationErrorMessage(geoError, isIOS));
+      return;
+    }
+
     const watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const position = {
@@ -253,6 +320,8 @@ export default function Tracking() {
         };
 
         setClientPosition(position);
+        setLocationSettingsMessage("");
+        setShowLocationSettingsButton(false);
 
         const savedCourseId =
           activeCourseId ||
@@ -324,10 +393,11 @@ export default function Tracking() {
           );
         }
       },
-      () => {
-        setError(
-          "يجب تفعيل الموقع الجغرافي لمشاركة موقعك مع السائق."
-        );
+      (geoError) => {
+        const isIOS = isIOSDevice();
+        setLocationSettingsMessage(getLocationErrorMessage(geoError, isIOS));
+        setShowLocationSettingsButton(geoError.code === 1 && isIOS);
+        setError(getLocationErrorMessage(geoError, isIOS));
       },
       {
         enableHighAccuracy: true,
@@ -405,29 +475,33 @@ export default function Tracking() {
     return labels[vehicle] || vehicle || "غير محدد";
   }
 
-  function requestClientPosition() {
+  async function requestClientPosition() {
     if (!navigator.geolocation) {
       setError("الموقع الجغرافي غير مدعوم في هذا المتصفح.");
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setClientPosition({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-        setError("");
-      },
-      () => {
-        setError("يجب السماح بالوصول إلى موقعك لرؤية موقعك على الخريطة.");
-      },
-      {
+    try {
+      const pos = await requestUserPosition({
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000,
         maximumAge: 60000,
-      }
-    );
+      });
+
+      setClientPosition({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
+      setError("");
+      setLocationSettingsMessage("");
+      setShowLocationSettingsButton(false);
+    } catch (geoError) {
+      const isIOS = isIOSDevice();
+      const message = getLocationErrorMessage(geoError, isIOS);
+      setError(message);
+      setLocationSettingsMessage(message);
+      setShowLocationSettingsButton(geoError.code === 1 && isIOS);
+    }
   }
 
   if (loading) {

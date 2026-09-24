@@ -4,6 +4,12 @@ import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
 import { Search } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import {
+  getLocationErrorMessage,
+  isIOSDevice,
+  openLocationSettings,
+  requestUserPosition,
+} from "../utils/geolocation.js";
 
 const LOCATION_CONSENT_KEY = "clientLocationConsent";
 
@@ -35,6 +41,8 @@ export default function Couriers() {
   const [clientPosition, setClientPosition] = useState(null);
   const [locationDisabled, setLocationDisabled] = useState(false);
   const [locationEnabledMessage, setLocationEnabledMessage] = useState(false);
+  const [locationSettingsMessage, setLocationSettingsMessage] = useState("");
+  const [showLocationSettingsButton, setShowLocationSettingsButton] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
   const [locationConsent, setLocationConsent] = useState(() => {
@@ -142,6 +150,8 @@ export default function Couriers() {
     setClientPosition(position);
     setLocationDisabled(false);
     setSearchingLocation(false);
+    setLocationSettingsMessage("");
+    setShowLocationSettingsButton(false);
 
     if (!hasShownLocationMessageRef.current) {
       hasShownLocationMessageRef.current = true;
@@ -157,12 +167,17 @@ export default function Couriers() {
 
   function handleLocationError(error) {
     console.error("Erreur GPS client :", error);
+    const isIOS = isIOSDevice();
+    const message = getLocationErrorMessage(error, isIOS);
+
     setSearchingLocation(false);
     setLocationDisabled(true);
     setLocationEnabledMessage(false);
+    setLocationSettingsMessage(message);
+    setShowLocationSettingsButton(error.code === 1 && isIOS);
   }
 
-  function handleFindAroundMe() {
+  async function handleFindAroundMe() {
     if (!locationConsent) {
       setLocationDisabled(true);
       setLocationEnabledMessage(false);
@@ -182,16 +197,30 @@ export default function Couriers() {
     setSearchingLocation(true);
     setLocationDisabled(false);
     setLocationEnabledMessage(false);
+    setLocationSettingsMessage("");
+    setShowLocationSettingsButton(false);
 
-    clientWatchRef.current = navigator.geolocation.watchPosition(
-      handleLocationSuccess,
-      handleLocationError,
-      {
+    try {
+      const initialPosition = await requestUserPosition({
         enableHighAccuracy: true,
         maximumAge: 10000,
-        timeout: 15000,
-      }
-    );
+        timeout: 20000,
+      });
+
+      handleLocationSuccess(initialPosition);
+
+      clientWatchRef.current = navigator.geolocation.watchPosition(
+        handleLocationSuccess,
+        handleLocationError,
+        {
+          enableHighAccuracy: true,
+          maximumAge: 10000,
+          timeout: 20000,
+        }
+      );
+    } catch (error) {
+      handleLocationError(error);
+    }
   }
 
   function handleLocationConsentChange() {
@@ -220,12 +249,6 @@ export default function Couriers() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (locationConsent && !clientPosition && !searchingLocation) {
-      handleFindAroundMe();
-    }
-  }, [locationConsent]);
 
   const vehicleLabels = {
     moto: "دراجة نارية",
