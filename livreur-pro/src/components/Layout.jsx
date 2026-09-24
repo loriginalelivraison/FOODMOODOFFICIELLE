@@ -99,16 +99,16 @@ export default function Layout() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "36px",
-              height: "36px",
-              borderRadius: "12px",
+              width: "30px",
+              height: "30px",
+              borderRadius: "10px",
               background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
               color: "#ffffff",
               boxShadow: "0 8px 18px rgba(245, 158, 11, 0.25)",
               textDecoration: "none",
             }}
           >
-            <Lock size={18} color="#ffffff" />
+            <Lock size={15} color="#ffffff" />
           </Link>
         </div>
 

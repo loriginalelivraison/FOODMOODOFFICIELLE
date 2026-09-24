@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -33,16 +33,16 @@ const clientIcon = new L.DivIcon({
   className: "client-marker",
   html: `
     <div style="
-      width:20px;
-      height:20px;
-      background:#16a34a;
-      border:4px solid white;
+      width:16px;
+      height:16px;
+      background:#22c55e;
+      border:3px solid white;
       border-radius:50%;
-      box-shadow:0 0 0 8px rgba(22,163,74,0.25);
+      box-shadow:0 0 0 6px rgba(34,197,94,0.18);
     "></div>
   `,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
 });
 
 function getVehicleMarkerIcon(vehicle) {
@@ -95,10 +95,12 @@ const vehicleLabels = {
   camion: "شاحنة",
 };
 
-function LocateButton({ clientPosition, onRequestClientPosition }) {
+function LocateButton({ clientPosition, onRequestClientPosition, isLocating = false }) {
   const map = useMap();
 
   function handleClick() {
+    if (isLocating) return;
+
     if (!hasPosition(clientPosition)) {
       onRequestClientPosition?.();
       return;
@@ -113,22 +115,44 @@ function LocateButton({ clientPosition, onRequestClientPosition }) {
 
   return (
     <div className="map-action-buttons">
-      <MapActionButton onClick={handleClick}>📍 موقعي</MapActionButton>
+      <MapActionButton onClick={handleClick} loading={isLocating}>
+        {isLocating ? "جاري تحديد موقعي..." : "📍 موقعي"}
+      </MapActionButton>
     </div>
   );
 }
 
 function RecenterOnClient({ clientPosition }) {
   const map = useMap();
+  const hasCenteredOnceRef = useRef(false);
 
   useEffect(() => {
-    if (!hasPosition(clientPosition)) return;
+    if (hasPosition(clientPosition)) {
+      if (hasCenteredOnceRef.current) {
+        return;
+      }
 
-    map.flyTo(
-      [Number(clientPosition.latitude), Number(clientPosition.longitude)],
-      13,
-      { duration: 1.2 }
-    );
+      hasCenteredOnceRef.current = true;
+
+      const clientPoint = [
+        Number(clientPosition.latitude),
+        Number(clientPosition.longitude),
+      ];
+
+      map.whenReady(() => {
+        map.invalidateSize();
+        map.flyTo(clientPoint, 10, { duration: 1.2 });
+      });
+
+      return;
+    }
+
+    hasCenteredOnceRef.current = false;
+
+    map.whenReady(() => {
+      map.invalidateSize();
+      map.flyTo(ALGERIA_CENTER, 5, { duration: 1.2 });
+    });
   }, [map, clientPosition]);
 
   return null;
@@ -138,6 +162,7 @@ export default function CouriersMap({
   couriers = [],
   clientPosition,
   onRequestClientPosition,
+  isLocating = false,
 }) {
   const navigate = useNavigate();
 
@@ -192,6 +217,7 @@ export default function CouriersMap({
         <LocateButton
           clientPosition={clientPosition}
           onRequestClientPosition={onRequestClientPosition}
+          isLocating={isLocating}
         />
 
         <RecenterOnClient clientPosition={clientPosition} />

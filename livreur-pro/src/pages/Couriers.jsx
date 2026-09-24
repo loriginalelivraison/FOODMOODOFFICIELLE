@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { getLivreurs } from "../livreursapi.js";
 import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
-import { Search } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import {
   getLocationErrorMessage,
@@ -35,7 +34,9 @@ export default function Couriers() {
   const [selectedCity, setSelectedCity] = useState("");
   const [couriers, setCouriers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState("");
+  const [visibleCount, setVisibleCount] = useState(12);
 
   const clientWatchRef = useRef(null);
   const [clientPosition, setClientPosition] = useState(null);
@@ -102,6 +103,18 @@ export default function Couriers() {
     ];
   }, [couriers]);
 
+  useEffect(() => {
+    if (!query && !onlyAvailable && !selectedVehicle && !selectedCity) {
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const timer = setTimeout(() => setSearchLoading(false), 250);
+
+    return () => clearTimeout(timer);
+  }, [query, onlyAvailable, selectedVehicle, selectedCity]);
+
   const filtered = useMemo(() => {
     let list = couriers.filter((c) => {
       const searchText =
@@ -117,18 +130,18 @@ export default function Couriers() {
 
     if (clientPosition) {
       list = list
-  .filter((c) => c.latitude !== null && c.longitude !== null)
-  .map((c) => ({
-    ...c,
-    distanceKm: getDistanceKm(
-      clientPosition.latitude,
-      clientPosition.longitude,
-      c.latitude,
-      c.longitude
-    ),
-  }))
-  .filter((c) => c.distanceKm <= 30) // <-- Affiche uniquement les livreurs dans un rayon de 30 km
-  .sort((a, b) => a.distanceKm - b.distanceKm);
+        .filter((c) => c.latitude !== null && c.longitude !== null)
+        .map((c) => ({
+          ...c,
+          distanceKm: getDistanceKm(
+            clientPosition.latitude,
+            clientPosition.longitude,
+            c.latitude,
+            c.longitude
+          ),
+        }))
+        .filter((c) => c.distanceKm <= 40)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
     }
 
     return list;
@@ -177,8 +190,10 @@ export default function Couriers() {
     setShowLocationSettingsButton(error.code === 1 && isIOS);
   }
 
-  async function handleFindAroundMe() {
-    if (!locationConsent) {
+  async function handleFindAroundMe(forceConsent = null) {
+    const consentEnabled = forceConsent ?? locationConsent;
+
+    if (!consentEnabled) {
       setLocationDisabled(true);
       setLocationEnabledMessage(false);
       setSearchingLocation(false);
@@ -224,23 +239,26 @@ export default function Couriers() {
   }
 
   function handleLocationConsentChange() {
-    setLocationConsent((currentConsent) => {
-      const nextConsent = !currentConsent;
-      localStorage.setItem(LOCATION_CONSENT_KEY, String(nextConsent));
+    const nextConsent = !locationConsent;
+    setLocationConsent(nextConsent);
+    localStorage.setItem(LOCATION_CONSENT_KEY, String(nextConsent));
 
-      if (clientWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(clientWatchRef.current);
-        clientWatchRef.current = null;
-      }
+    if (clientWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(clientWatchRef.current);
+      clientWatchRef.current = null;
+    }
 
-      if (!nextConsent) {
-        setClientPosition(null);
-        setLocationDisabled(false);
-      }
-
-      return nextConsent;
-    });
+    if (!nextConsent) {
+      setClientPosition(null);
+      setLocationDisabled(false);
+    }
   }
+
+  useEffect(() => {
+    if (locationConsent) {
+      handleFindAroundMe(true);
+    }
+  }, [locationConsent]);
 
   useEffect(() => {
     return () => {
@@ -316,76 +334,20 @@ export default function Couriers() {
   ];
 
   const hasNearbyResults = Boolean(clientPosition) && filtered.length > 0;
+  const nearbyTitle =
+    filtered.length > 0
+      ? `${filtered.length} سائقًا بالقرب منك`
+      : "لا يوجد سائقون بالقرب منك";
+
+  const visibleCouriers = filtered.slice(0, visibleCount);
+  const hasMoreCouriers = filtered.length > visibleCount;
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [query, onlyAvailable, selectedVehicle, selectedCity, clientPosition]);
 
   return (
     <section className="page" dir="rtl">
-      <div className="page-title">
-        <center>
-          <div className="around-me-top">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginTop: "14px",
-                gap: "12px",
-              }}
-            >
-              <span style={{ fontWeight: "700", fontSize: "14px" }}>
-                أوافق على استخدام بيانات الموقع الجغرافي
-              </span>
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={locationConsent}
-                onClick={handleLocationConsentChange}
-                style={{
-                  width: "54px",
-                  height: "30px",
-                  borderRadius: "30px",
-                  border: "none",
-                  padding: "3px",
-                  cursor: "pointer",
-                  backgroundColor: locationConsent ? "#8BCF35" : "#d1d5db",
-                  transition: "background-color 0.25s ease",
-                  position: "relative",
-                  flexShrink: 0,
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "3px",
-                    left: locationConsent ? "27px" : "3px",
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "50%",
-                    backgroundColor: "#ffffff",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
-                    transition: "left 0.25s ease",
-                  }}
-                />
-              </button>
-            </div>
-
-            {!clientPosition && (
-              <button
-                type="button"
-                className="primary-btn full location-search-button"
-                onClick={handleFindAroundMe}
-                disabled={searchingLocation}
-                style={{ marginTop: "16px" }}
-              >
-                {searchingLocation
-                  ? <LoadingSpinner label="جاري البحث عن السائقين..." size={20} />
-                  : "ابحث عن سائق بقربك"}
-              </button>
-            )}
-          </div>
-        </center>
-      </div>
-
       {locationDisabled && !clientPosition && (
         <div
           style={{
@@ -403,85 +365,12 @@ export default function Couriers() {
         </div>
       )}
 
-      {(locationEnabledMessage || hasNearbyResults) && (
-        <div
-          style={{
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
-            color: "#15803d",
-            padding: "14px",
-            borderRadius: "12px",
-            marginBottom: "18px",
-            fontWeight: "700",
-            textAlign: "center",
-          }}
-        >
-             قائمة السائقين 
-        </div>
-      )}
+     
+      <div style={{ display: "none" }} aria-hidden="true" />
 
-      <div className="toolbar compact-toolbar">
-        <label className="search-box">
-          <Search size={18} />
+     
 
-          <input
-            value={query}
-            onFocus={() => setShowFilters(true)}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShowFilters(true);
-            }}
-            placeholder="ابحث عن سائق"
-            style={{
-              width: "250px",
-              background: "#fff7ed",
-              border: "1px solid #f5bf99",
-              color: "#1f2937",
-            }}
-          />
-        </label>
-
-        {showFilters && (
-          <>
-            <select
-              className="filter-select"
-              value={selectedVehicle}
-              onChange={(e) => setSelectedVehicle(e.target.value)}
-            >
-              <option value="">كل وسائل النقل</option>
-              {vehicleOptions.map((vehicle) => (
-                <option key={vehicle} value={vehicle}>
-                  {vehicleLabels[vehicle] || vehicle}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="filter-select"
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-            >
-              <option value="">كل المناطق</option>
-              {streets.map((street) => (
-                <option key={street} value={street}>
-                  {street}
-                </option>
-              ))}
-            </select>
-
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={onlyAvailable}
-                onChange={(e) => setOnlyAvailable(e.target.checked)}
-              />
-              المتاحين فقط
-            </label>
-          </>
-        )}
-      </div>
-
-      {loading && <LoadingSpinner label="جاري تحميل قائمة السائقين..." />}
+      {(loading || searchLoading) && <LoadingSpinner label={loading ? "جاري تحميل قائمة السائقين..." : "جاري البحث..."} />}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {!loading && !error && filtered.length === 0 && (
@@ -500,36 +389,140 @@ export default function Couriers() {
       >
         <div
           style={{
-            height: "260px",
-            borderRadius: "18px",
+            height: "200px",
+            borderRadius: "22px",
             overflow: "hidden",
+            border: "1px solid rgba(245, 133, 50, 0.25)",
           }}
         >
           <CouriersMap
             couriers={filtered}
             clientPosition={clientPosition}
             onRequestClientPosition={handleFindAroundMe}
+            isLocating={searchingLocation}
           />
         </div>
       </div>
 
-      {!loading && !error && (
-        <p
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "12px",
+          marginTop: "6px",
+          marginBottom: "10px",
+          padding: "0 2px",
+          width: "100%",
+        }}
+      >
+        <span
           style={{
-            textAlign: "center",
-            margin: "15px 0",
             fontWeight: "600",
+            fontSize: "11px",
+            lineHeight: 1.4,
+            color: "#374151",
+            textAlign: "center",
           }}
         >
-          عدد السائقين : {filtered.length}
-        </p>
-      )}
+          أوافق على استخدام بيانات الموقع الجغرافي
+        </span>
 
-      <div className="courier-grid">
-        {filtered.map((courier) => (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={locationConsent}
+          onClick={handleLocationConsentChange}
+          style={{
+            width: "50px",
+            height: "28px",
+            borderRadius: "30px",
+            border: "none",
+            padding: "3px",
+            cursor: "pointer",
+            backgroundColor: locationConsent ? "#8BCF35" : "#d1d5db",
+            transition: "background-color 0.25s ease",
+            position: "relative",
+            flexShrink: 0,
+            boxShadow: "0 4px 12px rgba(139, 207, 53, 0.18)",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: "3px",
+              left: locationConsent ? "25px" : "3px",
+              width: "22px",
+              height: "22px",
+              borderRadius: "50%",
+              backgroundColor: "#ffffff",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+              transition: "left 0.25s ease",
+            }}
+          />
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: "12px",
+          padding: "0 2px",
+        }}
+      >
+        <div
+          style={{
+            background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+            border: "1px solid #e5e7eb",
+            borderRadius: "999px",
+            padding: "8px 18px",
+            fontWeight: 700,
+            color: "#111827",
+            fontSize: "13px",
+            letterSpacing: "0.2px",
+            boxShadow: "0 4px 12px rgba(15, 23, 42, 0.06)",
+            textAlign: "center",
+          }}
+        >
+          {nearbyTitle}
+        </div>
+      </div>
+
+      <div className="courier-grid" style={{ marginTop: "18px" }}>
+        {visibleCouriers.map((courier) => (
           <CourierCard courier={courier} key={courier.id} />
         ))}
       </div>
+
+      {hasMoreCouriers && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginTop: "18px",
+            marginBottom: "12px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setVisibleCount((count) => count + 12)}
+            style={{
+              background: "linear-gradient(135deg, #f59e0b, #f97316)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "999px",
+              padding: "10px 20px",
+              fontWeight: 700,
+              fontSize: "13px",
+              cursor: "pointer",
+              boxShadow: "0 8px 18px rgba(249, 115, 22, 0.25)",
+            }}
+          >
+            المزيد
+          </button>
+        </div>
+      )}
     </section>
   );
 }
