@@ -538,6 +538,15 @@ export default function LivreurDashboard() {
               <p>📏 المسافة التقريبية: {offer.estimated_distance_km == null ? "قيد التقدير" : `${offer.estimated_distance_km} كم`}</p>
               <p>💰 السعر المقترح: {offer.final_price ?? offer.proposed_price} دج</p>
               <p>🕒 وقت الطلب: {new Date(offer.created_at).toLocaleTimeString("ar-DZ", { hour: "2-digit", minute: "2-digit" })}</p>
+              {offer.my_offer_response === "accepted" && (
+                <div className="course-progress-notice" aria-live="polite">
+                  <LoadingSpinner label="" size={28} />
+                  <div>
+                    <strong>بانتظار اختيار الزبون لك</strong>
+                    <p>تم إرسال قبولك. سنعرض تحديث الرحلة هنا عند اختيارك.</p>
+                  </div>
+                </div>
+              )}
               {offer.my_offer_response === "pending" && (
                 <div className="driver-offer-actions">
                   <button type="button" onClick={() => handleOfferResponse(offer.id, "accepted")} disabled={respondingOfferId !== null}>

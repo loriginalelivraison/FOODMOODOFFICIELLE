@@ -197,6 +197,16 @@ export default function LivreurCourse() {
         </p>
       </div>
 
+      {((isOffer && course.my_offer_response === "accepted") || ["driver_selected", "driver_arriving", "driver_arrived", "in_progress"].includes(course.status)) && (
+        <div className="course-progress-notice" aria-live="polite">
+          <LoadingSpinner label="" size={28} />
+          <div>
+            <strong>{isOffer ? "بانتظار اختيار الزبون لك" : course.status === "driver_selected" || course.status === "driver_arriving" ? "أنت في الطريق إلى الزبون" : course.status === "driver_arrived" ? "بانتظار بدء الزبون للرحلة" : "الرحلة جارية الآن"}</strong>
+            <p>{isOffer ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : course.status === "driver_selected" || course.status === "driver_arriving" ? "توجه إلى موقع الزبون، وسيتم تحديث حالة الرحلة عند وصولك." : course.status === "driver_arrived" ? "أبلغ الزبون بوصولك وانتظر بدء الرحلة." : "توجه إلى الوجهة المحددة لإكمال الرحلة."}</p>
+          </div>
+        </div>
+      )}
+
       {isOffer && course.my_offer_response !== "accepted" && (
         <div className="driver-offer-actions" dir="rtl">
           <button type="button" onClick={() => handleOfferResponse("accepted")} disabled={responding}>قبول</button>

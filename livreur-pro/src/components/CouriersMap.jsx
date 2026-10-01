@@ -159,8 +159,9 @@ function RecenterOnClient({ clientPosition }) {
   return null;
 }
 
-function DestinationPicker({ active, onSelect }) {
+function DestinationPicker({ active, clientPosition, onSelect }) {
   const map = useMap();
+  const hasZoomedOnClientRef = useRef(false);
 
   useMapEvents({
     click(event) {
@@ -174,10 +175,19 @@ function DestinationPicker({ active, onSelect }) {
   });
 
   useEffect(() => {
-    if (active) {
-      map.flyTo(map.getCenter(), Math.max(map.getZoom(), 13), { duration: 0.4 });
+    if (!active) {
+      hasZoomedOnClientRef.current = false;
+      return;
     }
-  }, [active, map]);
+    if (!hasPosition(clientPosition) || hasZoomedOnClientRef.current) return;
+
+    hasZoomedOnClientRef.current = true;
+    map.flyTo(
+      [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+      15,
+      { duration: 0.8 }
+    );
+  }, [active, clientPosition, map]);
 
   return null;
 }
@@ -250,7 +260,11 @@ export default function CouriersMap({
 
         <RecenterOnClient clientPosition={clientPosition} />
 
-        <DestinationPicker active={selectingDestination} onSelect={onSelectDestination} />
+        <DestinationPicker
+          active={selectingDestination}
+          clientPosition={clientPosition}
+          onSelect={onSelectDestination}
+        />
 
         {hasClientPosition && (
           <Marker

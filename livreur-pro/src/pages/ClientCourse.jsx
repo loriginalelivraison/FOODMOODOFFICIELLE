@@ -103,6 +103,16 @@ export default function ClientCourse() {
         <strong>{statusLabels[course.status] || course.status}</strong>
       </div>
 
+      {["searching", "driver_accepted", "driver_selected", "driver_arriving", "driver_arrived", "in_progress"].includes(course.status) && (
+        <div className="course-progress-notice" aria-live="polite">
+          <LoadingSpinner label="" size={28} />
+          <div>
+            <strong>{course.status === "searching" ? "البحث عن سائق جارٍ" : course.status === "driver_accepted" ? "بانتظار اختيارك للسائق" : course.status === "driver_selected" || course.status === "driver_arriving" ? "السائق في طريقه إليك" : course.status === "driver_arrived" ? "السائق وصل، بانتظار بدء الرحلة" : "الرحلة جارية الآن"}</strong>
+            <p>{course.status === "searching" ? "نبحث عن سائق قريب لطلبك. يرجى الانتظار." : course.status === "driver_accepted" ? "راجع السائقين الذين ردوا واختر من يناسبك." : course.status === "driver_selected" || course.status === "driver_arriving" ? "يمكنك متابعة موقع السائق وتفاصيل الرحلة هنا." : course.status === "driver_arrived" ? "السائق ينتظر عند موقع الانطلاق." : "يتم تنفيذ الرحلة إلى وجهتك."}</p>
+          </div>
+        </div>
+      )}
+
       <div className="course-follow-summary">
         <p><b>موقع الانطلاق</b><span>{positionIsValid(...start) ? `${Number(start[0]).toFixed(5)}, ${Number(start[1]).toFixed(5)}` : "غير متوفر"}</span></p>
         <p><b>الوجهة</b><span>{course.destination || "غير محددة"}</span></p>
