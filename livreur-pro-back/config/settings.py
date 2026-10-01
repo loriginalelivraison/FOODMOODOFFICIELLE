@@ -141,6 +141,13 @@ USE_I18N = True
 
 USE_TZ = True
 
+COURSE_MIN_PRICE_DZD = os.getenv("COURSE_MIN_PRICE_DZD", "100")
+COURSE_SURCHARGE_START = os.getenv("COURSE_SURCHARGE_START", "22:00")
+COURSE_SURCHARGE_END = os.getenv("COURSE_SURCHARGE_END", "06:00")
+COURSE_SURCHARGE_PERCENT = os.getenv("COURSE_SURCHARGE_PERCENT", "15")
+COURSE_TARIFF_TIME_ZONE = os.getenv("COURSE_TARIFF_TIME_ZONE", "Africa/Algiers")
+COURSE_SEARCH_RADIUS_KM = float(os.getenv("COURSE_SEARCH_RADIUS_KM", "40"))
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/

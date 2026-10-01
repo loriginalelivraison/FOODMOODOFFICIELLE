@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
@@ -18,10 +19,99 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 const String backendUrl =
     "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
+const String courseOfferCategory = "COURSE_OFFER";
+const String acceptCourseAction = "accept";
+const String rejectCourseAction = "reject";
+
+InitializationSettings get notificationSettings => InitializationSettings(
+      android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(
+        notificationCategories: [
+          DarwinNotificationCategory(
+            courseOfferCategory,
+            actions: [
+              DarwinNotificationAction.plain(
+                acceptCourseAction,
+                'قبول',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                rejectCourseAction,
+                'رفض',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+AndroidNotificationDetails notificationDetails({required bool courseOffer}) =>
+    AndroidNotificationDetails(
+      'high_importance_channel',
+      'Notifications livraisons',
+      channelDescription: 'إشعارات طلبات الرحلات الجديدة',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      actions: courseOffer
+          ? const [
+              AndroidNotificationAction(
+                acceptCourseAction,
+                'قبول',
+                showsUserInterface: true,
+              ),
+              AndroidNotificationAction(
+                rejectCourseAction,
+                'رفض',
+                showsUserInterface: true,
+              ),
+            ]
+          : const [],
+    );
+
+NotificationDetails notificationPlatformDetails({required bool courseOffer}) =>
+    NotificationDetails(
+      android: notificationDetails(courseOffer: courseOffer),
+      iOS: DarwinNotificationDetails(
+        categoryIdentifier: courseOffer ? courseOfferCategory : null,
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+Future<void> showPushNotification(
+  FlutterLocalNotificationsPlugin notifications,
+  RemoteMessage message,
+) async {
+  final type = message.data['type']?.toString() ?? 'course_accepted';
+  final courseId = message.data['course_id']?.toString();
+  final isCourseOffer = type == 'course_offer';
+  final title = message.notification?.title ??
+      message.data['title']?.toString() ??
+      'طلب رحلة جديد';
+  final body = message.notification?.body ??
+      message.data['body']?.toString() ??
+      'افتح WinRak للاطلاع على تفاصيل الرحلة.';
+
+  await notifications.show(
+    id: int.tryParse(courseId ?? '') ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title: title,
+    body: body,
+    notificationDetails: notificationPlatformDetails(courseOffer: isCourseOffer),
+    payload: jsonEncode({"type": type, "course_id": courseId}),
+  );
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp();
+  if (defaultTargetPlatform != TargetPlatform.android) return;
+  final notifications = FlutterLocalNotificationsPlugin();
+  await notifications.initialize(settings: notificationSettings);
+  await showPushNotification(notifications, message);
 }
 
 Future<void> main() async {
@@ -141,13 +231,15 @@ void onStart(ServiceInstance service) async {
 }
 
 class FoodMoodApp extends StatelessWidget {
-  const FoodMoodApp({super.key});
+  final Widget home;
+
+  const FoodMoodApp({super.key, this.home = const FoodMoodWebView()});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: FoodMoodWebView(),
+      home: home,
     );
   }
 }
@@ -170,18 +262,27 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   Timer? syncTimer;
 
   Future<void> initializeLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: androidSettings);
-
     await localNotifications.initialize(
-      settings: settings,
-      onDidReceiveNotificationResponse: (response) async {
-        await openCourseFromNotification(response.payload);
-      },
+      settings: notificationSettings,
+      onDidReceiveNotificationResponse: handleNotificationResponse,
     );
+
+    final launchDetails = await localNotifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp == true &&
+        launchDetails?.notificationResponse != null) {
+      await handleNotificationResponse(launchDetails!.notificationResponse!);
+    }
   }
 
-  Future<void> openCourseFromNotification(String? payload) async {
+  Future<void> handleNotificationResponse(NotificationResponse response) async {
+    final action = response.actionId == acceptCourseAction ||
+            response.actionId == rejectCourseAction
+        ? response.actionId
+        : null;
+    await openCourseFromNotification(response.payload, action: action);
+  }
+
+  Future<void> openCourseFromNotification(String? payload, {String? action}) async {
     if (payload == null || payload.isEmpty) return;
 
     try {
@@ -190,38 +291,21 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
 
       if (courseId == null || courseId.isEmpty) return;
 
-      await controller.loadRequest(
-        Uri.parse("https://www.winrak.fr/livreur-course/$courseId"),
-      );
+      final query = action != null && data['type'] == 'course_offer'
+          ? {"offer_action": action}
+          : <String, String>{};
+      await controller.loadRequest(Uri.https(
+        "www.winrak.fr",
+        "/livreur-course/$courseId",
+        query.isEmpty ? null : query,
+      ));
     } catch (e) {
       debugPrint("Erreur navigation notification : $e");
     }
   }
 
   Future<void> showForegroundNotification(RemoteMessage message) async {
-    const androidDetails = AndroidNotificationDetails(
-      'high_importance_channel',
-      'Notifications livraisons',
-      channelDescription: 'Notifications des nouvelles demandes de livraison',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-    );
-
-    final title = message.notification?.title ?? 'Nouvelle course';
-    final body = message.notification?.body ??
-        'Un client a confirmé la course. Ouvrez WinRak.';
-
-    await localNotifications.show(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title: title,
-      body: body,
-      notificationDetails: const NotificationDetails(android: androidDetails),
-      payload: jsonEncode({
-        "type": message.data["type"] ?? "course_accepted",
-        "course_id": message.data["course_id"],
-      }),
-    );
+    await showPushNotification(localNotifications, message);
   }
 
   Future<void> requestPermissions() async {
@@ -387,9 +471,6 @@ Future<void> syncAuthFromWebView() async {
     super.initState();
 
     requestPermissions();
-    initializeLocalNotifications().then((_) {
-      listenFirebaseMessages();
-    });
 
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -470,6 +551,10 @@ androidController.setOnShowFileSelector(
         await syncAuthFromWebView();
       },
     );
+
+    initializeLocalNotifications().then((_) {
+      listenFirebaseMessages();
+    });
   }
 
   @override

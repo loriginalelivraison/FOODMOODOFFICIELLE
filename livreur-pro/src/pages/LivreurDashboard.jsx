@@ -5,6 +5,9 @@ import {
   setLivreurUnavailable,
   getLivreurCourses,
   finishCourse,
+  getActiveCoursesForLivreur,
+  getCourseOffers,
+  respondToCourseOffer,
 } from "../livreursapi.js";
 import LogoutButton from "../components/LogoutButton.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -160,6 +163,8 @@ export default function LivreurDashboard() {
   }, [trackingEnabled]);
 
   const [activeCourse, setActiveCourse] = useState(null);
+  const [courseOffers, setCourseOffers] = useState([]);
+  const [respondingOfferId, setRespondingOfferId] = useState(null);
   const [courseNotification, setCourseNotification] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [courses, setCourses] = useState([]);
@@ -186,6 +191,22 @@ export default function LivreurDashboard() {
       setError(err.message || "حدث خطأ أثناء تحميل السجل");
     } finally {
       setLoadingHistory(false);
+    }
+  }
+
+  async function handleOfferResponse(courseId, response) {
+    if (respondingOfferId) return;
+    setRespondingOfferId(courseId);
+    setError("");
+    try {
+      await respondToCourseOffer(courseId, response);
+      const updatedOffers = await getCourseOffers();
+      setCourseOffers(updatedOffers);
+    } catch (err) {
+      setError(err.message || "تعذر تحديث طلب الرحلة.");
+      getCourseOffers().then(setCourseOffers).catch(() => {});
+    } finally {
+      setRespondingOfferId(null);
     }
   }
 
@@ -290,6 +311,25 @@ export default function LivreurDashboard() {
 
   return () => clearInterval(interval);
 }, [livreur?.id]);
+
+  useEffect(() => {
+    if (!livreur?.id) return;
+    let cancelled = false;
+    async function loadOffers() {
+      try {
+        const data = await getCourseOffers();
+        if (!cancelled) setCourseOffers(data);
+      } catch (err) {
+        console.error("Erreur chargement des offres :", err);
+      }
+    }
+    loadOffers();
+    const interval = setInterval(loadOffers, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [livreur?.id]);
   if (!livreur) {
     return (
       <div style={{ padding: "20px" }} dir="rtl">
@@ -483,6 +523,35 @@ export default function LivreurDashboard() {
           ) : trackingEnabled ? "إيقاف مشاركة الموقع" : "تشغيل مشاركة الموقع"}
         </button>
       </div>
+
+      {courseOffers.length > 0 && (
+        <section className="driver-offers" aria-live="polite">
+          <h2>طلبات الرحلات</h2>
+          {courseOffers.map((offer) => (
+            <article className="driver-offer" key={offer.id}>
+              <div className="driver-offer-head">
+                <strong>طلب رحلة جديد · #{offer.id}</strong>
+                <span>{offer.my_offer_response === "accepted" ? "في انتظار اختيار الزبون" : "طلب جديد"}</span>
+              </div>
+              <p>📍 الانطلاق: {offer.client_latitude}, {offer.client_longitude}</p>
+              <p>🎯 الوجهة: {offer.destination}</p>
+              <p>📏 المسافة التقريبية: {offer.estimated_distance_km == null ? "قيد التقدير" : `${offer.estimated_distance_km} كم`}</p>
+              <p>💰 السعر المقترح: {offer.final_price ?? offer.proposed_price} دج</p>
+              <p>🕒 وقت الطلب: {new Date(offer.created_at).toLocaleTimeString("ar-DZ", { hour: "2-digit", minute: "2-digit" })}</p>
+              {offer.my_offer_response === "pending" && (
+                <div className="driver-offer-actions">
+                  <button type="button" onClick={() => handleOfferResponse(offer.id, "accepted")} disabled={respondingOfferId !== null}>
+                    {respondingOfferId === offer.id ? "جارٍ الإرسال…" : "قبول"}
+                  </button>
+                  <button type="button" onClick={() => handleOfferResponse(offer.id, "rejected")} disabled={respondingOfferId !== null}>
+                    رفض
+                  </button>
+                </div>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
 
       {courseNotification && activeCourse && (
         <div

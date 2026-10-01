@@ -2,12 +2,14 @@ import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createClient, loginClient } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import CourierRegister from "./CourierRegister.jsx";
 
 export default function ClientAuth() {
   const navigate = useNavigate();
   const formRef = useRef(null);
 
   const [mode, setMode] = useState("register");
+  const [accountType, setAccountType] = useState("client");
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [password, setPassword] = useState("");
@@ -86,19 +88,51 @@ export default function ClientAuth() {
     }
   }
 
+  if (accountType === "courier") {
+    return (
+      <CourierRegister
+        onChooseClient={() => {
+          setAccountType("client");
+          setError("");
+          setMessage("");
+        }}
+      />
+    );
+  }
+
   return (
     <section className="page auth-page" dir="rtl">
       <div className="auth-card">
         <center>
+          <h2>هل أنت؟</h2>
+        </center>
+
+        <div className="auth-switch" aria-label="نوع الحساب">
+          <button
+            type="button"
+            aria-pressed="true"
+            className="primary-btn small"
+          >
+            زبون
+          </button>
+          <button
+            type="button"
+            aria-pressed="false"
+            className="secondary-btn small"
+            onClick={() => setAccountType("courier")}
+          >
+            عامل توصيل / سائق
+          </button>
+        </div>
+
+        <center>
           <h2>
-            {mode === "register" ? "إنشاء حساب عميل" : "تسجيل الدخول"}
+            {mode === "register" ? "هل تريد؟" : "تسجيل الدخول"}
           </h2>
 
-          <h5>
-            {mode === "register"
-              ? "أنشئ حسابك للتواصل مع السائقين وتتبع الطلبات بسهولة."
-              : "قم بتسجيل الدخول للوصول إلى حسابك."}
-          </h5>
+          {mode === "login" && (
+            <h5>قم بتسجيل الدخول للوصول إلى حسابك.</h5>
+          )}
         </center>
 
         <div className="auth-switch">

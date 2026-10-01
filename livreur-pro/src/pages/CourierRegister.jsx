@@ -10,7 +10,7 @@ import {
   requestUserPosition,
 } from "../utils/geolocation.js";
 
-export default function CourierRegister() {
+export default function CourierRegister({ onChooseClient }) {
   const navigate = useNavigate();
   const formRef = useRef(null);
 
@@ -237,6 +237,26 @@ async function handleSubmit(e) {
   return (
     <section className="page auth-page" dir="rtl">
       <div className="auth-card">
+        {onChooseClient && (
+          <div className="auth-switch" aria-label="نوع الحساب">
+            <button
+              type="button"
+              aria-pressed="false"
+              className="secondary-btn small"
+              onClick={onChooseClient}
+            >
+              زبون
+            </button>
+            <button
+              type="button"
+              aria-pressed="true"
+              className="primary-btn small"
+            >
+              عامل توصيل / سائق
+            </button>
+          </div>
+        )}
+
         <center>
           <h2>
             {mode === "register"

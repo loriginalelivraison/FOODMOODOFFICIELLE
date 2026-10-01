@@ -5,6 +5,7 @@ import {
   Marker,
   Popup,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 
 import { useNavigate } from "react-router-dom";
@@ -158,11 +159,37 @@ function RecenterOnClient({ clientPosition }) {
   return null;
 }
 
+function DestinationPicker({ active, onSelect }) {
+  const map = useMap();
+
+  useMapEvents({
+    click(event) {
+      if (active) {
+        onSelect?.({
+          latitude: event.latlng.lat,
+          longitude: event.latlng.lng,
+        });
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (active) {
+      map.flyTo(map.getCenter(), Math.max(map.getZoom(), 13), { duration: 0.4 });
+    }
+  }, [active, map]);
+
+  return null;
+}
+
 export default function CouriersMap({
   couriers = [],
   clientPosition,
   onRequestClientPosition,
   isLocating = false,
+  selectingDestination = false,
+  destinationPosition = null,
+  onSelectDestination,
 }) {
   const navigate = useNavigate();
 
@@ -193,6 +220,7 @@ export default function CouriersMap({
 
   return (
     <div
+      className={selectingDestination ? "destination-map-picking" : ""}
       style={{
         height: "100%",
         width: "100%",
@@ -222,6 +250,8 @@ export default function CouriersMap({
 
         <RecenterOnClient clientPosition={clientPosition} />
 
+        <DestinationPicker active={selectingDestination} onSelect={onSelectDestination} />
+
         {hasClientPosition && (
           <Marker
             key="client-position"
@@ -234,6 +264,15 @@ export default function CouriersMap({
             <Popup>
               <strong>أنت هنا</strong>
             </Popup>
+          </Marker>
+        )}
+
+        {hasPosition(destinationPosition) && (
+          <Marker
+            key="destination-position"
+            position={[Number(destinationPosition.latitude), Number(destinationPosition.longitude)]}
+          >
+            <Popup>الوجهة المحددة</Popup>
           </Marker>
         )}
 

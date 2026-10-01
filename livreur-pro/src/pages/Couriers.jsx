@@ -1,5 +1,12 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { getLivreurs } from "../livreursapi.js";
+import { useNavigate } from "react-router-dom";
+import {
+  createCourseRequest,
+  cancelCourse,
+  getCourse,
+  getLivreurs,
+  selectCourseDriver,
+} from "../livreursapi.js";
 import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -11,6 +18,8 @@ import {
 } from "../utils/geolocation.js";
 
 const LOCATION_CONSENT_KEY = "clientLocationConsent";
+const MIN_COURSE_PRICE_DZD = 100;
+const DRIVER_RESPONSE_WINDOW_SECONDS = 50;
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -28,6 +37,7 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
 }
 
 export default function Couriers() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState("");
@@ -50,10 +60,162 @@ export default function Couriers() {
     const saved = localStorage.getItem(LOCATION_CONSENT_KEY);
     return saved === null ? true : saved === "true";
   });
+  const [destination, setDestination] = useState("");
+  const [destinationPosition, setDestinationPosition] = useState(null);
+  const [selectingDestination, setSelectingDestination] = useState(false);
+  const [proposedPrice, setProposedPrice] = useState("");
+  const [bookingError, setBookingError] = useState("");
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [requestedCourseId, setRequestedCourseId] = useState(() =>
+    localStorage.getItem("currentClientCourseId")
+  );
+  const [requestedCourse, setRequestedCourse] = useState(null);
+  const [selectingDriverId, setSelectingDriverId] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState("changed_mind");
+  const [cancellationComment, setCancellationComment] = useState("");
+  const [cancellingCourse, setCancellingCourse] = useState(false);
+  const [responseSecondsLeft, setResponseSecondsLeft] = useState(DRIVER_RESPONSE_WINDOW_SECONDS);
 
   const hasShownLocationMessageRef = useRef(
     sessionStorage.getItem("clientLocationMessageShown") === "true"
   );
+
+  useEffect(() => {
+    if (!requestedCourseId) return;
+    let cancelled = false;
+
+    async function refreshRequest() {
+      try {
+        const course = await getCourse(requestedCourseId);
+        if (!cancelled) setRequestedCourse(course);
+      } catch (err) {
+        if (!cancelled) setBookingError(err.message);
+      }
+    }
+
+    refreshRequest();
+    const interval = setInterval(refreshRequest, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [requestedCourseId]);
+
+  useEffect(() => {
+    if (!requestedCourse || !["searching", "driver_accepted"].includes(requestedCourse.status)) return;
+    if (requestedCourse.accepted_drivers?.length) {
+      setResponseSecondsLeft(0);
+      return;
+    }
+
+    const createdAt = new Date(requestedCourse.created_at).getTime();
+    if (!Number.isFinite(createdAt)) return;
+    const updateRemaining = () => {
+      const elapsed = Math.floor((Date.now() - createdAt) / 1000);
+      setResponseSecondsLeft(Math.max(0, DRIVER_RESPONSE_WINDOW_SECONDS - elapsed));
+    };
+    updateRemaining();
+    const interval = setInterval(updateRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [requestedCourse]);
+
+  async function handleRequestCourse(event) {
+    event.preventDefault();
+    if (bookingLoading) return;
+    setBookingError("");
+
+    if (Number(proposedPrice) < MIN_COURSE_PRICE_DZD) {
+      setBookingError(`الحد الأدنى للسعر هو ${MIN_COURSE_PRICE_DZD} دج.`);
+      return;
+    }
+    if (!destination.trim() && !destinationPosition) {
+      setBookingError("يرجى إدخال الوجهة.");
+      return;
+    }
+    if (localStorage.getItem("role") !== "client" || !localStorage.getItem("access")) {
+      localStorage.setItem("redirectAfterLogin", "/livreurs");
+      navigate("/connexion-client");
+      return;
+    }
+
+    setBookingLoading(true);
+    try {
+      const position = await requestUserPosition({
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 20000,
+      });
+      handleLocationSuccess(position);
+
+      let requestKey = sessionStorage.getItem("pendingCourseRequestKey");
+      if (!requestKey) {
+        requestKey = crypto.randomUUID();
+        sessionStorage.setItem("pendingCourseRequestKey", requestKey);
+      }
+
+      const course = await createCourseRequest({
+        destination: destinationPosition ? "" : destination.trim(),
+        ...(destinationPosition && {
+          destination_latitude: destinationPosition.latitude,
+          destination_longitude: destinationPosition.longitude,
+        }),
+        proposed_price: Number(proposedPrice),
+        client_latitude: position.coords.latitude,
+        client_longitude: position.coords.longitude,
+        request_key: requestKey,
+      });
+      sessionStorage.removeItem("pendingCourseRequestKey");
+      localStorage.setItem("currentClientCourseId", String(course.id));
+      setRequestedCourse(course);
+      setRequestedCourseId(course.id);
+      setDestinationPosition(null);
+      setSelectingDestination(false);
+    } catch (err) {
+      const gpsErrors = {
+        1: "يرجى السماح بالوصول إلى موقعك الجغرافي ثم أعد المحاولة.",
+        2: "تعذر تحديد موقعك حالياً. تحقق من إعدادات الموقع.",
+        3: "استغرق تحديد الموقع وقتاً طويلاً. أعد المحاولة.",
+      };
+      setBookingError(typeof err.code === "number"
+        ? gpsErrors[err.code] || "تعذر تحديد موقعك. أعد المحاولة."
+        : err.message || "تعذر إنشاء الطلب. تحقق من اتصال الإنترنت وحاول مجدداً.");
+    } finally {
+      setBookingLoading(false);
+    }
+  }
+
+  async function handleSelectDriver(driverId) {
+    if (!requestedCourse || selectingDriverId) return;
+    setSelectingDriverId(driverId);
+    setBookingError("");
+    try {
+      await selectCourseDriver(requestedCourse.id, driverId);
+      navigate(`/course/${requestedCourse.id}`);
+    } catch (err) {
+      setBookingError(err.message || "تعذر تأكيد هذا السائق.");
+      const latest = await getCourse(requestedCourse.id).catch(() => null);
+      if (latest) setRequestedCourse(latest);
+    } finally {
+      setSelectingDriverId(null);
+    }
+  }
+
+  async function handleCancelRequest(event) {
+    event.preventDefault();
+    if (!requestedCourse || cancellingCourse) return;
+    setCancellingCourse(true);
+    setBookingError("");
+    try {
+      const updated = await cancelCourse(requestedCourse.id, cancellationReason, cancellationComment);
+      setRequestedCourse(updated);
+      localStorage.removeItem("currentClientCourseId");
+      setRequestedCourseId(null);
+    } catch (err) {
+      setBookingError(err.message || "تعذر إلغاء الطلب.");
+    } finally {
+      setCancellingCourse(false);
+    }
+  }
 
   useEffect(() => {
     async function loadLivreurs() {
@@ -334,11 +496,6 @@ export default function Couriers() {
   ];
 
   const hasNearbyResults = Boolean(clientPosition) && filtered.length > 0;
-  const nearbyTitle =
-    filtered.length > 0
-      ? `${filtered.length} سائقًا بالقرب منك`
-      : "لا يوجد سائقون بالقرب منك";
-
   const visibleCouriers = filtered.slice(0, visibleCount);
   const hasMoreCouriers = filtered.length > visibleCount;
 
@@ -374,7 +531,7 @@ export default function Couriers() {
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {!loading && !error && filtered.length === 0 && (
-        <p>Aucun livreur disponible pour le moment.</p>
+        <p>لا يوجد سائقون متاحون حالياً.</p>
       )}
 
       <div
@@ -400,8 +557,42 @@ export default function Couriers() {
             clientPosition={clientPosition}
             onRequestClientPosition={handleFindAroundMe}
             isLocating={searchingLocation}
+            selectingDestination={selectingDestination}
+            destinationPosition={destinationPosition}
+            onSelectDestination={(position) => {
+              setDestinationPosition(position);
+              setDestination("");
+            }}
           />
         </div>
+      </div>
+
+      <div className="destination-picker-controls" dir="rtl">
+        <p>
+          {selectingDestination
+            ? destinationPosition
+              ? "تم تحديد الوجهة على الخريطة. اضغط لتغيير الموقع."
+              : "اضغط على الخريطة لتحديد وجهتك."
+            : destinationPosition
+            ? "تم اختيار الوجهة من الخريطة."
+            : "يمكنك كتابة الوجهة أو اختيارها من الخريطة."}
+        </p>
+        <button
+          type="button"
+          className={selectingDestination ? "destination-picker-active" : ""}
+          onClick={() => setSelectingDestination((active) => !active)}
+        >
+          {selectingDestination ? "إنهاء تحديد الوجهة" : "تحديد الوجهة على الخريطة"}
+        </button>
+        {destinationPosition && (
+          <button
+            type="button"
+            className="destination-picker-clear"
+            onClick={() => setDestinationPosition(null)}
+          >
+            مسح الموقع
+          </button>
+        )}
       </div>
 
       <div
@@ -463,31 +654,143 @@ export default function Couriers() {
         </button>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "12px",
-          padding: "0 2px",
-        }}
-      >
-        <div
-          style={{
-            background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-            border: "1px solid #e5e7eb",
-            borderRadius: "999px",
-            padding: "8px 18px",
-            fontWeight: 700,
-            color: "#111827",
-            fontSize: "13px",
-            letterSpacing: "0.2px",
-            boxShadow: "0 4px 12px rgba(15, 23, 42, 0.06)",
-            textAlign: "center",
-          }}
-        >
-          {nearbyTitle}
+      <section className="course-request-panel" aria-labelledby="course-request-title">
+        <div className="course-request-heading">
+          <div>
+            <h2 id="course-request-title">اطلب رحلة</h2>
+          </div>
+          <span className={`gps-status ${clientPosition ? "gps-ready" : "gps-waiting"}`}>
+            <span aria-hidden="true" />
+            {searchingLocation
+              ? "جارٍ تحديد الموقع…"
+              : clientPosition
+              ? "تم تحديد موقعك تلقائياً"
+              : "بانتظار تحديد موقعك"}
+          </span>
         </div>
-      </div>
+
+        <form className="course-request-form" onSubmit={handleRequestCourse}>
+          <label>
+            الوجهة
+            <input
+              type="text"
+              value={destination}
+              onChange={(event) => setDestination(event.target.value)}
+              placeholder="أدخل وجهتك"
+              maxLength={255}
+              required={!destinationPosition}
+              disabled={Boolean(destinationPosition)}
+            />
+          </label>
+          <label>
+            السعر المقترح <span>(دج)</span>
+            <input
+              type="number"
+              value={proposedPrice}
+              onChange={(event) => setProposedPrice(event.target.value)}
+              placeholder={`الحد الأدنى ${MIN_COURSE_PRICE_DZD}`}
+              min={MIN_COURSE_PRICE_DZD}
+              step="1"
+              required
+            />
+            {proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD && (
+              <small className="course-price-error">الحد الأدنى للسعر هو {MIN_COURSE_PRICE_DZD} دج.</small>
+            )}
+          </label>
+          <button
+            className="course-request-submit"
+            type="submit"
+            disabled={bookingLoading || Number(proposedPrice) < MIN_COURSE_PRICE_DZD}
+          >
+            {bookingLoading ? "جارٍ البحث…" : "ابحث عن سائق"}
+          </button>
+        </form>
+
+        {bookingError && <p className="course-request-error" role="alert">{bookingError}</p>}
+
+        {requestedCourse && (
+          <div className="course-request-status" aria-live="polite">
+            <div className="course-status-heading">
+              <h3>الطلب رقم {requestedCourse.id}</h3>
+              <span>{requestedCourse.status === "searching" ? "جارٍ البحث عن سائق" : requestedCourse.status === "driver_accepted" ? "وصلت ردود السائقين" : requestedCourse.status === "driver_selected" ? "تم تأكيد السائق" : requestedCourse.status === "cancelled" ? "تم إلغاء الطلب" : requestedCourse.status}</span>
+            </div>
+            <p>
+              {requestedCourse.estimated_distance_km != null
+                ? `المسافة التقديرية: ${requestedCourse.estimated_distance_km} كم · `
+                : "جارٍ تقدير المسافة · "}
+              السعر النهائي: {requestedCourse.final_price ?? requestedCourse.proposed_price} دج
+              {Number(requestedCourse.surcharge_percent) > 0 && ` (زيادة ${requestedCourse.surcharge_percent}٪)`}
+            </p>
+
+            {requestedCourse.status === "searching" && !requestedCourse.accepted_drivers?.length && (
+              <div className={`driver-wait-state ${responseSecondsLeft === 0 ? "driver-wait-expired" : ""}`} aria-live="polite">
+                <span className="driver-wait-indicator" aria-hidden="true" />
+                <div>
+                  {responseSecondsLeft > 0 ? (
+                    <>
+                      <strong>جارٍ البحث عن سائقين قريبين</strong>
+                      <span>بانتظار الردود · {responseSecondsLeft.toLocaleString("ar-DZ")} ثانية</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>لم يقبل أي سائق الرحلة خلال ٥٠ ثانية</strong>
+                      <span>لا يزال بإمكانك الانتظار، فقد يصل رد لاحقاً، أو إلغاء الطلب.</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(requestedCourse.status === "searching" || requestedCourse.status === "driver_accepted") && (
+              <div className="accepted-driver-list">
+                {requestedCourse.accepted_drivers?.length ? requestedCourse.accepted_drivers.map((driver) => (
+                  <article className="accepted-driver" key={driver.id}>
+                    <div>
+                      <strong>{driver.nom}</strong>
+                      <span>{driver.vehicule} · {driver.distance_km == null ? "المسافة غير متاحة" : `${driver.distance_km} كم`} · {driver.note == null ? "بدون تقييم" : `★ ${driver.note}`}</span>
+                    </div>
+                    <a href={`tel:${driver.telephone}`} aria-label={`اتصل بـ ${driver.nom}`}>{driver.telephone}</a>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDriver(driver.id)}
+                      disabled={selectingDriverId !== null}
+                    >
+                      {selectingDriverId === driver.id ? "جارٍ التأكيد…" : "اختيار"}
+                    </button>
+                  </article>
+                )) : <p>بانتظار ردود السائقين القريبين…</p>}
+              </div>
+            )}
+
+            {requestedCourse.status === "driver_selected" && (
+              <button className="course-request-submit" type="button" onClick={() => navigate(`/course/${requestedCourse.id}`)}>
+                متابعة الرحلة
+              </button>
+            )}
+
+            {["searching", "driver_accepted"].includes(requestedCourse.status) && (
+              <form className="course-inline-cancel" onSubmit={handleCancelRequest}>
+                <label>
+                  سبب الإلغاء
+                  <select value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)}>
+                    <option value="changed_mind">غيّرت رأيي</option>
+                    <option value="driver_delay">تأخر السائق</option>
+                    <option value="request_error">خطأ في الوجهة أو الطلب</option>
+                    <option value="other">سبب آخر</option>
+                  </select>
+                </label>
+                {cancellationReason === "other" && (
+                  <label>
+                    ملاحظة
+                    <input value={cancellationComment} onChange={(event) => setCancellationComment(event.target.value)} maxLength={500} required />
+                  </label>
+                )}
+                <button type="submit" disabled={cancellingCourse}>{cancellingCourse ? "جارٍ الإلغاء…" : "إلغاء الطلب"}</button>
+              </form>
+            )}
+          </div>
+        )}
+      </section>
 
       <div className="courier-grid" style={{ marginTop: "18px" }}>
         {visibleCouriers.map((courier) => (

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useNavigation } from "react-router-dom";
-import { Home, Users, User, LogIn, Bike, Lock, ArrowLeft } from "lucide-react";
+import { Home, Users, User, LogIn, Lock, ArrowLeft } from "lucide-react";
 
 import LogoutButton from "./LogoutButton";
 import LoadingSpinner from "./LoadingSpinner";
@@ -123,10 +123,6 @@ export default function Layout() {
 
           {!auth.token ? (
             <>
-              <NavLink to="/inscription-livreur" className={linkClass}>
-                أصبح سائق
-              </NavLink>
-
               <NavLink to="/connexion-client" className={linkClass}>
                 تسجيل
               </NavLink>
@@ -160,17 +156,10 @@ export default function Layout() {
         </NavLink>
 
         {!auth.token ? (
-          <>
-            <NavLink to="/connexion-client" className={bottomLinkClass}>
-              <LogIn size={20} />
-              <span>تسجيل</span>
-            </NavLink>
-
-            <NavLink to="/inscription-livreur" className={bottomLinkClass}>
-              <Bike size={20} />
-              <span>سائق</span>
-            </NavLink>
-          </>
+          <NavLink to="/connexion-client" className={bottomLinkClass}>
+            <LogIn size={20} />
+            <span>تسجيل</span>
+          </NavLink>
    ) : (
   <NavLink to={dashboardLink} className={bottomLinkClass}>
     <User size={20} />

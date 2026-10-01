@@ -375,6 +375,73 @@ export async function createCourse(data) {
   return result;
 }
 
+async function courseAction(courseId, action, method = "POST", body = {}) {
+  const response = await fetch(`${API_BASE_URL}/courses/${courseId}/${action}/`, {
+    method,
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    handleInvalidToken(data);
+    const message = response.status === 409
+      ? "هذه الرحلة لم تعد متاحة أو تغيّرت حالتها. حدّث القائمة."
+      : toArabicMessage(data.detail || data.error, "تعذر تحديث حالة الرحلة.");
+    throw new Error(message);
+  }
+  return data;
+}
+
+export async function createCourseRequest(request) {
+  const response = await fetch(`${API_BASE_URL}/courses/request/`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(request),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail || data.error, "تعذر إنشاء طلب الرحلة."));
+  }
+  return data;
+}
+
+export async function getCourseOffers() {
+  const response = await fetch(`${API_BASE_URL}/courses/offers/`, {
+    headers: authHeaders(),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail, "تعذر تحميل طلبات الرحلات."));
+  }
+  return Array.isArray(data) ? data : data.results || [];
+}
+
+export function respondToCourseOffer(courseId, response) {
+  return courseAction(courseId, "respond", "POST", { response });
+}
+
+export function selectCourseDriver(courseId, livreurId) {
+  return courseAction(courseId, "select_driver", "POST", { livreur_id: livreurId });
+}
+
+export function cancelCourse(courseId, reason, comment = "") {
+  return courseAction(courseId, "cancel", "POST", { reason, comment });
+}
+
+export function markCourseArrived(courseId) {
+  return courseAction(courseId, "arrive");
+}
+
+export function markCourseEnroute(courseId) {
+  return courseAction(courseId, "enroute");
+}
+
+export function startCourse(courseId) {
+  return courseAction(courseId, "start");
+}
+
 export async function getActiveCourse(livreurId) {
   const response = await fetch(
     `${API_BASE_URL}/courses/active/?livreur_id=${livreurId}`,
