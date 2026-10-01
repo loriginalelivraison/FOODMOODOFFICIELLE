@@ -410,30 +410,14 @@ class CourseViewSet(ModelViewSet):
                     details={"livreur_ids": [driver.id for driver in nearby_drivers]},
                 )
 
-                request_time = timezone.localtime(course.created_at).strftime("%H:%M")
-                distance_label = f"{estimated_distance} كم" if estimated_distance is not None else "قيد التقدير"
-                body = (
-                    "طلب رحلة جديد\n"
-                    f"📍 الانطلاق: {start_lat:.5f}, {start_lon:.5f}\n"
-                    f"🎯 الوجهة: {destination}\n"
-                    f"📏 المسافة التقريبية: {distance_label}\n"
-                    f"💰 السعر المقترح: {final_price} دج\n"
-                    f"🕒 وقت الطلب: {request_time}\n"
-                    "افتح WinRak ثم اختر قبول أو رفض."
-                )
+                notification_price = format(final_price.normalize(), "f")
                 for driver in nearby_drivers:
                     transaction.on_commit(lambda driver=driver: send_livreur_notification(
                         driver,
-                        "طلب رحلة جديد",
-                        body,
+                        "رحلة جديدة",
+                        f"{notification_price} دج",
                         course_id=course.id,
                         notification_type="course_offer",
-                        extra_data={
-                            "destination": destination,
-                            "price": final_price,
-                            "accept_label": "قبول",
-                            "reject_label": "رفض",
-                        },
                     ))
         except Exception as exc:
             if request_key:

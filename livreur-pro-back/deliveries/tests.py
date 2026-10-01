@@ -87,6 +87,12 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(CourseOffer.objects.filter(course=course).count(), 2)
 		self.assertEqual(CourseEvent.objects.filter(course=course, event_type="created").count(), 1)
 		self.assertEqual(send_notification.call_count, 2)
+		notification_call = send_notification.call_args_list[0]
+		self.assertEqual(notification_call.args[1], "رحلة جديدة")
+		self.assertEqual(notification_call.args[2], "575 دج")
+		self.assertEqual(notification_call.kwargs["course_id"], course.id)
+		self.assertEqual(notification_call.kwargs["notification_type"], "course_offer")
+		self.assertNotIn("extra_data", notification_call.kwargs)
 
 	@patch("deliveries.views.resolve_destination_label", return_value="الجزائر الوسطى")
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
