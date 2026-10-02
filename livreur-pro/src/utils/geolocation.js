@@ -11,8 +11,8 @@ export function isSafariBrowser(userAgent = typeof navigator !== "undefined" ? n
     /Version\/.*Safari/i.test(userAgent);
 }
 
-export function getLocationSettingsUrl() {
-  if (isIOSDevice()) {
+export function getLocationSettingsUrl(userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "") {
+  if (isIOSDevice(userAgent)) {
     return [
       "app-settings:",
       "prefs:root=LOCATION_SERVICES",
@@ -43,25 +43,25 @@ export function openLocationSettings() {
 }
 
 export function getLocationErrorMessage(error, isIOS = false) {
-  if (!error) return "Impossible de récupérer votre position.";
+  if (!error) return "تعذر تحديد موقعك.";
 
   switch (error.code) {
     case 1:
       return isIOS
-        ? "Safari iOS a bloqué la géolocalisation. Ouvrez Réglages > Safari > Position, puis autorisez 'Position' et réessayez."
-        : "L'accès à la localisation a été refusé. Activez la position dans les paramètres du navigateur puis réessayez.";
+        ? "من إعدادات Safari، اسمح بالوصول إلى الموقع ثم أعد المحاولة."
+        : "تم رفض إذن تحديد الموقع. فعّل الموقع من إعدادات المتصفح ثم أعد المحاولة.";
     case 2:
-      return "La localisation est indisponible sur cet appareil pour le moment.";
+      return "خدمة الموقع غير متاحة على هذا الجهاز حالياً.";
     case 3:
-      return "Le GPS a mis trop de temps à répondre. Vérifiez votre connexion et réessayez.";
+      return "استغرق تحديد الموقع وقتاً طويلاً. تحقق من الاتصال ثم أعد المحاولة.";
     default:
-      return "La localisation n'a pas pu être récupérée. Vérifiez votre réseau et les permissions du navigateur.";
+      return "تعذر تحديد الموقع. تحقق من الاتصال وأذونات المتصفح.";
   }
 }
 
 export function requestUserPosition(options = {}) {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
-    return Promise.reject(new Error("La géolocalisation n'est pas supportée par ce navigateur."));
+    return Promise.reject(new Error("الموقع الجغرافي غير مدعوم في هذا المتصفح."));
   }
 
   const settings = {

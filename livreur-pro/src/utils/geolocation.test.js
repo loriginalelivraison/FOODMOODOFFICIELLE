@@ -15,23 +15,22 @@ test("detects iPhone user agent", () => {
   assert.equal(isSafariBrowser(userAgent), true);
 });
 
-test("returns iOS-specific guidance for denied permission", () => {
+test("returns Arabic iOS guidance for denied permission", () => {
   const message = getLocationErrorMessage({ code: 1 }, true);
 
-  assert.match(message, /Réglages/i);
   assert.match(message, /Safari/i);
-  assert.match(message, /Position/i);
+  assert.match(message, /الموقع/i);
 });
 
 test("returns iOS settings urls for Apple devices", () => {
-  const urls = getLocationSettingsUrl();
+  const urls = getLocationSettingsUrl("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
 
   assert.ok(urls.length > 0);
   assert.ok(urls.some((url) => url.includes("app-settings") || url.includes("LOCATION_SERVICES")));
 });
 
-test("returns timeout guidance", () => {
+test("returns Arabic timeout guidance", () => {
   const message = getLocationErrorMessage({ code: 3 }, false);
 
-  assert.match(message, /GPS|connexion|réessayez/i);
+  assert.match(message, /الموقع|الاتصال/i);
 });

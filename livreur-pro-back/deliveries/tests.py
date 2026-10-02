@@ -30,27 +30,28 @@ class CourseRequestTests(TestCase):
 		self.client_api.force_authenticate(self.client_user)
 
 		self.drivers = []
-		for index, available in enumerate([False, True], start=1):
+		for index, (available, vehicle) in enumerate([(False, "moto"), (True, "moto"), (True, "voiture"), (True, "camion")], start=1):
 			user = User.objects.create_user(username=f"driver{index}", password="pass")
 			self.drivers.append(Livreur.objects.create(
 				user=user,
 				nom=f"Chauffeur {index}",
 				telephone=f"055500000{index + 1}",
 				ville="Alger",
-				vehicule="moto",
+				vehicule=vehicle,
 				disponible=available,
 				latitude=36.75 + index * 0.001,
 				longitude=3.06,
 				fcm_token=f"token-{index}",
 			))
 
-	def create_request(self, price=500):
+	def create_request(self, price=500, vehicle_type="moto", request_key="client-request-1"):
 		return self.client_api.post("/api/courses/request/", {
 			"destination": "Place des Martyrs, Alger",
 			"proposed_price": price,
 			"client_latitude": 36.75,
 			"client_longitude": 3.06,
-			"request_key": "client-request-1",
+			"request_key": request_key,
+			"vehicle_type": vehicle_type,
 		}, format="json")
 
 	def test_surcharge_uses_configured_local_time_window(self):
@@ -84,6 +85,7 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(course.proposed_price, 500)
 		self.assertEqual(course.final_price, 575)
 		self.assertEqual(course.estimated_distance_km, 2.5)
+		self.assertEqual(course.vehicle_type, "moto")
 		self.assertEqual(CourseOffer.objects.filter(course=course).count(), 2)
 		self.assertEqual(CourseEvent.objects.filter(course=course, event_type="created").count(), 1)
 		self.assertEqual(send_notification.call_count, 2)
@@ -93,6 +95,47 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(notification_call.kwargs["course_id"], course.id)
 		self.assertEqual(notification_call.kwargs["notification_type"], "course_offer")
 		self.assertNotIn("extra_data", notification_call.kwargs)
+		recipients = [call.args[0] for call in send_notification.call_args_list]
+		self.assertTrue(all(isinstance(recipient, Livreur) for recipient in recipients))
+		self.assertEqual({recipient.vehicule for recipient in recipients}, {"moto"})
+
+	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
+	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
+	def test_quote_uses_route_distance_and_minimum(self, route, destination):
+		response = self.client_api.post("/api/courses/quote/", {
+			"destination": "Place des Martyrs, Alger",
+			"client_latitude": 36.75,
+			"client_longitude": 3.06,
+		}, format="json")
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.data["proposed_price"], Decimal("125"))
+		self.assertEqual(response.data["estimated_distance_km"], 2.5)
+		self.assertEqual(response.data["route_geometry"], [[3.06, 36.75], [3.07, 36.76]])
+		route.assert_called_once_with(36.75, 3.06, 36.76, 3.07)
+
+	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
+	@patch("deliveries.views.resolve_route", return_value=(2.5, None))
+	@patch("deliveries.views.send_livreur_notification")
+	def test_vehicle_type_limits_offers_and_notifications_for_car_and_truck(self, send_notification, route, destination):
+		for vehicle_type in ("voiture", "camion"):
+			with self.captureOnCommitCallbacks(execute=True):
+				response = self.create_request(
+					vehicle_type=vehicle_type,
+					request_key=f"request-{vehicle_type}",
+				)
+			self.assertEqual(response.status_code, 201)
+			course = Course.objects.get(pk=response.data["id"])
+			offers = CourseOffer.objects.filter(course=course).select_related("livreur")
+			self.assertEqual(course.vehicle_type, vehicle_type)
+			self.assertEqual({offer.livreur.vehicule for offer in offers}, {vehicle_type})
+			recipients = [call.args[0] for call in send_notification.call_args_list]
+			self.assertTrue(all(isinstance(recipient, Livreur) for recipient in recipients))
+			self.assertEqual(
+				{recipient.vehicule for recipient in recipients},
+				{vehicle_type},
+			)
+			send_notification.reset_mock()
 
 	@patch("deliveries.views.resolve_destination_label", return_value="الجزائر الوسطى")
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
@@ -121,7 +164,7 @@ class CourseRequestTests(TestCase):
 		course_response = self.create_request()
 		course_id = course_response.data["id"]
 
-		for driver in self.drivers:
+		for driver in self.drivers[:2]:
 			driver_api = APIClient()
 			driver_api.force_authenticate(driver.user)
 			accepted = driver_api.post(f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json")

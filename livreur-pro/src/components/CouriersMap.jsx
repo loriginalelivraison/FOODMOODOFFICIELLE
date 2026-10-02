@@ -3,6 +3,7 @@ import {
   MapContainer,
   TileLayer,
   Marker,
+  Polyline,
   Popup,
   useMap,
   useMapEvents,
@@ -192,6 +193,19 @@ function DestinationPicker({ active, clientPosition, onSelect }) {
   return null;
 }
 
+function RouteBounds({ positions }) {
+  const map = useMap();
+  const routeKey = positions.map(([latitude, longitude]) => `${latitude},${longitude}`).join("|");
+
+  useEffect(() => {
+    if (positions.length > 1) {
+      map.fitBounds(positions, { padding: [36, 36], maxZoom: 14 });
+    }
+  }, [map, routeKey]);
+
+  return null;
+}
+
 export default function CouriersMap({
   couriers = [],
   clientPosition,
@@ -200,6 +214,7 @@ export default function CouriersMap({
   selectingDestination = false,
   destinationPosition = null,
   onSelectDestination,
+  routeGeometry = null,
 }) {
   const navigate = useNavigate();
 
@@ -218,6 +233,18 @@ export default function CouriersMap({
   });
 
   const hasClientPosition = hasPosition(clientPosition);
+  const hasDestinationPosition = hasPosition(destinationPosition);
+  const route = Array.isArray(routeGeometry)
+    ? routeGeometry.map(([longitude, latitude]) => [latitude, longitude])
+    : [];
+  const routePositions = route.length > 1
+    ? route
+    : hasClientPosition && hasDestinationPosition
+      ? [
+          [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+          [Number(destinationPosition.latitude), Number(destinationPosition.longitude)],
+        ]
+      : [];
 
   const center = hasClientPosition
     ? [
@@ -266,6 +293,8 @@ export default function CouriersMap({
           onSelect={onSelectDestination}
         />
 
+        <RouteBounds positions={routePositions} />
+
         {hasClientPosition && (
           <Marker
             key="client-position"
@@ -281,13 +310,24 @@ export default function CouriersMap({
           </Marker>
         )}
 
-        {hasPosition(destinationPosition) && (
+        {hasDestinationPosition && (
           <Marker
             key="destination-position"
             position={[Number(destinationPosition.latitude), Number(destinationPosition.longitude)]}
           >
             <Popup>الوجهة المحددة</Popup>
           </Marker>
+        )}
+
+        {routePositions.length > 1 && (
+          <Polyline
+            positions={routePositions}
+            pathOptions={{
+              color: "#f97316",
+              weight: 5,
+              ...(route.length < 2 && { dashArray: "8 8" }),
+            }}
+          />
         )}
 
         {availableCouriers.map((courier) => (

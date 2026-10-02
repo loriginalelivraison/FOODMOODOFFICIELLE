@@ -112,6 +112,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "destination",
             "destination_latitude",
             "destination_longitude",
+            "vehicle_type",
             "estimated_distance_km",
             "route_geometry",
             "proposed_price",

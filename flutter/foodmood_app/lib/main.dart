@@ -49,7 +49,7 @@ InitializationSettings get notificationSettings => InitializationSettings(
 AndroidNotificationDetails notificationDetails({required bool courseOffer}) =>
     AndroidNotificationDetails(
       'high_importance_channel',
-      'Notifications livraisons',
+      'إشعارات التوصيل',
       channelDescription: 'إشعارات طلبات الرحلات الجديدة',
       importance: Importance.max,
       priority: Priority.high,
@@ -129,15 +129,15 @@ Future<void> main() async {
 Future<void> initializeBackgroundService() async {
   const AndroidNotificationChannel locationChannel = AndroidNotificationChannel(
     'foodmood_location',
-    'FoodMood localisation',
-    description: 'Service de localisation FoodMood en arrière-plan',
+    'موقع WinRak',
+    description: 'خدمة الموقع في الخلفية',
     importance: Importance.low,
   );
 
   const AndroidNotificationChannel fcmChannel = AndroidNotificationChannel(
     'high_importance_channel',
-    'Notifications livraisons',
-    description: 'Notifications des nouvelles demandes de livraison',
+    'إشعارات التوصيل',
+    description: 'إشعارات طلبات الرحلات الجديدة',
     importance: Importance.high,
   );
 
@@ -162,8 +162,8 @@ Future<void> initializeBackgroundService() async {
       autoStart: false,
       isForegroundMode: true,
       notificationChannelId: 'foodmood_location',
-      initialNotificationTitle: 'FoodMood actif',
-      initialNotificationContent: 'Partage de position en cours',
+      initialNotificationTitle: 'WinRak نشط',
+      initialNotificationContent: 'جارٍ مشاركة الموقع',
       foregroundServiceNotificationId: 888,
       foregroundServiceTypes: [
         AndroidForegroundType.location,
@@ -192,8 +192,8 @@ void onStart(ServiceInstance service) async {
     await service.setAsForegroundService();
 
     service.setForegroundNotificationInfo(
-      title: 'FoodMood actif',
-      content: 'Votre position est partagée',
+      title: 'WinRak نشط',
+      content: 'تمت مشاركة موقعك',
     );
   }
 

@@ -36,6 +36,15 @@ def adjusted_price(proposed_price, surcharge_percent):
     return (Decimal(proposed_price) * multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def suggested_price(distance):
+    minimum = Decimal(settings.COURSE_MIN_PRICE_DZD)
+    price_per_km = Decimal(settings.COURSE_PRICE_PER_KM_DZD)
+    distance_price = (Decimal(str(distance)) * price_per_km).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    )
+    return max(minimum, distance_price)
+
+
 def resolve_destination(destination):
     try:
         response = requests.get(

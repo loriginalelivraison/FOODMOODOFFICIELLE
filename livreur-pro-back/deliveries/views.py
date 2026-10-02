@@ -29,6 +29,7 @@ from .course_services import (
     resolve_destination,
     resolve_destination_label,
     resolve_route,
+    suggested_price,
 )
 
 
@@ -313,8 +314,8 @@ class CourseViewSet(ModelViewSet):
 
         send_livreur_notification(
             livreur,
-            "Nouvelle demande de livraison",
-            "Un client a confirmé la course. Ouvrez WinRak.",
+            "طلب توصيل جديد",
+            "أكد أحد العملاء الرحلة. افتح WinRak للاطلاع على التفاصيل.",
             course_id=course.id,
         )
 
@@ -351,6 +352,10 @@ class CourseViewSet(ModelViewSet):
         if destination_lat is not None and not (-90 <= destination_lat <= 90 and -180 <= destination_lon <= 180):
             return Response({"detail": "Coordonnées de destination invalides."}, status=400)
 
+        vehicle_type = str(request.data.get("vehicle_type", "voiture")).strip().lower()
+        if vehicle_type not in {"moto", "voiture", "camion"}:
+            return Response({"detail": "نوع المركبة غير صالح."}, status=400)
+
         request_key = str(request.data.get("request_key", "")).strip()[:64] or None
         if request_key:
             existing = Course.objects.filter(client=client, request_key=request_key).first()
@@ -379,6 +384,7 @@ class CourseViewSet(ModelViewSet):
                     destination=destination,
                     destination_latitude=destination_lat,
                     destination_longitude=destination_lon,
+                    vehicle_type=vehicle_type,
                     estimated_distance_km=estimated_distance,
                     route_geometry=route_geometry,
                     proposed_price=proposed_price,
@@ -391,11 +397,15 @@ class CourseViewSet(ModelViewSet):
                 record_course_event(course, "created", "client", client.id, new_status=course.status)
 
                 nearby_drivers = []
+                matching_vehicles = [vehicle_type]
+                if vehicle_type == "moto":
+                    matching_vehicles.append("scooter")
                 for driver in Livreur.objects.select_related("user").filter(
                     user__is_active=True,
                     fcm_token__gt="",
                     latitude__isnull=False,
                     longitude__isnull=False,
+                    vehicule__in=matching_vehicles,
                 ):
                     driver_distance = distance_km(start_lat, start_lon, driver.latitude, driver.longitude)
                     if driver_distance <= settings.COURSE_SEARCH_RADIUS_KM:
@@ -427,6 +437,50 @@ class CourseViewSet(ModelViewSet):
             raise exc
 
         return Response(self.get_serializer(course).data, status=201)
+
+    @action(detail=False, methods=["post"], permission_classes=[AllowAny])
+    def quote(self, request):
+        destination = str(request.data.get("destination", "")).strip()
+        try:
+            start_lat = float(request.data["client_latitude"])
+            start_lon = float(request.data["client_longitude"])
+        except (KeyError, TypeError, ValueError):
+            return Response({"detail": "Position GPS invalide."}, status=400)
+        try:
+            destination_lat = float(request.data["destination_latitude"])
+            destination_lon = float(request.data["destination_longitude"])
+        except (KeyError, TypeError, ValueError):
+            destination_lat = destination_lon = None
+
+        if not destination and destination_lat is None:
+            return Response({"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400)
+        if not (-90 <= start_lat <= 90 and -180 <= start_lon <= 180):
+            return Response({"detail": "Coordonnées GPS invalides."}, status=400)
+        if destination_lat is not None and not (-90 <= destination_lat <= 90 and -180 <= destination_lon <= 180):
+            return Response({"detail": "Coordonnées de destination invalides."}, status=400)
+        if destination_lat is None:
+            destination_position = resolve_destination(destination)
+            if not destination_position:
+                return Response({"detail": "Destination introuvable. Vérifiez l’adresse puis réessayez."}, status=422)
+            destination_lat, destination_lon = destination_position
+        elif not destination:
+            destination = (resolve_destination_label(destination_lat, destination_lon) or "موقع محدد على الخريطة")[:255]
+
+        estimated_distance, route_geometry = resolve_route(
+            start_lat, start_lon, destination_lat, destination_lon
+        )
+        price = suggested_price(estimated_distance)
+        surcharge_percent = current_surcharge_percent()
+        return Response({
+            "destination": destination,
+            "destination_latitude": destination_lat,
+            "destination_longitude": destination_lon,
+            "estimated_distance_km": estimated_distance,
+            "route_geometry": route_geometry,
+            "proposed_price": price,
+            "surcharge_percent": surcharge_percent,
+            "final_price": adjusted_price(price, surcharge_percent),
+        })
 
     @action(detail=False, methods=["get"])
     def offers(self, request):

@@ -406,6 +406,30 @@ export async function createCourseRequest(request) {
   return data;
 }
 
+export async function getCourseQuote(request) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/courses/quote/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+  } catch {
+    throw new Error("تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.");
+  } finally {
+    clearTimeout(timeout);
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail || data.error, "تعذر حساب سعر الرحلة."));
+  }
+  return data;
+}
+
 export async function getCourseOffers() {
   const response = await fetch(`${API_BASE_URL}/courses/offers/`, {
     headers: authHeaders(),
