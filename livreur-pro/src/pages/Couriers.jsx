@@ -54,6 +54,7 @@ export default function Couriers() {
   const [searchingLocation, setSearchingLocation] = useState(false);
   const [destinationPosition, setDestinationPosition] = useState(null);
   const [destination, setDestination] = useState("");
+  const [destinationConfirmed, setDestinationConfirmed] = useState(false);
   const [selectingDestination, setSelectingDestination] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [proposedPrice, setProposedPrice] = useState("");
@@ -90,7 +91,7 @@ export default function Couriers() {
   }
 
   useEffect(() => {
-    if (!clientPosition || !selectedVehicle || !hasDestination || requestedCourseId) {
+    if (!clientPosition || !selectedVehicle || !hasDestination || !destinationConfirmed || requestedCourseId) {
       setPriceQuote(null);
       setProposedPrice("");
       setPriceCalculating(false);
@@ -135,7 +136,7 @@ export default function Couriers() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [clientPosition, destination, destinationPosition, hasDestination, quoteRevision, requestedCourseId, selectedVehicle]);
+  }, [clientPosition, destination, destinationConfirmed, destinationPosition, hasDestination, quoteRevision, requestedCourseId, selectedVehicle]);
 
   useEffect(() => {
     if (!priceQuote) return undefined;
@@ -459,9 +460,11 @@ export default function Couriers() {
             onSelectDestination={(position) => {
               setDestinationPosition(position);
               setDestination("");
+              setDestinationConfirmed(false);
+              setSelectingDestination(false);
               setPriceQuote(null);
               setProposedPrice("");
-              setPriceCalculating(Boolean(selectedVehicle));
+              setPriceCalculating(false);
               setBookingError("");
             }}
           />
@@ -488,7 +491,34 @@ export default function Couriers() {
         </section>
       )}
 
+      {!requestedCourseId && !quoteRequestActive && !destinationPosition && (
+        <p className="destination-choice-hint" dir="rtl">
+          أدخل وجهتك في الحقل أو اخترها من الخريطة
+        </p>
+      )}
+
       {!requestedCourseId && !quoteRequestActive && <div className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
+        {!destinationPosition && (
+          <label className="destination-text-field">
+            <input
+              type="text"
+              value={destination}
+              onChange={(event) => {
+                setDestination(event.target.value);
+                setDestinationPosition(null);
+                setDestinationConfirmed(false);
+                setSelectingDestination(false);
+                setPriceQuote(null);
+                setProposedPrice("");
+                setPriceCalculating(false);
+              }}
+              placeholder="الوجهة أو العنوان"
+              aria-label=" الوجهة أو العنوان"
+              maxLength={255}
+              disabled={!clientPosition}
+            />
+          </label>
+        )}
         <button
           type="button"
           className={selectingDestination ? "destination-picker-active" : ""}
@@ -501,27 +531,21 @@ export default function Couriers() {
             ? "تغيير الوجهة على الخريطة"
             : "اختيار من الخريطة"}
         </button>
-        {!destinationPosition && (
-          <label className="destination-text-field">
-            <input
-              type="text"
-              value={destination}
-              onChange={(event) => {
-                setDestination(event.target.value);
-                setDestinationPosition(null);
-                setSelectingDestination(false);
-                setPriceQuote(null);
-                setProposedPrice("");
-                setPriceCalculating(Boolean(selectedVehicle && event.target.value.trim()));
-              }}
-              placeholder="اكتب المكان أو العنوان"
-              aria-label="اكتب المكان أو العنوان"
-              maxLength={255}
-              disabled={!clientPosition}
-            />
-          </label>
-        )}
       </div>}
+
+      {!requestedCourseId && !quoteRequestActive && hasDestination && !destinationConfirmed && (
+        <button
+          className="destination-confirm-button"
+          type="button"
+          disabled={!clientPosition}
+          onClick={() => {
+            setBookingError("");
+            setDestinationConfirmed(true);
+          }}
+        >
+          تأكيد الوجهة
+        </button>
+      )}
 
       <section className="course-request-panel" aria-labelledby="course-request-title">
         {!requestedCourseId && selectedVehicle && hasDestination && priceCalculating && (
