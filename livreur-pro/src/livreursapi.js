@@ -78,6 +78,8 @@ export async function loginJWT(credentials) {
 
   const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
 
+  await clearCurrentDriverFcmToken();
+
   localStorage.clear();
 
   if (redirectAfterLogin) {
@@ -153,6 +155,34 @@ export async function updateLivreurPosition(id, position) {
   }
 
   return data;
+}
+
+export async function clearLivreurFcmToken(id) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/clear_fcm_token/`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail || data.error, "تعذر إيقاف إشعارات السائق."));
+  }
+
+  return data;
+}
+
+export async function clearCurrentDriverFcmToken() {
+  if (localStorage.getItem("role") !== "livreur") return;
+
+  let livreur;
+  try {
+    livreur = JSON.parse(localStorage.getItem("livreur") || "null");
+  } catch {
+    return;
+  }
+
+  if (livreur?.id) return clearLivreurFcmToken(livreur.id);
 }
 
 export async function getLivreurBytelephone(telephone) {
@@ -265,6 +295,8 @@ export async function loginClient(credentials) {
   }
 
   const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
+
+  await clearCurrentDriverFcmToken();
 
   localStorage.clear();
 

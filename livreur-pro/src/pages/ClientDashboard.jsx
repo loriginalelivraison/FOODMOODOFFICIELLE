@@ -3,6 +3,7 @@ import {
   deleteClient,
   getClientCourses,
   getCommentairesLivreur,
+  clearCurrentDriverFcmToken,
 } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 import LogoutButton from "../components/LogoutButton.jsx";
@@ -109,7 +110,8 @@ export default function ClientDashboard() {
   }
 
 
- function logout() {
+ async function logout() {
+  await clearCurrentDriverFcmToken();
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
 

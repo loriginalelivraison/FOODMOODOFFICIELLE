@@ -1,10 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { clearCurrentDriverFcmToken } from "../livreursapi.js";
 
 export default function LogoutButton() {
   const navigate = useNavigate();
 
- function logout() {
+ async function logout() {
+  await clearCurrentDriverFcmToken();
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
 

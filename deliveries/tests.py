@@ -60,6 +60,30 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(current_surcharge_percent(datetime(2026, 1, 2, 5, 59, tzinfo=local_zone)), Decimal("15"))
 		self.assertEqual(current_surcharge_percent(datetime(2026, 1, 2, 6, 0, tzinfo=local_zone)), Decimal("0"))
 
+	def test_driver_fcm_token_is_cleared_and_unique_to_current_driver(self):
+		previous_token = self.drivers[0].fcm_token
+		previous_driver_api = APIClient()
+		previous_driver_api.force_authenticate(self.drivers[0].user)
+		cleared = previous_driver_api.delete(
+			f"/api/livreurs/{self.drivers[0].id}/clear_fcm_token/"
+		)
+		self.assertEqual(cleared.status_code, 200)
+		self.drivers[0].refresh_from_db()
+		self.assertIsNone(self.drivers[0].fcm_token)
+
+		current_driver_api = APIClient()
+		current_driver_api.force_authenticate(self.drivers[1].user)
+		updated = current_driver_api.patch(
+			f"/api/livreurs/{self.drivers[1].id}/update_fcm_token/",
+			{"fcm_token": previous_token},
+			format="json",
+		)
+		self.assertEqual(updated.status_code, 200)
+		self.drivers[0].refresh_from_db()
+		self.drivers[1].refresh_from_db()
+		self.assertIsNone(self.drivers[0].fcm_token)
+		self.assertEqual(self.drivers[1].fcm_token, previous_token)
+
 	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
 	def test_quote_is_public_and_returns_route_geometry(self, route, destination):

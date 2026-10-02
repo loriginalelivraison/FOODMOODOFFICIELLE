@@ -8,6 +8,7 @@ import {
   getActiveCoursesForLivreur,
   getCourseOffers,
   respondToCourseOffer,
+  clearCurrentDriverFcmToken,
 } from "../livreursapi.js";
 import LogoutButton from "../components/LogoutButton.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -417,7 +418,14 @@ export default function LivreurDashboard() {
     }
   }
 
-  function logout() {
+  async function logout() {
+  try {
+    await clearCurrentDriverFcmToken();
+  } catch (err) {
+    setError(err.message || "تعذر إيقاف إشعارات السائق. أعد المحاولة.");
+    return;
+  }
+
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
 

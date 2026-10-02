@@ -120,6 +120,7 @@ class LivreurViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        Livreur.objects.exclude(pk=livreur.pk).filter(fcm_token=token).update(fcm_token=None)
         livreur.fcm_token = token
         livreur.save(update_fields=["fcm_token"])
 
@@ -127,6 +128,17 @@ class LivreurViewSet(ModelViewSet):
             "success": True,
             "message": "FCM token enregistré",
         })
+
+    @action(detail=True, methods=["delete"], url_path="clear_fcm_token")
+    def clear_fcm_token(self, request, pk=None):
+        livreur = self.get_object()
+
+        if livreur.user != request.user:
+            return Response({"error": "Accès interdit"}, status=403)
+
+        livreur.fcm_token = None
+        livreur.save(update_fields=["fcm_token"])
+        return Response({"success": True})
 
 
 class DemandeLivraisonViewSet(ModelViewSet):

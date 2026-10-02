@@ -204,7 +204,10 @@ export default function Couriers() {
 
     return availableCouriers;
   }, [couriers, clientPosition]);
-  const visibleCouriers = nearbyCouriers.slice(0, visibleCourierCount);
+  const matchingCouriers = selectedVehicle
+    ? nearbyCouriers.filter((courier) => courier.vehicle === selectedVehicle)
+    : nearbyCouriers;
+  const visibleCouriers = matchingCouriers.slice(0, visibleCourierCount);
 
   useEffect(() => {
     if (!requestedCourseId) return;
@@ -446,7 +449,7 @@ export default function Couriers() {
 
       {shouldShowMap && <div className="couriers-map-frame">
           <CouriersMap
-            couriers={nearbyCouriers.filter((courier) => courier.vehicle === selectedVehicle || (selectedVehicle === "moto" && courier.vehicle === "scooter"))}
+            couriers={matchingCouriers}
             clientPosition={clientPosition}
             onRequestClientPosition={handleFindAroundMe}
             isLocating={searchingLocation}
@@ -464,7 +467,28 @@ export default function Couriers() {
           />
       </div>}
 
-      {!requestedCourseId && !quoteRequestActive && <div className="destination-picker-controls" dir="rtl">
+      {!requestedCourseId && !quoteRequestActive && (
+        <section className="course-vehicle-section" aria-labelledby="course-vehicle-title">
+          <h2 id="course-vehicle-title">اختر نوع المركبة</h2>
+          <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
+            {VEHICLE_TYPES.map(({ value, label, icon: Icon }) => (
+              <button
+                className={`vehicle-type-option ${selectedVehicle === value ? "selected" : ""}`}
+                type="button"
+                key={value}
+                aria-pressed={selectedVehicle === value}
+                disabled={!clientPosition}
+                onClick={() => setSelectedVehicle(value)}
+              >
+                <Icon size={23} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!requestedCourseId && !quoteRequestActive && <div className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
         <button
           type="button"
           className={selectingDestination ? "destination-picker-active" : ""}
@@ -475,54 +499,31 @@ export default function Couriers() {
             ? "إنهاء التحديد"
             : destinationPosition
             ? "تغيير الوجهة على الخريطة"
-            : "تحديد الوجهة على الخريطة"}
+            : "اختيار من الخريطة"}
         </button>
         {!destinationPosition && (
-          <>
-            <span className="destination-choice-divider">أو</span>
-            <label className="destination-text-field">
-              <span>أدخل الوجهة</span>
-              <input
-                type="text"
-                value={destination}
-                onChange={(event) => {
-                  setDestination(event.target.value);
-                  setDestinationPosition(null);
-                  setSelectingDestination(false);
-                  setPriceQuote(null);
-                  setProposedPrice("");
-                  setPriceCalculating(Boolean(selectedVehicle && event.target.value.trim()));
-                }}
-                placeholder="اسم المكان أو العنوان"
-                maxLength={255}
-                disabled={!clientPosition}
-              />
-            </label>
-          </>
+          <label className="destination-text-field">
+            <input
+              type="text"
+              value={destination}
+              onChange={(event) => {
+                setDestination(event.target.value);
+                setDestinationPosition(null);
+                setSelectingDestination(false);
+                setPriceQuote(null);
+                setProposedPrice("");
+                setPriceCalculating(Boolean(selectedVehicle && event.target.value.trim()));
+              }}
+              placeholder="اكتب المكان أو العنوان"
+              aria-label="اكتب المكان أو العنوان"
+              maxLength={255}
+              disabled={!clientPosition}
+            />
+          </label>
         )}
       </div>}
 
       <section className="course-request-panel" aria-labelledby="course-request-title">
-        {!requestedCourseId && !quoteRequestActive && <div className="course-request-heading">
-          <h2 id="course-request-title">اختر نوع المركبة</h2>
-        </div>}
-
-        {!requestedCourseId && !quoteRequestActive && <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
-          {VEHICLE_TYPES.map(({ value, label, icon: Icon }) => (
-            <button
-              className={`vehicle-type-option ${selectedVehicle === value ? "selected" : ""}`}
-              type="button"
-              key={value}
-              aria-pressed={selectedVehicle === value}
-              disabled={!clientPosition}
-              onClick={() => setSelectedVehicle(value)}
-            >
-              <Icon size={23} aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>}
-
         {!requestedCourseId && selectedVehicle && hasDestination && priceCalculating && (
           <div className="course-price-loading" role="status" aria-live="polite">
             <LoadingSpinner label="" size={34} />
@@ -703,7 +704,7 @@ export default function Couriers() {
         <h2 id="nearby-couriers-title">السائقون المتاحون حولك</h2>
         {couriersLoading && <LoadingSpinner label="جاري تحميل السائقين..." />}
         {couriersError && <p className="course-request-error" role="alert">{couriersError}</p>}
-        {!couriersLoading && !couriersError && nearbyCouriers.length === 0 && (
+        {!couriersLoading && !couriersError && matchingCouriers.length === 0 && (
           <p className="nearby-couriers-empty">لا يوجد سائقون متاحون بالقرب منك حالياً.</p>
         )}
         <div className="courier-grid">
@@ -711,7 +712,7 @@ export default function Couriers() {
             <CourierCard courier={courier} key={courier.id} />
           ))}
         </div>
-        {nearbyCouriers.length > visibleCourierCount && (
+        {matchingCouriers.length > visibleCourierCount && (
           <button
             className="course-request-submit nearby-couriers-more"
             type="button"

@@ -17,7 +17,7 @@
   margin-inline: auto;
 }
 .couriers-map-frame {
-  height: clamp(320px, 52vh, 560px);
+  height: clamp(220px, 38vh, 420px);
   overflow: hidden;
   border: 1px solid #d6e1df;
   border-radius: 9px;
@@ -63,6 +63,20 @@
 .nearby-couriers-more {
   display: block;
   margin: 14px auto 0;
+}
+.course-vehicle-section {
+  margin-top: 9px;
+  padding: 12px;
+  border: 1px solid #d6e1df;
+  border-top: 3px solid #f97316;
+  border-radius: 8px;
+  background: #fff;
+}
+.course-vehicle-section h2 {
+  margin: 0;
+  color: #18252c;
+  font-size: 18px;
+  font-weight: 800;
 }
 .course-request-panel {
   margin: 12px 0 16px;
@@ -120,13 +134,13 @@
 }
 .course-request-form label {
   display: grid;
-  gap: 4px;
+  gap: 7px;
   color: #263940;
-  font-size: 11px;
-  font-weight: 750;
+  font-size: 14px;
+  font-weight: 800;
 }
-.course-request-form label > span { color: #68777d; font-weight: 500; }
-.course-request-form label > .course-quote-distance { color: #176b53; font-size: 12px; font-weight: 700; }
+.course-request-form label > span { color: #53646b; font-weight: 600; }
+.course-request-form label > .course-quote-distance { color: #176b53; font-size: 14px; font-weight: 750; }
 .course-request-form input {
   width: 100%;
   min-height: 44px;
@@ -179,13 +193,13 @@
   border: 0;
   border-radius: 0;
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   outline: none;
   appearance: textfield;
   -moz-appearance: textfield;
 }
-.course-price-field > span { flex: 0 0 auto; font-size: 10px; font-weight: 800; }
+.course-price-field > span { flex: 0 0 auto; font-size: 12px; font-weight: 800; }
 .course-price-stepper input::-webkit-inner-spin-button,
 .course-price-stepper input::-webkit-outer-spin-button { margin: 0; appearance: none; }
 .course-price-error { color: #b42318; font-weight: 650; }
@@ -197,7 +211,7 @@
   border-radius: 6px;
   background: #f97316;
   color: white;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 750;
   cursor: pointer;
 }
@@ -206,12 +220,12 @@
 .vehicle-type-selector {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 .vehicle-type-option {
   display: grid;
-  min-height: 72px;
+  min-height: 68px;
   place-items: center;
   align-content: center;
   gap: 6px;
@@ -219,7 +233,7 @@
   border-radius: 7px;
   background: #fff;
   color: #3d5056;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -240,22 +254,24 @@
 }
 .course-quote-retry { margin-top: 10px; color: #b54708; }
 .destination-picker-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 8px;
-  margin: 10px 0 0;
+  margin: 9px 0 0;
 }
+.destination-picker-controls.destination-only { grid-template-columns: minmax(0, 1fr); }
 .destination-picker-controls button {
-  flex: 1 1 100%;
-  min-height: 44px;
-  padding: 9px 14px;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  padding: 6px;
   border: 1px solid #f97316;
   border-radius: 6px;
   background: #fff;
   color: #c2410c;
-  font-size: 14px;
-  font-weight: 750;
+  font-size: 13px;
+  font-weight: 800;
   cursor: pointer;
 }
 .destination-picker-controls button.destination-picker-active {
@@ -265,27 +281,25 @@
 .destination-choice-divider {
   flex: 1 1 100%;
   color: #7b8581;
-  font-size: 12px;
+  font-size: 14px;
   text-align: center;
 }
 .destination-text-field {
-  display: grid;
-  flex: 1 1 100%;
-  gap: 5px;
-  color: #263940;
-  font-size: 12px;
-  font-weight: 750;
+  display: block;
+  min-width: 0;
 }
 .destination-text-field input {
   width: 100%;
-  min-height: 44px;
-  padding: 9px 11px;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  padding: 6px 8px;
   border: 1px solid #cbd8d4;
   border-radius: 7px;
   background: #fff;
   color: #18252c;
   outline-color: #f97316;
-  font-size: 14px;
+  font-size: 13px;
 }
 .destination-picker-controls button.destination-picker-clear {
   border-color: #d9e1e6;
@@ -367,7 +381,8 @@
 .course-inline-cancel button { min-height: 38px; padding: 7px 12px; border: 0; border-radius: 5px; background: #a52b27; color: white; font-weight: 750; cursor: pointer; }
 .course-inline-cancel button:disabled { opacity: .6; cursor: wait; }
 @media (max-width: 700px) {
-  .couriers-map-frame { height: min(48vh, 460px); min-height: 320px; }
+  .couriers-map-frame { height: clamp(155px, 26vh, 240px); min-height: 155px; }
+  .course-vehicle-section { padding: 11px; }
   .course-request-panel { padding: 12px; }
   .course-request-heading { align-items: center; flex-direction: row; justify-content: space-between; gap: 8px; }
   .gps-status { justify-content: flex-end; text-align: right; }
