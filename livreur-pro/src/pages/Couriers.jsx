@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bike, CarFront, Truck } from "lucide-react";
+import { Bike, CarFront, Minus, Plus, Truck } from "lucide-react";
 import {
   createCourseRequest,
   cancelCourse,
@@ -19,6 +19,7 @@ import {
 } from "../utils/geolocation.js";
 
 const MIN_COURSE_PRICE_DZD = 100;
+const PRICE_ADJUSTMENT_DZD = 50;
 const DRIVER_RESPONSE_WINDOW_SECONDS = 50;
 const VEHICLE_TYPES = [
   { value: "moto", label: "دراجة نارية", icon: Bike },
@@ -59,9 +60,7 @@ export default function Couriers() {
   const [priceQuote, setPriceQuote] = useState(null);
   const [priceCalculating, setPriceCalculating] = useState(false);
   const [quoteRequestActive, setQuoteRequestActive] = useState(false);
-  const [routePreviewVisible, setRoutePreviewVisible] = useState(false);
-  const [showPriceRoute, setShowPriceRoute] = useState(false);
-  const routePreviewTimeoutRef = useRef(null);
+  const priceFormRef = useRef(null);
   const [quoteRevision, setQuoteRevision] = useState(0);
   const [bookingError, setBookingError] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -81,18 +80,13 @@ export default function Couriers() {
         longitude: priceQuote.destination_longitude,
       }
     : destinationPosition;
-  const shouldShowMap = !requestedCourseId && (
-    !priceQuote || routePreviewVisible || showPriceRoute
-  );
+  const shouldShowMap = !requestedCourseId;
 
-  function togglePriceRoute() {
-    if (routePreviewVisible || showPriceRoute) {
-      clearTimeout(routePreviewTimeoutRef.current);
-      setRoutePreviewVisible(false);
-      setShowPriceRoute(false);
-      return;
-    }
-    setShowPriceRoute(true);
+  function adjustProposedPrice(amount) {
+    setProposedPrice((currentValue) => {
+      const currentPrice = Number(currentValue || priceQuote?.proposed_price || MIN_COURSE_PRICE_DZD);
+      return String(Math.max(MIN_COURSE_PRICE_DZD, currentPrice + amount));
+    });
   }
 
   useEffect(() => {
@@ -109,8 +103,6 @@ export default function Couriers() {
     setProposedPrice("");
     setPriceCalculating(true);
     setQuoteRequestActive(false);
-    setRoutePreviewVisible(false);
-    setShowPriceRoute(false);
     setBookingError("");
 
     const timeout = setTimeout(async () => {
@@ -129,10 +121,6 @@ export default function Couriers() {
         if (cancelled) return;
         setPriceQuote(quote);
         setProposedPrice(String(quote.proposed_price));
-        setRoutePreviewVisible(true);
-        setShowPriceRoute(false);
-        clearTimeout(routePreviewTimeoutRef.current);
-        routePreviewTimeoutRef.current = setTimeout(() => setRoutePreviewVisible(false), 1600);
       } catch (error) {
         if (!cancelled) setBookingError(error.message || "تعذر حساب سعر الرحلة.");
       } finally {
@@ -148,6 +136,15 @@ export default function Couriers() {
       clearTimeout(timeout);
     };
   }, [clientPosition, destination, destinationPosition, hasDestination, quoteRevision, requestedCourseId, selectedVehicle]);
+
+  useEffect(() => {
+    if (!priceQuote) return undefined;
+
+    const frame = requestAnimationFrame(() => {
+      priceFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [priceQuote]);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,7 +427,6 @@ export default function Couriers() {
       handleFindAroundMe({ watch: false });
     }
     return () => {
-      clearTimeout(routePreviewTimeoutRef.current);
       if (clientWatchRef.current !== null) {
         navigator.geolocation.clearWatch(clientWatchRef.current);
       }
@@ -463,15 +459,12 @@ export default function Couriers() {
               setPriceQuote(null);
               setProposedPrice("");
               setPriceCalculating(Boolean(selectedVehicle));
-              setRoutePreviewVisible(false);
-              setShowPriceRoute(false);
-              clearTimeout(routePreviewTimeoutRef.current);
               setBookingError("");
             }}
           />
       </div>}
 
-      {!requestedCourseId && !priceQuote && !quoteRequestActive && <div className="destination-picker-controls" dir="rtl">
+      {!requestedCourseId && !quoteRequestActive && <div className="destination-picker-controls" dir="rtl">
         <button
           type="button"
           className={selectingDestination ? "destination-picker-active" : ""}
@@ -499,9 +492,6 @@ export default function Couriers() {
                   setPriceQuote(null);
                   setProposedPrice("");
                   setPriceCalculating(Boolean(selectedVehicle && event.target.value.trim()));
-                  setRoutePreviewVisible(false);
-                  setShowPriceRoute(false);
-                  clearTimeout(routePreviewTimeoutRef.current);
                 }}
                 placeholder="اسم المكان أو العنوان"
                 maxLength={255}
@@ -513,11 +503,11 @@ export default function Couriers() {
       </div>}
 
       <section className="course-request-panel" aria-labelledby="course-request-title">
-        {!requestedCourseId && !priceQuote && !quoteRequestActive && <div className="course-request-heading">
+        {!requestedCourseId && !quoteRequestActive && <div className="course-request-heading">
           <h2 id="course-request-title">اختر نوع المركبة</h2>
         </div>}
 
-        {!requestedCourseId && !priceQuote && !quoteRequestActive && <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
+        {!requestedCourseId && !quoteRequestActive && <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
           {VEHICLE_TYPES.map(({ value, label, icon: Icon }) => (
             <button
               className={`vehicle-type-option ${selectedVehicle === value ? "selected" : ""}`}
@@ -541,17 +531,41 @@ export default function Couriers() {
         )}
 
         {!requestedCourseId && priceQuote && !priceCalculating && (
-          <form className="course-request-form" onSubmit={handleRequestCourse}>
+          <form ref={priceFormRef} className="course-request-form" onSubmit={handleRequestCourse}>
             <label>
               السعر المقترح (دج)
-              <input
-                type="number"
-                value={proposedPrice}
-                onChange={(event) => setProposedPrice(event.target.value)}
-                min={MIN_COURSE_PRICE_DZD}
-                step="1"
-                required
-              />
+              <span className="course-price-stepper" dir="ltr">
+                <button
+                  type="button"
+                  aria-label="زيادة السعر"
+                  title="زيادة السعر"
+                  disabled={bookingLoading}
+                  onClick={() => adjustProposedPrice(PRICE_ADJUSTMENT_DZD)}
+                >
+                  <Plus size={17} aria-hidden="true" />
+                </button>
+                <span className="course-price-field" dir="rtl">
+                  <input
+                    type="number"
+                    value={proposedPrice}
+                    onChange={(event) => setProposedPrice(event.target.value)}
+                    min={MIN_COURSE_PRICE_DZD}
+                    step="1"
+                    required
+                    aria-label="السعر المقترح بالدينار الجزائري"
+                  />
+                  <span aria-hidden="true">دج</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label="خفض السعر"
+                  title="خفض السعر"
+                  disabled={bookingLoading || Number(proposedPrice) <= MIN_COURSE_PRICE_DZD}
+                  onClick={() => adjustProposedPrice(-PRICE_ADJUSTMENT_DZD)}
+                >
+                  <Minus size={17} aria-hidden="true" />
+                </button>
+              </span>
               <span className="course-quote-distance">المسافة التقديرية: {priceQuote.estimated_distance_km} كم</span>
               {proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD && (
                 <small className="course-price-error">الحد الأدنى للسعر هو {MIN_COURSE_PRICE_DZD} دج.</small>
@@ -565,11 +579,6 @@ export default function Couriers() {
               {bookingLoading ? "جارٍ إرسال الطلب…" : "ابحث عن سائق"}
             </button>
           </form>
-        )}
-        {!requestedCourseId && priceQuote && !priceCalculating && (
-          <button className="course-route-toggle" type="button" onClick={togglePriceRoute}>
-            {routePreviewVisible || showPriceRoute ? "إخفاء المسار" : "عرض المسار على الخريطة"}
-          </button>
         )}
         {!requestedCourseId && !priceCalculating && hasDestination && !priceQuote && bookingError && (
           <button className="course-quote-retry" type="button" onClick={() => setQuoteRevision((revision) => revision + 1)}>

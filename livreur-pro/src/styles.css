@@ -138,6 +138,56 @@
   outline-color: #f97316;
   font-size: 14px;
 }
+.course-price-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+}
+.course-price-stepper button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #1976bd;
+  color: #fff;
+  cursor: pointer;
+}
+.course-price-stepper button:hover:not(:disabled) { background: #125e99; }
+.course-price-stepper button:disabled { opacity: .45; cursor: not-allowed; }
+.course-price-field {
+  display: inline-flex;
+  width: 82px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border: 1px solid #29343b;
+  border-radius: 999px;
+  background: #fff;
+  color: #18252c;
+}
+.course-price-stepper .course-price-field input {
+  width: 48px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.course-price-field > span { flex: 0 0 auto; font-size: 10px; font-weight: 800; }
+.course-price-stepper input::-webkit-inner-spin-button,
+.course-price-stepper input::-webkit-outer-spin-button { margin: 0; appearance: none; }
 .course-price-error { color: #b42318; font-weight: 650; }
 .course-request-submit,
 .accepted-driver button {
@@ -189,18 +239,6 @@
   color: #754316;
 }
 .course-quote-retry { margin-top: 10px; color: #b54708; }
-.course-route-toggle {
-  min-height: 40px;
-  margin-top: 10px;
-  padding: 8px 12px;
-  border: 1px solid #f97316;
-  border-radius: 6px;
-  background: #fff;
-  color: #b54708;
-  font-size: 13px;
-  font-weight: 750;
-  cursor: pointer;
-}
 .destination-picker-controls {
   display: flex;
   align-items: center;

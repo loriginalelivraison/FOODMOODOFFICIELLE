@@ -44,14 +44,14 @@ class CourseRequestTests(TestCase):
 				fcm_token=f"token-{index}",
 			))
 
-	def create_request(self, price=500):
+	def create_request(self, price=500, vehicle_type="moto", request_key="client-request-1"):
 		return self.client_api.post("/api/courses/request/", {
 			"destination": "Place des Martyrs, Alger",
 			"proposed_price": price,
 			"client_latitude": 36.75,
 			"client_longitude": 3.06,
-			"request_key": "client-request-1",
-			"vehicle_type": "moto",
+			"request_key": request_key,
+			"vehicle_type": vehicle_type,
 		}, format="json")
 
 	def test_surcharge_uses_configured_local_time_window(self):
@@ -75,6 +75,42 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(response.data["estimated_distance_km"], 2.5)
 		self.assertEqual(response.data["route_geometry"], [[3.06, 36.75], [3.07, 36.76]])
 		route.assert_called_once_with(36.75, 3.06, 36.76, 3.07)
+
+	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
+	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
+	@patch("deliveries.views.send_livreur_notification")
+	def test_only_matching_vehicle_drivers_receive_search_notifications(self, send_notification, route, destination):
+		for index, vehicle_type in enumerate(("voiture", "camion"), start=3):
+			user = User.objects.create_user(username=f"driver{index}", password="pass")
+			matching_driver = Livreur.objects.create(
+				user=user,
+				nom=f"Chauffeur {vehicle_type}",
+				telephone=f"055500000{index + 1}",
+				ville="Alger",
+				vehicule=vehicle_type,
+				disponible=True,
+				latitude=36.751,
+				longitude=3.06,
+				fcm_token=f"token-{vehicle_type}",
+			)
+			with self.captureOnCommitCallbacks(execute=True):
+				response = self.create_request(
+					vehicle_type=vehicle_type,
+					request_key=f"request-{vehicle_type}",
+				)
+
+			self.assertEqual(response.status_code, 201)
+			course = Course.objects.get(pk=response.data["id"])
+			self.assertEqual(course.vehicle_type, vehicle_type)
+			self.assertEqual(
+				list(CourseOffer.objects.filter(course=course).values_list("livreur_id", flat=True)),
+				[matching_driver.id],
+			)
+			self.assertEqual(
+				[call.args[0].id for call in send_notification.call_args_list],
+				[matching_driver.id],
+			)
+			send_notification.reset_mock()
 
 	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
