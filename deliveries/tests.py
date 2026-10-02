@@ -51,6 +51,7 @@ class CourseRequestTests(TestCase):
 			"client_latitude": 36.75,
 			"client_longitude": 3.06,
 			"request_key": "client-request-1",
+			"vehicle_type": "moto",
 		}, format="json")
 
 	def test_surcharge_uses_configured_local_time_window(self):
@@ -58,6 +59,22 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(current_surcharge_percent(datetime(2026, 1, 1, 22, 0, tzinfo=local_zone)), Decimal("15"))
 		self.assertEqual(current_surcharge_percent(datetime(2026, 1, 2, 5, 59, tzinfo=local_zone)), Decimal("15"))
 		self.assertEqual(current_surcharge_percent(datetime(2026, 1, 2, 6, 0, tzinfo=local_zone)), Decimal("0"))
+
+	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
+	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))
+	def test_quote_is_public_and_returns_route_geometry(self, route, destination):
+		anonymous_client = APIClient()
+		response = anonymous_client.post("/api/courses/quote/", {
+			"destination": "Place des Martyrs, Alger",
+			"client_latitude": 36.75,
+			"client_longitude": 3.06,
+		}, format="json")
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.data["proposed_price"], Decimal("125"))
+		self.assertEqual(response.data["estimated_distance_km"], 2.5)
+		self.assertEqual(response.data["route_geometry"], [[3.06, 36.75], [3.07, 36.76]])
+		route.assert_called_once_with(36.75, 3.06, 36.76, 3.07)
 
 	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))

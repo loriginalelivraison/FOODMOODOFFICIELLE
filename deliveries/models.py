@@ -146,6 +146,11 @@ class Course(models.Model):
     destination = models.CharField(max_length=255, blank=True)
     destination_latitude = models.FloatField(null=True, blank=True)
     destination_longitude = models.FloatField(null=True, blank=True)
+    vehicle_type = models.CharField(
+        max_length=20,
+        choices=[("moto", "Moto"), ("voiture", "Voiture"), ("camion", "Camion")],
+        default="voiture",
+    )
     estimated_distance_km = models.FloatField(null=True, blank=True)
     route_geometry = models.JSONField(null=True, blank=True)
     proposed_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
