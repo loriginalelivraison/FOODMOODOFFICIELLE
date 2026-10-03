@@ -79,6 +79,10 @@ function CourseTrackingPanel({
   submittingReview,
   reviewError,
   onNewRequest,
+  hasCalledDriver,
+  onDriverCall,
+  arrivalConfirmed,
+  onConfirmArrival,
 }) {
   const acceptedDrivers = course.accepted_drivers || [];
   const selectedDriver = acceptedDrivers.find(
@@ -106,8 +110,16 @@ function CourseTrackingPanel({
     : [];
   const showMap = course.status === "driver_arriving"
     ? hasStart && hasDriverPosition
-    : course.status === "in_progress"
+    : course.status === "driver_selected"
+      ? arrivalConfirmed && hasStart
+      : course.status === "in_progress"
       && hasStart && (hasDestination || course.route_geometry?.length > 1);
+  const driverToClientRoute = hasStart && hasDriverPosition
+    ? [
+        [Number(selectedDriver.longitude), Number(selectedDriver.latitude)],
+        [Number(course.client_longitude), Number(course.client_latitude)],
+      ]
+    : null;
   const vehicleLabels = {
     moto: "دراجة نارية",
     scooter: "دراجة نارية",
@@ -236,16 +248,27 @@ function CourseTrackingPanel({
                     </span>
                   )}
                 </div>
-                {selectedDriver.telephone && (
+                {selectedDriver.telephone && !hasCalledDriver && (
                   <a
                     className="tracking-call-button"
                     href={`tel:${selectedDriver.telephone}`}
+                    onClick={onDriverCall}
                     aria-label={`اتصل بـ ${selectedDriver.nom}`}
                   >
                     اتصال
                   </a>
                 )}
               </article>
+            )}
+            {course.status === "driver_selected" && hasCalledDriver && !arrivalConfirmed && (
+              <div className="driver-arrival-choice" role="group" aria-label="هل السائق في طريقه إليك؟">
+                <button type="button" onClick={onConfirmArrival}>
+                  نعم، السائق قادم
+                </button>
+                <button type="button" onClick={onCancel} disabled={cancelling}>
+                  {cancelling ? "جارٍ الإلغاء…" : "إلغاء الرحلة"}
+                </button>
+              </div>
             )}
             {course.status === "driver_arriving" && showMap && (
               <div className="course-tracking-map">
@@ -255,6 +278,19 @@ function CourseTrackingPanel({
                     latitude: Number(course.client_latitude),
                     longitude: Number(course.client_longitude),
                   }}
+                  routeGeometry={driverToClientRoute}
+                />
+              </div>
+            )}
+            {course.status === "driver_selected" && arrivalConfirmed && showMap && (
+              <div className="course-tracking-map">
+                <CouriersMap
+                  couriers={trackingCouriers}
+                  clientPosition={{
+                    latitude: Number(course.client_latitude),
+                    longitude: Number(course.client_longitude),
+                  }}
+                  routeGeometry={driverToClientRoute}
                 />
               </div>
             )}
@@ -376,6 +412,8 @@ export default function Couriers() {
   );
   const [requestedCourse, setRequestedCourse] = useState(null);
   const [selectingDriverId, setSelectingDriverId] = useState(null);
+  const [calledDriverCourseId, setCalledDriverCourseId] = useState(null);
+  const [arrivalConfirmedCourseId, setArrivalConfirmedCourseId] = useState(null);
   const cancellationReason = "changed_mind";
   const [cancellingCourse, setCancellingCourse] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
@@ -540,6 +578,17 @@ export default function Couriers() {
     };
   }, [requestedCourseId]);
 
+  useEffect(() => {
+    if (requestedCourse?.status !== "completed") return undefined;
+
+    const timeout = setTimeout(() => {
+      localStorage.removeItem("currentClientCourseId");
+      navigate("/", { replace: true });
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [navigate, requestedCourse?.status]);
+
   async function handleRequestCourse(event) {
     event.preventDefault();
     if (bookingLoading) return;
@@ -661,7 +710,9 @@ export default function Couriers() {
         message: reviewMessage.trim() || "بدون تعليق",
       });
       localStorage.setItem(`courseReviewSubmitted:${requestedCourse.id}`, "true");
+      localStorage.removeItem("currentClientCourseId");
       setReviewSubmitted(true);
+      navigate("/", { replace: true });
     } catch (err) {
       setReviewError(err.message || "تعذر إرسال تقييمك. يرجى المحاولة مجدداً.");
     } finally {
@@ -950,6 +1001,10 @@ export default function Couriers() {
             setReviewMessage={setReviewMessage}
             submittingReview={submittingReview}
             reviewError={reviewError}
+            hasCalledDriver={calledDriverCourseId === String(requestedCourse.id)}
+            onDriverCall={() => setCalledDriverCourseId(String(requestedCourse.id))}
+            arrivalConfirmed={arrivalConfirmedCourseId === String(requestedCourse.id)}
+            onConfirmArrival={() => setArrivalConfirmedCourseId(String(requestedCourse.id))}
             onNewRequest={() => {
               localStorage.removeItem("currentClientCourseId");
               setRequestedCourse(null);

@@ -2059,6 +2059,28 @@ input::placeholder {
 .confirmed-driver-details strong { font-size: 16px; }
 .confirmed-driver-details .confirmed-driver-meta { color: #176b53; font-weight: 750; }
 .tracking-call-button { min-width: 68px; background: #176b53; text-decoration: none; }
+.driver-arrival-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.driver-arrival-choice button {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #176b53;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.driver-arrival-choice button + button {
+  border: 1px solid #f0c9c6;
+  background: #fff;
+  color: #a52b27;
+}
+.driver-arrival-choice button:disabled { opacity: .55; cursor: wait; }
 .course-tracking-map {
   height: 210px;
   overflow: hidden;
