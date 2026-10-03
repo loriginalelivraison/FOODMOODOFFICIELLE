@@ -156,6 +156,10 @@ function CourseTrackingPanel({
         </nav>
       )}
 
+      {!["completed", "cancelled"].includes(course.status) && (
+        <div className="course-live-bar" aria-hidden="true" />
+      )}
+
       <div
         key={course.status}
         className={`course-tracking-stage status-${course.status}`}

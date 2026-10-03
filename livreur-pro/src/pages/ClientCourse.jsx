@@ -239,6 +239,8 @@ export default function ClientCourse() {
         </nav>
       )}
 
+      {active && <div className="course-live-bar" aria-hidden="true" />}
+
       <div className="course-tracking-stage" aria-live="polite">
         {course.status === "searching" && (
           <div className="course-searching-state">
