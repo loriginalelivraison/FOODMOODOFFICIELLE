@@ -23,12 +23,53 @@ export default function ClientDashboard() {
   const [courses, setCourses] = useState([]);
   const [comments, setComments] = useState({});
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [activeCourse, setActiveCourse] = useState(null);
+  const [loadingActiveCourse, setLoadingActiveCourse] = useState(true);
+  const [activeCourseError, setActiveCourseError] = useState("");
 
   useEffect(() => {
     if (showHistory) {
       loadHistory();
     }
   }, [showHistory]);
+
+  useEffect(() => {
+    if (!localStorage.getItem("access") || localStorage.getItem("role") !== "client") {
+      setLoadingActiveCourse(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function refreshActiveCourse() {
+      try {
+        const clientCourses = await getClientCourses();
+        const currentCourse = clientCourses.find(
+          (course) => course.active && !["completed", "cancelled"].includes(course.status)
+        ) || null;
+        if (cancelled) return;
+
+        setActiveCourse(currentCourse);
+        setActiveCourseError("");
+        if (currentCourse) {
+          localStorage.setItem("currentClientCourseId", String(currentCourse.id));
+        } else {
+          localStorage.removeItem("currentClientCourseId");
+        }
+      } catch (err) {
+        if (!cancelled) setActiveCourseError(err.message || "تعذر تحميل الرحلة الحالية.");
+      } finally {
+        if (!cancelled) setLoadingActiveCourse(false);
+      }
+    }
+
+    refreshActiveCourse();
+    const interval = setInterval(refreshActiveCourse, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   async function loadHistory() {
     setLoadingHistory(true);
@@ -134,6 +175,43 @@ export default function ClientDashboard() {
         <h1>لوحة تحكم الزبون</h1>
         <p>مرحباً بك في حسابك، يمكنك متابعة السائقين والاطلاع على سجل رحلاتك.</p>
       </div>
+
+      <section className="client-current-course tracking-card" aria-labelledby="client-current-course-title">
+        <h2 id="client-current-course-title">رحلتي الحالية</h2>
+        {loadingActiveCourse && <LoadingSpinner label="جارٍ البحث عن رحلة نشطة…" />}
+        {!loadingActiveCourse && activeCourse && (
+          <>
+            <p>
+              {activeCourse.destination || "رحلتك قيد التنفيذ"}
+              {" · "}
+              {activeCourse.status === "searching"
+                ? "جارٍ البحث عن سائق"
+                : activeCourse.status === "driver_accepted"
+                  ? "بانتظار اختيار السائق"
+                  : activeCourse.status === "driver_selected"
+                    ? "تم تأكيد السائق"
+                    : activeCourse.status === "driver_arriving"
+                      ? "السائق في الطريق"
+                      : activeCourse.status === "driver_arrived"
+                        ? "وصل السائق"
+                        : activeCourse.status === "in_progress"
+                          ? "الرحلة جارية"
+                          : "نشطة"}
+            </p>
+            <button
+              className="primary-btn full"
+              type="button"
+              onClick={() => navigate(`/course/${activeCourse.id}`)}
+            >
+              متابعة الرحلة
+            </button>
+          </>
+        )}
+        {!loadingActiveCourse && !activeCourse && !activeCourseError && (
+          <p>ليست لديك رحلة نشطة حالياً.</p>
+        )}
+        {activeCourseError && <p className="course-request-error" role="alert">{activeCourseError}</p>}
+      </section>
 
       <div className="tracking-card">
         <h2>إجراءات الحساب</h2>

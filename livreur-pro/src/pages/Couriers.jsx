@@ -579,6 +579,12 @@ export default function Couriers() {
   }, [requestedCourseId]);
 
   useEffect(() => {
+    if (requestedCourseId) {
+      navigate(`/course/${requestedCourseId}`, { replace: true });
+    }
+  }, [navigate, requestedCourseId]);
+
+  useEffect(() => {
     if (requestedCourse?.status !== "completed") return undefined;
 
     const timeout = setTimeout(() => {
@@ -651,6 +657,7 @@ export default function Couriers() {
       localStorage.setItem("currentClientCourseId", String(course.id));
       setRequestedCourse(course);
       setRequestedCourseId(course.id);
+      navigate(`/course/${course.id}`);
       setDestinationPosition(null);
       setDestination("");
       setSelectingDestination(false);
@@ -675,6 +682,7 @@ export default function Couriers() {
     try {
       const updatedCourse = await selectCourseDriver(requestedCourse.id, driverId);
       setRequestedCourse(updatedCourse);
+      navigate(`/course/${requestedCourse.id}`);
     } catch (err) {
       setBookingError(err.message || "تعذر تأكيد هذا السائق.");
       const latest = await getCourse(requestedCourse.id).catch(() => null);
