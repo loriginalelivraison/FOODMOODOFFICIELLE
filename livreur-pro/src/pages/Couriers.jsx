@@ -43,8 +43,9 @@ function hasCoordinates(latitude, longitude) {
 
 function getCourseStepIndex(status) {
   if (status === "searching") return 0;
-  if (["driver_accepted", "driver_selected"].includes(status)) return 1;
-  if (status === "driver_arriving") return 2;
+  if (status === "driver_accepted") return 1;
+  // Dès que le client confirme le chauffeur, l'étape passe à "في الطريق" (en route).
+  if (["driver_selected", "driver_arriving"].includes(status)) return 2;
   if (["driver_arrived", "in_progress"].includes(status)) return 3;
   if (status === "completed") return 4;
   return -1;

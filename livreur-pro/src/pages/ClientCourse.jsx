@@ -27,8 +27,9 @@ function positionIsValid(latitude, longitude) {
 
 function getStepIndex(status) {
   if (status === "searching") return 0;
-  if (["driver_accepted", "driver_selected"].includes(status)) return 1;
-  if (status === "driver_arriving") return 2;
+  if (status === "driver_accepted") return 1;
+  // Dès que le client confirme le chauffeur, l'étape passe à "في الطريق" (en route).
+  if (["driver_selected", "driver_arriving"].includes(status)) return 2;
   if (["driver_arrived", "in_progress"].includes(status)) return 3;
   if (status === "completed") return 4;
   return -1;
@@ -173,7 +174,11 @@ export default function ClientCourse() {
     "in_progress",
     "completed",
   ].includes(course.status);
-  const driverRoute = hasStart && hasDriverPosition
+  const hasSelectedDriver = Boolean(course.livreur);
+  // Avant que le client choisisse son chauffeur, on ne trace aucune ligne vers un
+  // chauffeur : seulement le client, la destination et les chauffeurs disponibles
+  // (comme la carte affichée une fois le chauffeur confirmé).
+  const driverRoute = hasSelectedDriver && hasStart && hasDriverPosition
     ? [
         [Number(selectedDriver.longitude), Number(selectedDriver.latitude)],
         [Number(course.client_longitude), Number(course.client_latitude)],
