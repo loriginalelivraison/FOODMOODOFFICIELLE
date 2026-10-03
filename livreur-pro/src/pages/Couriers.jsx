@@ -5,6 +5,7 @@ import {
   createCommentaireLivreur,
   createCourseRequest,
   cancelCourse,
+  finishCourse,
   getCourse,
   getCourseQuote,
   getLivreurs,
@@ -84,6 +85,8 @@ function CourseTrackingPanel({
   onDriverCall,
   arrivalConfirmed,
   onConfirmArrival,
+  onFinish,
+  finishing,
 }) {
   const acceptedDrivers = course.accepted_drivers || [];
   const selectedDriver = acceptedDrivers.find(
@@ -330,6 +333,18 @@ function CourseTrackingPanel({
           </>
         )}
 
+        {course.status !== "completed" && course.status !== "cancelled" && (
+          <button
+            className="primary-btn full"
+            type="button"
+            onClick={onFinish}
+            disabled={finishing}
+            style={{ background: "#dc2626", marginTop: "12px" }}
+          >
+            {finishing ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
+          </button>
+        )}
+
         {course.status === "completed" && (
           <section className="course-review-card" aria-label="تقييم الرحلة">
             {reviewAlreadySubmitted ? (
@@ -403,6 +418,7 @@ export default function Couriers() {
   const [destination, setDestination] = useState("");
   const [destinationConfirmed, setDestinationConfirmed] = useState(false);
   const [selectingDestination, setSelectingDestination] = useState(false);
+  const [finishingCourse, setFinishingCourse] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [proposedPrice, setProposedPrice] = useState("");
   const [priceQuote, setPriceQuote] = useState(null);
@@ -694,6 +710,21 @@ export default function Couriers() {
       if (latest) setRequestedCourse(latest);
     } finally {
       setSelectingDriverId(null);
+    }
+  }
+
+  async function handleFinishRequest() {
+    if (!requestedCourse || finishingCourse) return;
+    setFinishingCourse(true);
+    setBookingError("");
+    try {
+      const updated = await finishCourse(requestedCourse.id);
+      setRequestedCourse(updated);
+      localStorage.removeItem("currentClientCourseId");
+    } catch (err) {
+      setBookingError(err.message || "تعذر إنهاء الرحلة.");
+    } finally {
+      setFinishingCourse(false);
     }
   }
 
@@ -1006,6 +1037,8 @@ export default function Couriers() {
             selectingDriverId={selectingDriverId}
             onCancel={handleCancelRequest}
             cancelling={cancellingCourse}
+            onFinish={handleFinishRequest}
+            finishing={finishingCourse}
             onReviewSubmit={handleReviewSubmit}
             reviewAlreadySubmitted={reviewAlreadySubmitted}
             reviewRating={reviewRating}

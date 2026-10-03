@@ -30,6 +30,7 @@ class Livreur(models.Model):
 
     note = models.FloatField(null=True, blank=True, default=None)
     nombre_livraisons = models.PositiveIntegerField(default=0)
+    points = models.PositiveIntegerField(default=0)
 
     fcm_token = models.TextField(blank=True, null=True)
 
@@ -100,6 +101,7 @@ class Client(models.Model):
     )
     nom = models.CharField(max_length=100)
     telephone = models.CharField(max_length=20, unique=True)
+    points = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

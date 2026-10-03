@@ -773,8 +773,8 @@ class CourseViewSet(ModelViewSet):
                 return Response({"error": "Accès interdit"}, status=403)
             if not course.active or course.status in ["completed", "cancelled"]:
                 return Response(self.get_serializer(course).data)
-            if course.destination and (not is_livreur or course.status != "in_progress"):
-                return Response({"detail": "Seul le chauffeur peut terminer une course en cours."}, status=409)
+            if course.destination and course.status != "in_progress":
+                return Response({"detail": "Seule une course en cours peut être terminée."}, status=409)
             if course.livreur_id and course.status not in ["in_progress", "driver_selected", "driver_arrived", "driver_arriving"]:
                 return Response({"detail": "La course ne peut pas être terminée dans cet état."}, status=409)
 
@@ -791,18 +791,27 @@ class CourseViewSet(ModelViewSet):
             ])
             record_course_event(course, "completed", "livreur" if is_livreur else "client", livreur.id if is_livreur else client.id, previous_status, "completed")
 
+            points_earned = settings.COURSE_COMPLETION_POINTS
+
             if livreur:
                 if course.client_confirmed:
                     livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
+                livreur.points = (livreur.points or 0) + points_earned
                 has_other_active_course = Course.objects.filter(livreur=livreur, active=True).exclude(pk=course.pk).exists()
                 livreur.disponible = False if has_other_active_course else (
                     course.availability_before_course if course.availability_before_course is not None else True
                 )
-                livreur.save(update_fields=["nombre_livraisons", "disponible"])
+                livreur.save(update_fields=["nombre_livraisons", "disponible", "points"])
+
+            client.points = (client.points or 0) + points_earned
+            client.save(update_fields=["points"])
 
         return Response({
             "message": "Course terminée",
             "active": False,
-            "nombre_livraisons": livreur.nombre_livraisons,
-            "disponible": livreur.disponible,
+            "nombre_livraisons": livreur.nombre_livraisons if livreur else None,
+            "disponible": livreur.disponible if livreur else None,
+            "points_earned": points_earned,
+            "client_points": client.points,
+            "livreur_points": livreur.points if livreur else None,
         })

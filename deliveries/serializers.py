@@ -28,9 +28,10 @@ class ClientSerializer(serializers.ModelSerializer):
             "user",
             "nom",
             "telephone",
+            "points",
             "created_at",
         ]
-        read_only_fields = ["user", "created_at"]
+        read_only_fields = ["user", "points", "created_at"]
 
 class CourseSerializer(serializers.ModelSerializer):
     finished_by_name = serializers.SerializerMethodField()

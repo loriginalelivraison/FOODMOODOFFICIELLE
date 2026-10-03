@@ -430,6 +430,22 @@ export async function updateLivreurProfile(id, data) {
   return result;
 }
 
+export async function getClientProfile() {
+  const response = await fetch(`${API_BASE_URL}/clients/`, {
+    headers: authHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail, "تعذر تحميل بيانات الحساب."));
+  }
+
+  const list = Array.isArray(data) ? data : data.results || [];
+  return list[0] || null;
+}
+
 export async function createCourse(data) {
   const response = await fetch(`${API_BASE_URL}/courses/`, {
     method: "POST",

@@ -464,6 +464,11 @@ export default function LivreurDashboard() {
       setCourseNotification("");
       setMessage("تم إنهاء الرحلة وتسجيلها في السجل.");
       if (showHistory) loadHistory();
+      try {
+        setProfile(await getLivreurById(livreur.id));
+      } catch (profileErr) {
+        console.error("Erreur rafraîchissement profil :", profileErr);
+      }
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
     } finally {
@@ -553,6 +558,7 @@ export default function LivreurDashboard() {
             <span>📞 {livreur.telephone}</span>
             {profile?.note != null && <span>⭐ {profile.note}</span>}
             {profile?.nombre_livraisons != null && <span>🚚 {profile.nombre_livraisons} رحلة</span>}
+            {profile?.points != null && <span>🏅 {profile.points} نقطة</span>}
           </span>
           <span className={`account-badge ${isAvailable ? "is-online" : "is-offline"}`}>
             {isAvailable ? "متاح" : "غير متاح"}
@@ -571,6 +577,50 @@ export default function LivreurDashboard() {
           تعديل
         </button>
       </header>
+
+      {activeCourse && (
+        <section className="account-card">
+          <h2>رحلتي الحالية</h2>
+          <div className="account-row">
+            <span className="account-row-label">رقم الرحلة</span>
+            <span className="account-row-value">#{activeCourse.id}</span>
+          </div>
+          {activeCourse.destination && (
+            <div className="account-row">
+              <span className="account-row-label">الوجهة</span>
+              <span className="account-row-value">{activeCourse.destination}</span>
+            </div>
+          )}
+          {activeCourse.client_latitude != null && activeCourse.client_longitude != null && (
+            <div className="account-row">
+              <span className="account-row-label">موقع العميل</span>
+              <span className="account-row-value">{activeCourse.client_latitude}, {activeCourse.client_longitude}</span>
+            </div>
+          )}
+          {(activeCourse.final_price ?? activeCourse.proposed_price) != null && (
+            <div className="account-row">
+              <span className="account-row-label">الأجرة</span>
+              <span className="account-row-value">{activeCourse.final_price ?? activeCourse.proposed_price} دج</span>
+            </div>
+          )}
+          <button
+            className="primary-btn full"
+            type="button"
+            onClick={() => navigate(`/livreur-course/${activeCourse.id}`)}
+          >
+            فتح الرحلة
+          </button>
+          <button
+            className="primary-btn full"
+            type="button"
+            onClick={handleFinishCourse}
+            disabled={finishingCourse}
+            style={{ background: "#dc2626" }}
+          >
+            {finishingCourse ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
+          </button>
+        </section>
+      )}
 
       <section className="account-card">
         <h2>حالة الاستقبال</h2>
@@ -661,48 +711,6 @@ export default function LivreurDashboard() {
             </article>
           ))}
         </section>
-      )}
-
-      {courseNotification && activeCourse && (
-        <div
-          className="course-notification clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() => navigate(`/livreur-course/${activeCourse.id}`)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              navigate(`/livreur-course/${activeCourse.id}`);
-            }
-          }}
-          style={{
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
-            color: "#15803d",
-            padding: "14px",
-            borderRadius: "14px",
-            marginBottom: "15px",
-            fontWeight: "700",
-            textAlign: "center",
-          }}
-        >
-          {courseNotification}
-          <br />
-          <span style={{ color: "#374151", fontWeight: "600" }}>
-            رقم الرحلة: {activeCourse.id}
-          </span>
-          <button
-            className="primary-btn full"
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              handleFinishCourse();
-            }}
-            disabled={finishingCourse}
-            style={{ marginTop: "12px", background: "#dc2626" }}
-          >
-            {finishingCourse ? <LoadingSpinner label="جاري إنهاء الرحلة..." size={20} /> : "إنهاء الرحلة"}
-          </button>
-        </div>
       )}
 
       {message && (

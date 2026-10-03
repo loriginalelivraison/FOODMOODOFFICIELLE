@@ -5,6 +5,8 @@ import {
   getCommentairesLivreur,
   clearCurrentDriverFcmToken,
   updateClientProfile,
+  getClientProfile,
+  finishCourse,
 } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -53,12 +55,19 @@ export default function ClientDashboard() {
   const [activeCourse, setActiveCourse] = useState(null);
   const [loadingActiveCourse, setLoadingActiveCourse] = useState(true);
   const [activeCourseError, setActiveCourseError] = useState("");
+  const [clientPoints, setClientPoints] = useState(null);
+  const [finishingActiveCourse, setFinishingActiveCourse] = useState(false);
 
   useEffect(() => {
     if (showHistory) {
       loadHistory();
     }
   }, [showHistory]);
+
+  useEffect(() => {
+    if (!localStorage.getItem("access") || localStorage.getItem("role") !== "client") return;
+    loadClientProfile();
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem("access") || localStorage.getItem("role") !== "client") {
@@ -97,6 +106,15 @@ export default function ClientDashboard() {
       clearInterval(interval);
     };
   }, []);
+
+  async function loadClientProfile() {
+    try {
+      const data = await getClientProfile();
+      if (data) setClientPoints(data.points ?? 0);
+    } catch (err) {
+      console.error("Erreur chargement profil client :", err);
+    }
+  }
 
   async function loadHistory() {
     setLoadingHistory(true);
@@ -188,6 +206,25 @@ export default function ClientDashboard() {
     }
   }
 
+  async function handleFinishActiveCourse() {
+    if (!activeCourse || finishingActiveCourse) return;
+
+    setFinishingActiveCourse(true);
+    setError("");
+
+    try {
+      await finishCourse(activeCourse.id);
+      setActiveCourse(null);
+      localStorage.removeItem("currentClientCourseId");
+      await loadClientProfile();
+      await loadHistory();
+    } catch (err) {
+      setError(err.message || "تعذر إنهاء الرحلة.");
+    } finally {
+      setFinishingActiveCourse(false);
+    }
+  }
+
 
   if (!client) {
     return (
@@ -234,6 +271,7 @@ export default function ClientDashboard() {
           <h1>{client.nom}</h1>
           <span className="account-meta">
             <span>📞 {client.telephone}</span>
+            {clientPoints != null && <span>🏅 {clientPoints} نقطة</span>}
           </span>
         </div>
         <button
@@ -267,6 +305,15 @@ export default function ClientDashboard() {
               onClick={() => navigate(`/course/${activeCourse.id}`)}
             >
               متابعة الرحلة
+            </button>
+            <button
+              className="primary-btn full"
+              type="button"
+              onClick={handleFinishActiveCourse}
+              disabled={finishingActiveCourse}
+              style={{ background: "#dc2626" }}
+            >
+              {finishingActiveCourse ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
             </button>
           </>
         )}
