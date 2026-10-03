@@ -9,11 +9,19 @@ import {
   getCourseOffers,
   respondToCourseOffer,
   clearCurrentDriverFcmToken,
+  getLivreurById,
+  getCommentairesLivreur,
+  updateLivreurProfile,
 } from "../livreursapi.js";
-import LogoutButton from "../components/LogoutButton.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import MapActionButton from "../components/MapActionButton.jsx";
 import { useNavigate } from "react-router-dom";
+
+function formatDate(value) {
+  if (!value) return "غير متوفر";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "غير متوفر" : date.toLocaleDateString("ar-DZ");
+}
 import {
   MapContainer,
   TileLayer,
@@ -148,8 +156,18 @@ function CenterOnInitialPosition({ position }) {
 }
 
 export default function LivreurDashboard() {
-  const livreurStorage = localStorage.getItem("livreur");
-  const livreur = livreurStorage ? JSON.parse(livreurStorage) : null;
+  const [livreur, setLivreur] = useState(() => {
+    const stored = localStorage.getItem("livreur");
+    return stored ? JSON.parse(stored) : null;
+  });
+
+  const [profile, setProfile] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editNom, setEditNom] = useState(livreur?.nom || "");
+  const [editVille, setEditVille] = useState(livreur?.ville || "");
+  const [editVehicule, setEditVehicule] = useState(livreur?.vehicule || "moto");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -167,7 +185,7 @@ export default function LivreurDashboard() {
   const [courseOffers, setCourseOffers] = useState([]);
   const [respondingOfferId, setRespondingOfferId] = useState(null);
   const [courseNotification, setCourseNotification] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [courses, setCourses] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [finishingCourse, setFinishingCourse] = useState(false);
@@ -331,6 +349,39 @@ export default function LivreurDashboard() {
       clearInterval(interval);
     };
   }, [livreur?.id]);
+
+  useEffect(() => {
+    if (!livreur?.id) return undefined;
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        const data = await getLivreurById(livreur.id);
+        if (!cancelled) setProfile(data);
+      } catch (err) {
+        console.error("Erreur chargement profil :", err);
+      }
+    }
+
+    async function loadReviews() {
+      try {
+        const data = await getCommentairesLivreur(livreur.id);
+        if (!cancelled) {
+          setReviews(Array.isArray(data) ? data : data.results || []);
+        }
+      } catch (err) {
+        console.error("Erreur chargement avis :", err);
+      }
+    }
+
+    loadProfile();
+    loadReviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [livreur?.id]);
+
   if (!livreur) {
     return (
       <div style={{ padding: "20px" }} dir="rtl">
@@ -339,7 +390,9 @@ export default function LivreurDashboard() {
     );
   }
 
-  const photoUrl = livreur.photo || livreur.image || null;
+  const photoUrl = profile?.photo || livreur.photo || livreur.image || null;
+  const displayName = profile?.nom || livreur.nom;
+  const isAvailable = trackingEnabled && !activeCourse;
   const vehicleLabels = {
     moto: "دراجة نارية",
     scooter: "دراجة نارية",
@@ -418,6 +471,44 @@ export default function LivreurDashboard() {
     }
   }
 
+  async function handleProfileSave(event) {
+    event.preventDefault();
+    if (!livreur || savingProfile) return;
+
+    const nom = editNom.trim();
+    const ville = editVille.trim();
+
+    if (!nom) {
+      setError("الاسم مطلوب.");
+      return;
+    }
+
+    setSavingProfile(true);
+    setError("");
+
+    try {
+      const updated = await updateLivreurProfile(livreur.id, {
+        nom,
+        ville,
+        vehicule: editVehicule,
+      });
+      const nextLivreur = {
+        ...livreur,
+        nom: updated.nom ?? nom,
+        ville: updated.ville ?? ville,
+        vehicule: updated.vehicule ?? editVehicule,
+      };
+      setLivreur(nextLivreur);
+      localStorage.setItem("livreur", JSON.stringify(nextLivreur));
+      window.dispatchEvent(new Event("authChanged"));
+      setEditingProfile(false);
+    } catch (err) {
+      setError(err.message || "تعذر تحديث المعلومات.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   async function logout() {
   try {
     await clearCurrentDriverFcmToken();
@@ -447,90 +538,92 @@ export default function LivreurDashboard() {
   });
 
   return (
-    <section className="page" dir="rtl">
-      <div
-        style={{
-          background: "#fff7ed",
-          border: "1px solid #fed7aa",
-          borderRadius: "24px",
-          padding: "18px",
-          marginBottom: "18px",
-          boxShadow: "0 10px 25px rgba(249,115,22,0.12)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "14px",
-          }}
-        >
-          <div
-            style={{
-              width: "76px",
-              height: "76px",
-              borderRadius: "50%",
-              overflow: "hidden",
-              background: "#ffedd5",
-              border: "3px solid white",
-              flexShrink: 0,
-            }}
-          >
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt={livreur.nom}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: "30px",
-                }}
-              >
-                🛵
-              </div>
-            )}
-          </div>
-
-          <div>
-            <h2 style={{ margin: 0 }}>{livreur.nom}</h2>
-            <p style={{ margin: "6px 0", color: "#6b7280" }}>
-              {livreur.ville} — {vehicleLabels[livreur.vehicule] || livreur.vehicule}
-            </p>
-            <p style={{ margin: 0, fontWeight: "600" }}>
-              📞 {livreur.telephone}
-            </p>
-          </div>
+    <section className="page account-page" dir="rtl">
+      <header className="account-header">
+        <div className="account-avatar">
+          {photoUrl ? (
+            <img src={photoUrl} alt={displayName} />
+          ) : (
+            <span>🛵</span>
+          )}
         </div>
-
+        <div className="account-identity">
+          <h1>{displayName}</h1>
+          <span className="account-meta">
+            <span>📞 {livreur.telephone}</span>
+            {profile?.note != null && <span>⭐ {profile.note}</span>}
+            {profile?.nombre_livraisons != null && <span>🚚 {profile.nombre_livraisons} رحلة</span>}
+          </span>
+          <span className={`account-badge ${isAvailable ? "is-online" : "is-offline"}`}>
+            {isAvailable ? "متاح" : "غير متاح"}
+          </span>
+        </div>
         <button
-          onClick={handleTrackingToggle}
-          style={{
-            marginTop: "18px",
-            width: "100%",
-            padding: "13px",
-            borderRadius: "14px",
-            border: "none",
-            background: trackingEnabled ? "#dc2626" : "#16a34a",
-            color: "white",
-            fontWeight: "bold",
-            cursor: "pointer",
+          type="button"
+          className="account-edit-btn"
+          onClick={() => {
+            setEditNom(livreur.nom || "");
+            setEditVille(livreur.ville || "");
+            setEditVehicule(livreur.vehicule || "moto");
+            setEditingProfile((value) => !value);
           }}
         >
-          {updatingTracking ? (
-            <LoadingSpinner label="جاري تحديث الموقع..." size={20} />
-          ) : trackingEnabled ? "إيقاف مشاركة الموقع" : "تشغيل مشاركة الموقع"}
+          تعديل
         </button>
-      </div>
+      </header>
+
+      <section className="account-card">
+        <h2>حالة الاستقبال</h2>
+        <div className={`account-badge ${isAvailable ? "is-online" : "is-offline"}`} style={{ justifySelf: "start" }}>
+          {isAvailable ? "متاح لاستقبال الطلبات" : "غير متاح حالياً"}
+        </div>
+        <button
+          className="primary-btn full"
+          type="button"
+          onClick={handleTrackingToggle}
+          disabled={updatingTracking}
+          style={{ background: trackingEnabled ? "#dc2626" : "#16a34a" }}
+        >
+          {updatingTracking ? <LoadingSpinner label="جاري تحديث الموقع..." size={20} /> : trackingEnabled ? "إيقاف مشاركة الموقع" : "تشغيل مشاركة الموقع"}
+        </button>
+      </section>
+
+      {editingProfile && (
+        <section className="account-card">
+          <h2>تعديل المعلومات</h2>
+          <form className="account-form" onSubmit={handleProfileSave}>
+            <label>
+              الاسم
+              <input value={editNom} onChange={(event) => setEditNom(event.target.value)} maxLength={100} />
+            </label>
+            <label>
+              رقم الهاتف
+              <input value={livreur.telephone} disabled readOnly />
+            </label>
+            <label>
+              المدينة
+              <input value={editVille} onChange={(event) => setEditVille(event.target.value)} maxLength={100} />
+            </label>
+            <label>
+              نوع المركبة
+              <select value={editVehicule} onChange={(event) => setEditVehicule(event.target.value)}>
+                <option value="moto">دراجة نارية</option>
+                <option value="voiture">سيارة</option>
+                <option value="camion">شاحنة</option>
+                <option value="velo">دراجة</option>
+              </select>
+            </label>
+            <div className="account-form-actions">
+              <button type="submit" className="save" disabled={savingProfile}>
+                {savingProfile ? "جارٍ الحفظ…" : "حفظ"}
+              </button>
+              <button type="button" className="cancel" onClick={() => setEditingProfile(false)}>
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
 
       {courseOffers.length > 0 && (
         <section className="driver-offers" aria-live="polite">
@@ -720,102 +813,94 @@ export default function LivreurDashboard() {
         
         </MapContainer>
       </div>
-      <button
-        className="primary-btn full"
-        style={{ marginTop: "14px" }}
-        type="button"
-        onClick={() => setShowHistory(!showHistory)}
-      >
-        {showHistory ? "إخفاء السجل" : "السجل"}
+      <section className="account-card">
+        <h2>المعلومات الشخصية</h2>
+        <div className="account-row">
+          <span className="account-row-label">الاسم</span>
+          <span className="account-row-value">{displayName}</span>
+        </div>
+        <div className="account-row">
+          <span className="account-row-label">رقم الهاتف</span>
+          <span className="account-row-value">{livreur.telephone}</span>
+        </div>
+        {livreur.ville && (
+          <div className="account-row">
+            <span className="account-row-label">المدينة</span>
+            <span className="account-row-value">{livreur.ville}</span>
+          </div>
+        )}
+      </section>
+
+      {livreur.vehicule && (
+        <section className="account-card">
+          <h2>المركبة</h2>
+          <div className="account-row">
+            <span className="account-row-label">النوع</span>
+            <span className="account-row-value">{vehicleLabels[livreur.vehicule] || livreur.vehicule}</span>
+          </div>
+        </section>
+      )}
+
+      <section className="account-card">
+        <h2>سجل الرحلات</h2>
+        {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
+        {!loadingHistory && courses.length === 0 && (
+          <p className="account-empty">لا توجد رحلات مسجلة حالياً.</p>
+        )}
+        {!loadingHistory && courses.map((course) => (
+          <article className="account-item" key={course.id}>
+            <div className="account-item-head">
+              <strong>رحلة رقم {course.id}</strong>
+              <span className={`account-status-pill ${course.status === "completed" ? "is-done" : course.status === "cancelled" ? "is-cancel" : course.active ? "is-active" : ""}`}>
+                {course.active ? "نشطة" : "منتهية"}
+              </span>
+            </div>
+            <div className="account-item-meta">
+              <span>{formatDate(course.created_at)}</span>
+              {course.destination && <span>{course.destination}</span>}
+              {(course.final_price ?? course.proposed_price) != null && (
+                <span className="account-item-price">{course.final_price ?? course.proposed_price} دج</span>
+              )}
+            </div>
+          </article>
+        ))}
+      </section>
+
+      {reviews.length > 0 && (
+        <section className="account-card">
+          <h2>تقييمات الزبائن</h2>
+          {reviews.map((comment) => (
+            <article className="account-item" key={comment.id}>
+              <div className="account-item-head">
+                <strong>⭐ {comment.note || 5} / 5</strong>
+                <span className="account-item-meta">{formatDate(comment.created_at)}</span>
+              </div>
+              {comment.message && <p style={{ margin: 0 }}>{comment.message}</p>}
+            </article>
+          ))}
+        </section>
+      )}
+
+      <section className="account-card">
+        <h2>المساعدة والدعم</h2>
+        <a className="account-link" href="https://www.winrak.fr" target="_blank" rel="noreferrer">
+          موقع WinRak
+        </a>
+      </section>
+
+      <section className="account-card">
+        <h2>الخصوصية والأمان</h2>
+        <button className="account-link" type="button" onClick={() => navigate("/privacy")}>
+          سياسة الخصوصية
+        </button>
+      </section>
+
+      <button className="account-logout" type="button" onClick={logout}>
+        تسجيل الخروج
       </button>
 
-      {showHistory && (
-        <div className="tracking-card" style={{ marginTop: "18px" }}>
-          <h2>سجل الرحلات</h2>
-
-          {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
-
-          {!loadingHistory && courses.length === 0 && (
-            <p>لا توجد رحلات مسجلة حالياً.</p>
-          )}
-
-          {!loadingHistory &&
-            courses.map((course) => (
-              <div
-                key={course.id}
-                style={{
-                  background: "#fff7ed",
-                  border: "1px solid #fed7aa",
-                  borderRadius: "18px",
-                  padding: "14px",
-                  marginBottom: "14px",
-                }}
-              >
-                <h3 style={{ marginTop: 0 }}>رحلة رقم {course.id}</h3>
-
-                <p>
-                  <strong>رقم الزبون:</strong> {course.client}
-                </p>
-
-                <p>
-                  <strong>موقع الزبون:</strong>{" "}
-                  {course.client_latitude && course.client_longitude
-                    ? `${course.client_latitude}, ${course.client_longitude}`
-                    : "غير متوفر"}
-                </p>
-
-                <p>
-                  <strong>الحالة:</strong>{" "}
-                  {course.active ? "نشطة" : "منتهية"}
-                </p>
-
-                <p>
-                  <strong>تاريخ البداية:</strong>{" "}
-                  {course.created_at
-                    ? new Date(course.created_at).toLocaleString("ar-DZ")
-                    : "غير متوفر"}
-                </p>
-
-                <p>
-                  <strong>تاريخ النهاية:</strong>{" "}
-                  {course.finished_at
-                    ? new Date(course.finished_at).toLocaleString("ar-DZ")
-                    : "لم تنته بعد"}
-                </p>
-
-                <p>
-                  <strong>أنهى الرحلة:</strong>{" "}
-                  {course.finished_by_name
-                    ? `${course.finished_by_name} (${course.finished_by_type === "client" ? "الزبون" : "السائق"})`
-                    : "غير معروف"}
-                </p>
-              </div>
-            ))}
-        </div>
-      )}
-      <button className="primary-btn full"
-          style={{
-            marginTop: "14px",
-            background: "#991b1b",
-            fontFamily: '"Cairo", sans-serif',
-            fontWeight: "700",
-            fontSize: "15px",
-          }} onClick={logout} > خروج</button>
-      <button
-        onClick={handleDeleteAccount}
-        style={{
-          marginTop: "12px",
-          width: "100%",
-          padding: "13px",
-          borderRadius: "14px",
-          border: "1px solid #fecaca",
-          background: "#fef2f2",
-          color: "#c07d7d",
-          fontWeight: "bold",
-          cursor: "pointer",
-        }}
-      >
-        حذف الحساب نهائيا
+      <button className="account-delete" type="button" onClick={handleDeleteAccount}>
+        حذف الحساب نهائياً
       </button>
     </section>
   );

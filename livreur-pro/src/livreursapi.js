@@ -382,6 +382,54 @@ export async function deleteClient(id) {
   return true;
 }
 
+export async function updateClientProfile(id, data) {
+  const response = await fetch(`${API_BASE_URL}/clients/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    handleInvalidToken(result);
+    throw new Error(
+      toArabicMessage(
+        result.error || result.telephone || result.detail,
+        "حدث خطأ أثناء تعديل المعلومات."
+      )
+    );
+  }
+
+  return result;
+}
+
+export async function updateLivreurProfile(id, data) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
+    method: "PATCH",
+    headers: authHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    handleInvalidToken(result);
+    throw new Error(
+      toArabicMessage(
+        result.error || result.vehicule || result.detail,
+        "حدث خطأ أثناء تعديل المعلومات."
+      )
+    );
+  }
+
+  return result;
+}
+
 export async function createCourse(data) {
   const response = await fetch(`${API_BASE_URL}/courses/`, {
     method: "POST",

@@ -4,22 +4,49 @@ import {
   getClientCourses,
   getCommentairesLivreur,
   clearCurrentDriverFcmToken,
+  updateClientProfile,
 } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
-import LogoutButton from "../components/LogoutButton.jsx";
-import { LogOut } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+
+const STATUS_LABELS = {
+  searching: "جارٍ البحث عن سائق",
+  driver_accepted: "بانتظار اختيار السائق",
+  driver_selected: "تم تأكيد السائق",
+  driver_arriving: "السائق في الطريق",
+  driver_arrived: "وصل السائق",
+  in_progress: "الرحلة جارية",
+  completed: "مكتملة",
+  cancelled: "ملغاة",
+};
+
+const STATUS_CLASSES = {
+  completed: "is-done",
+  cancelled: "is-cancel",
+};
+
+function formatDate(value) {
+  if (!value) return "غير متوفر";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "غير متوفر" : date.toLocaleDateString("ar-DZ");
+}
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
 
-  const clientStorage = localStorage.getItem("client");
-  const client = clientStorage ? JSON.parse(clientStorage) : null;
+  const [client, setClient] = useState(() => {
+    const stored = localStorage.getItem("client");
+    return stored ? JSON.parse(stored) : null;
+  });
+
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editNom, setEditNom] = useState(client?.nom || "");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
   const [courses, setCourses] = useState([]);
   const [comments, setComments] = useState({});
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -133,6 +160,34 @@ export default function ClientDashboard() {
     }
   }
 
+  async function handleProfileSave(event) {
+    event.preventDefault();
+    if (!client || savingProfile) return;
+
+    const nom = editNom.trim();
+
+    if (!nom) {
+      setError("الاسم مطلوب.");
+      return;
+    }
+
+    setSavingProfile(true);
+    setError("");
+
+    try {
+      const updated = await updateClientProfile(client.id, { nom });
+      const nextClient = { ...client, nom: updated.nom || nom };
+      setClient(nextClient);
+      localStorage.setItem("client", JSON.stringify(nextClient));
+      window.dispatchEvent(new Event("authChanged"));
+      setEditingProfile(false);
+    } catch (err) {
+      setError(err.message || "تعذر تحديث المعلومات.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
 
   if (!client) {
     return (
@@ -168,36 +223,44 @@ export default function ClientDashboard() {
 
   if (!isLoggedIn) return null;
 
-  return (
-    <section className="page" dir="rtl">
-      <div className="page-title">
-        <span className="eyebrow">فضاء الزبون</span>
-        <h1>لوحة تحكم الزبون</h1>
-        <p>مرحباً بك في حسابك، يمكنك متابعة السائقين والاطلاع على سجل رحلاتك.</p>
-      </div>
+  const initial = (client.nom || "؟").trim().charAt(0) || "؟";
+  const reviews = Object.values(comments).flat();
 
-      <section className="client-current-course tracking-card" aria-labelledby="client-current-course-title">
-        <h2 id="client-current-course-title">رحلتي الحالية</h2>
+  return (
+    <section className="page account-page" dir="rtl">
+      <header className="account-header">
+        <div className="account-avatar">{initial}</div>
+        <div className="account-identity">
+          <h1>{client.nom}</h1>
+          <span className="account-meta">
+            <span>📞 {client.telephone}</span>
+          </span>
+        </div>
+        <button
+          type="button"
+          className="account-edit-btn"
+          onClick={() => {
+            setEditNom(client.nom || "");
+            setEditingProfile((value) => !value);
+          }}
+        >
+          تعديل
+        </button>
+      </header>
+
+      <section className="account-card">
+        <h2>رحلتي الحالية</h2>
         {loadingActiveCourse && <LoadingSpinner label="جارٍ البحث عن رحلة نشطة…" />}
         {!loadingActiveCourse && activeCourse && (
           <>
-            <p>
-              {activeCourse.destination || "رحلتك قيد التنفيذ"}
-              {" · "}
-              {activeCourse.status === "searching"
-                ? "جارٍ البحث عن سائق"
-                : activeCourse.status === "driver_accepted"
-                  ? "بانتظار اختيار السائق"
-                  : activeCourse.status === "driver_selected"
-                    ? "تم تأكيد السائق"
-                    : activeCourse.status === "driver_arriving"
-                      ? "السائق في الطريق"
-                      : activeCourse.status === "driver_arrived"
-                        ? "وصل السائق"
-                        : activeCourse.status === "in_progress"
-                          ? "الرحلة جارية"
-                          : "نشطة"}
-            </p>
+            <div className="account-row">
+              <span className="account-row-label">الوجهة</span>
+              <span className="account-row-value">{activeCourse.destination || "قيد التنفيذ"}</span>
+            </div>
+            <div className="account-row">
+              <span className="account-row-label">الحالة</span>
+              <span className="account-row-value">{STATUS_LABELS[activeCourse.status] || "نشطة"}</span>
+            </div>
             <button
               className="primary-btn full"
               type="button"
@@ -208,156 +271,123 @@ export default function ClientDashboard() {
           </>
         )}
         {!loadingActiveCourse && !activeCourse && !activeCourseError && (
-          <p>ليست لديك رحلة نشطة حالياً.</p>
+          <p className="account-empty">ليست لديك رحلة نشطة حالياً.</p>
         )}
         {activeCourseError && <p className="course-request-error" role="alert">{activeCourseError}</p>}
       </section>
 
-      <div className="tracking-card">
-        <h2>إجراءات الحساب</h2>
+      {editingProfile && (
+        <section className="account-card">
+          <h2>تعديل المعلومات</h2>
+          <form className="account-form" onSubmit={handleProfileSave}>
+            <label>
+              الاسم
+              <input
+                value={editNom}
+                onChange={(event) => setEditNom(event.target.value)}
+                maxLength={100}
+              />
+            </label>
+            <label>
+              رقم الهاتف
+              <input value={client.telephone} disabled readOnly />
+            </label>
+            <div className="account-form-actions">
+              <button type="submit" className="save" disabled={savingProfile}>
+                {savingProfile ? "جارٍ الحفظ…" : "حفظ"}
+              </button>
+              <button type="button" className="cancel" onClick={() => setEditingProfile(false)}>
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
 
-        <a className="primary-btn full" href="/livreurs">
+      <section className="account-card">
+        <h2>المعلومات الشخصية</h2>
+        <div className="account-row">
+          <span className="account-row-label">الاسم</span>
+          <span className="account-row-value">{client.nom}</span>
+        </div>
+        <div className="account-row">
+          <span className="account-row-label">رقم الهاتف</span>
+          <span className="account-row-value">{client.telephone}</span>
+        </div>
+      </section>
+
+      <section className="account-card">
+        <h2>رحلاتي</h2>
+        {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
+        {!loadingHistory && courses.length === 0 && (
+          <p className="account-empty">لا توجد رحلات مسجلة حالياً.</p>
+        )}
+        {!loadingHistory && courses.map((course) => (
+          <article className="account-item" key={course.id}>
+            <div className="account-item-head">
+              <strong>رحلة رقم {course.id}</strong>
+              <span className={`account-status-pill ${STATUS_CLASSES[course.status] || (course.active ? "is-active" : "")}`}>
+                {STATUS_LABELS[course.status] || (course.active ? "نشطة" : "منتهية")}
+              </span>
+            </div>
+            <div className="account-item-meta">
+              <span>{formatDate(course.created_at)}</span>
+              {course.livreur && <span>السائق: {course.livreur}</span>}
+              {course.destination && <span>{course.destination}</span>}
+              {(course.final_price ?? course.proposed_price) != null && (
+                <span className="account-item-price">{course.final_price ?? course.proposed_price} دج</span>
+              )}
+            </div>
+          </article>
+        ))}
+      </section>
+
+      {reviews.length > 0 && (
+        <section className="account-card">
+          <h2>تقييماتي</h2>
+          {reviews.map((comment) => (
+            <article className="account-item" key={comment.id}>
+              <div className="account-item-head">
+                <strong>⭐ {comment.note || 5} / 5</strong>
+                <span className="account-item-meta">{formatDate(comment.created_at)}</span>
+              </div>
+              {comment.message && <p style={{ margin: 0 }}>{comment.message}</p>}
+            </article>
+          ))}
+        </section>
+      )}
+
+      <section className="account-card">
+        <h2>المساعدة والدعم</h2>
+        <a className="account-link" href="/livreurs">
           عرض السائقين المتاحين
         </a>
+        <a className="account-link" href="https://www.winrak.fr" target="_blank" rel="noreferrer">
+          موقع WinRak
+        </a>
+      </section>
 
-        <button
-          className="primary-btn full"
-          type="button"
-          onClick={() => setShowHistory(!showHistory)}
-        >
-          {showHistory ? "إخفاء السجل" : "السجل"}
+      <section className="account-card">
+        <h2>الخصوصية والأمان</h2>
+        <button className="account-link" type="button" onClick={() => navigate("/privacy")}>
+          سياسة الخصوصية
         </button>
+      </section>
 
-        <button className="primary-btn full"
-          style={{
-            marginTop: "14px",
-            background: "#991b1b",
-            fontFamily: '"Cairo", sans-serif',
-            fontWeight: "700",
-            fontSize: "15px",
-          }} onClick={logout} > خروج</button>
+      {error && <p className="course-request-error" role="alert">{error}</p>}
 
-        <button
-          className="primary-btn full"
-          style={{
-            marginTop: "14px",
-            background: "#991b1b",
-            fontFamily: '"Cairo", sans-serif',
-            fontWeight: "700",
-            fontSize: "15px",
-          }}
-          onClick={handleDeleteClientAccount}
-          disabled={deleting}
-        >
-          {deleting ? <LoadingSpinner label="جاري حذف الحساب..." size={20} /> : "حذف حسابي نهائياً"}
-        </button>
+      <button className="account-logout" type="button" onClick={logout}>
+        تسجيل الخروج
+      </button>
 
-        {message && (
-          <p style={{ color: "green", marginTop: "14px" }}>{message}</p>
-        )}
-
-        {error && (
-          <p style={{ color: "red", marginTop: "14px" }}>{error}</p>
-        )}
-      </div>
-
-      {showHistory && (
-        <div className="tracking-card">
-          <h2>سجل الرحلات</h2>
-
-          {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
-
-          {!loadingHistory && courses.length === 0 && (
-            <p>لا توجد رحلات مسجلة حالياً.</p>
-          )}
-
-          {!loadingHistory &&
-            courses.map((course) => (
-              <div
-                key={course.id}
-                style={{
-                  background: "#fff7ed",
-                  border: "1px solid #fed7aa",
-                  borderRadius: "18px",
-                  padding: "14px",
-                  marginBottom: "14px",
-                }}
-              >
-                <h3 style={{ marginTop: 0 }}>رحلة رقم {course.id}</h3>
-
-                <p>
-                  <strong>رقم السائق:</strong> {course.livreur}
-                </p>
-
-                <p>
-                  <strong>موقع الزبون:</strong>{" "}
-                  {course.client_latitude && course.client_longitude
-                    ? `${course.client_latitude}, ${course.client_longitude}`
-                    : "غير متوفر"}
-                </p>
-
-                <p>
-                  <strong>الحالة:</strong>{" "}
-                  {course.active ? "نشطة" : "منتهية"}
-                </p>
-
-                <p>
-                  <strong>تاريخ البداية:</strong>{" "}
-                  {course.created_at
-                    ? new Date(course.created_at).toLocaleString("ar-DZ")
-                    : "غير متوفر"}
-                </p>
-
-                <p>
-                  <strong>تاريخ النهاية:</strong>{" "}
-                  {course.finished_at
-                    ? new Date(course.finished_at).toLocaleString("ar-DZ")
-                    : "لم تنته بعد"}
-                </p>
-
-                <p>
-                  <strong>أنهى الرحلة:</strong>{" "}
-                  {course.finished_by_name
-                    ? `${course.finished_by_name} (${course.finished_by_type === "client" ? "الزبون" : "السائق"})`
-                    : "غير معروف"}
-                </p>
-
-                <div style={{ marginTop: "12px" }}>
-                  <strong>تعليقاتك على هذا السائق:</strong>
-
-                  {comments[course.livreur]?.length > 0 ? (
-                    comments[course.livreur].map((comment) => (
-                      <div
-                        key={comment.id}
-                        style={{
-                          background: "white",
-                          borderRadius: "12px",
-                          padding: "10px",
-                          marginTop: "8px",
-                          border: "1px solid #e5e7eb",
-                        }}
-                      >
-                        <p style={{ margin: 0 }}>
-                          ⭐ {comment.note || 5} / 5
-                        </p>
-                        <p>{comment.message}</p>
-                        <small>
-                          {comment.created_at
-                            ? new Date(comment.created_at).toLocaleString(
-                                "ar-DZ"
-                              )
-                            : ""}
-                        </small>
-                      </div>
-                    ))
-                  ) : (
-                    <p>لا يوجد تعليق مسجل لهذه الرحلة.</p>
-                  )}
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
+      <button
+        className="account-delete"
+        type="button"
+        onClick={handleDeleteClientAccount}
+        disabled={deleting}
+      >
+        {deleting ? "جارٍ حذف الحساب…" : "حذف الحساب نهائياً"}
+      </button>
     </section>
   );
 }
