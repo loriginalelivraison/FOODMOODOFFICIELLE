@@ -265,23 +265,11 @@ export default function Tracking() {
 
           const course = await createCourse(payload);
 
-          setActiveCourseId(course.id);
-          setCourseStarted(true);
-          setCourseMessage("رائع! يمكنك الآن متابعة السائق على الخريطة.");
-          setCourseFinished(false);
-          setShowAcceptedQuestion(false);
-          setCallButtonsHidden(true);
-
-          localStorage.setItem(
-            `activeTrackingCourse_${id}`,
-            JSON.stringify({
-              courseId: course.id,
-              courseStarted: true,
-              courseFinished: false,
-              clientPosition: position,
-              courseMessage: "رائع! يمكنك الآن متابعة السائق على الخريطة.",
-            })
-          );
+          // Le client a choisi lui-même ce chauffeur : on enchaîne directement
+          // sur le parcours normal de l'étape 2 (page de suivi de la course).
+          localStorage.removeItem(`activeTrackingCourse_${id}`);
+          navigate(`/course/${course.id}`);
+          return;
         } catch (err) {
           console.error("ERREUR CREATE COURSE :", err);
           setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
