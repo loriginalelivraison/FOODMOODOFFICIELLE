@@ -1982,18 +1982,18 @@ input::placeholder {
 .accepted-driver-list { gap: 8px; margin-top: 0; }
 .accepted-driver-card {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid #e0e6e9;
-  border-radius: 10px;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid #d9e1e6;
+  border-radius: 11px;
   background: #fff;
 }
 .accepted-driver-card > img,
 .confirmed-driver-photo {
-  width: 44px;
-  height: 44px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   object-fit: cover;
   background: #f3f6f5;
@@ -2002,13 +2002,13 @@ input::placeholder {
 .confirmed-driver-details {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: 5px;
 }
 .accepted-driver-details strong,
 .confirmed-driver-details strong {
   overflow: hidden;
   color: #18252c;
-  font-size: 14px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2183,8 +2183,8 @@ input::placeholder {
   .course-request-panel { padding: 11px; }
   .course-stepper { margin-bottom: 18px; }
   .course-stepper li { font-size: 9px; }
-  .accepted-driver-card { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; padding: 8px; }
-  .accepted-driver-card > img { width: 40px; height: 40px; }
+  .accepted-driver-card { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 9px; padding: 10px; }
+  .accepted-driver-card > img { width: 48px; height: 48px; }
   .accepted-driver-card > button { min-width: 58px; min-height: 36px; padding: 6px 8px; }
   .confirmed-driver-card { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 9px; padding: 10px; }
   .confirmed-driver-photo { width: 48px; height: 48px; }

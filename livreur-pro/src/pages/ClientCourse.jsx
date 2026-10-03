@@ -255,6 +255,7 @@ export default function ClientCourse() {
           <div className="accepted-driver-list">
             {acceptedDrivers.map((driver) => (
               <article className="accepted-driver-card" key={driver.id}>
+                <img src={defaultAvatar} alt="" />
                 <div className="accepted-driver-details">
                   <strong>{driver.nom}</strong>
                   <span>
