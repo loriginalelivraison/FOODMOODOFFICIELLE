@@ -26,6 +26,17 @@ const VEHICLE_TYPES = [
   { value: "voiture", label: "سيارة", icon: CarFront },
   { value: "camion", label: "شاحنة", icon: Truck },
 ];
+const COURSE_STATUS_LABELS = {
+  searching: "جارٍ البحث عن سائق",
+  driver_accepted: "بانتظار اختيار السائق",
+  driver_selected: "تم تأكيد السائق",
+  driver_arriving: "السائق في الطريق إليك",
+  driver_arrived: "وصل السائق",
+  in_progress: "الرحلة جارية",
+  completed: "انتهت الرحلة",
+  cancelled: "أُلغيت الرحلة",
+};
+const VEHICLE_LABELS = Object.fromEntries(VEHICLE_TYPES.map(({ value, label }) => [value, label]));
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const radians = (degrees) => (degrees * Math.PI) / 180;
@@ -352,8 +363,6 @@ export default function Couriers() {
     try {
       const updated = await cancelCourse(requestedCourse.id, cancellationReason, cancellationComment);
       setRequestedCourse(updated);
-      localStorage.removeItem("currentClientCourseId");
-      setRequestedCourseId(null);
     } catch (err) {
       setBookingError(err.message || "تعذر إلغاء الطلب.");
     } finally {
@@ -472,7 +481,7 @@ export default function Couriers() {
 
       {!requestedCourseId && !quoteRequestActive && (
         <section className="course-vehicle-section" aria-labelledby="course-vehicle-title">
-          <h2 id="course-vehicle-title">اختر نوع المركبة</h2>
+          <h2 id="course-vehicle-title" style={{ fontSize: "13px" ,textAlign: "center"}} >اختر نوع المركبة</h2>
           <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
             {VEHICLE_TYPES.map(({ value, label, icon: Icon }) => (
               <button
@@ -491,13 +500,14 @@ export default function Couriers() {
         </section>
       )}
 
-      {!requestedCourseId && !quoteRequestActive && !destinationPosition && (
-        <p className="destination-choice-hint" dir="rtl">
+      {!requestedCourseId && selectedVehicle && !quoteRequestActive && !destinationPosition && (
+        
+        <h2 style={{ fontSize: "13px" ,textAlign: "center"}}>
           أدخل وجهتك في الحقل أو اخترها من الخريطة
-        </p>
+        </h2>
       )}
 
-      {!requestedCourseId && !quoteRequestActive && <div className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
+      {!requestedCourseId && selectedVehicle && !quoteRequestActive && <div className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
         {!destinationPosition && (
           <label className="destination-text-field">
             <input
@@ -533,7 +543,7 @@ export default function Couriers() {
         </button>
       </div>}
 
-      {!requestedCourseId && !quoteRequestActive && hasDestination && !destinationConfirmed && (
+      {!requestedCourseId && selectedVehicle && !quoteRequestActive && hasDestination && !destinationConfirmed && (
         <button
           className="destination-confirm-button"
           type="button"
@@ -547,11 +557,12 @@ export default function Couriers() {
         </button>
       )}
 
+      {(requestedCourseId || priceCalculating || priceQuote || bookingError) && (
       <section className="course-request-panel" aria-labelledby="course-request-title">
         {!requestedCourseId && selectedVehicle && hasDestination && priceCalculating && (
           <div className="course-price-loading" role="status" aria-live="polite">
             <LoadingSpinner label="" size={34} />
-            <strong>جارٍ حساب السعر</strong>
+            <strong style={{ fontSize: "13px" ,textAlign: "center"}}>جارٍ حساب السعر</strong>
           </div>
         )}
 
@@ -624,15 +635,49 @@ export default function Couriers() {
           <div className="course-request-status" aria-live="polite">
             <div className="course-status-heading">
               <h3>الطلب رقم {requestedCourse.id}</h3>
-              <span>{requestedCourse.status === "searching" ? "جارٍ البحث عن سائق" : requestedCourse.status === "driver_accepted" ? "وصلت ردود السائقين" : requestedCourse.status === "driver_selected" ? "تم تأكيد السائق" : requestedCourse.status === "cancelled" ? "تم إلغاء الطلب" : requestedCourse.status}</span>
+              <span className={`course-status-badge status-${requestedCourse.status}`}>
+                {COURSE_STATUS_LABELS[requestedCourse.status] || requestedCourse.status}
+              </span>
             </div>
-            <p>
-              {requestedCourse.estimated_distance_km != null
-                ? `المسافة التقديرية: ${requestedCourse.estimated_distance_km} كم · `
-                : "جارٍ تقدير المسافة · "}
-              السعر النهائي: {requestedCourse.final_price ?? requestedCourse.proposed_price} دج
-              {Number(requestedCourse.surcharge_percent) > 0 && ` (زيادة ${requestedCourse.surcharge_percent}٪)`}
-            </p>
+
+            <div className={`course-stage-card status-${requestedCourse.status}`} aria-live="polite">
+              <strong>{COURSE_STATUS_LABELS[requestedCourse.status] || "تحديث حالة الرحلة"}</strong>
+              <p>
+                {requestedCourse.status === "searching"
+                  ? "يتم إرسال طلبك إلى السائقين القريبين. سنعرض لك ردودهم هنا."
+                  : requestedCourse.status === "driver_accepted"
+                  ? "اختر السائق المناسب من القائمة للانتقال إلى تأكيد الرحلة."
+                  : requestedCourse.status === "driver_selected"
+                  ? "تم تأكيد السائق. افتح متابعة الرحلة لمعرفة آخر المستجدات."
+                  : requestedCourse.status === "driver_arriving"
+                  ? "السائق في طريقه إليك. يمكنك متابعة موقعه من صفحة الرحلة."
+                  : requestedCourse.status === "driver_arrived"
+                  ? "وصل السائق إلى نقطة الانطلاق. استعد لبدء الرحلة."
+                  : requestedCourse.status === "in_progress"
+                  ? "انطلقت الرحلة، والسائق في طريقه إلى وجهتك."
+                  : requestedCourse.status === "completed"
+                  ? "اكتملت الرحلة بنجاح."
+                  : requestedCourse.status === "cancelled"
+                  ? "تم إلغاء هذا الطلب."
+                  : "تابع حالة الرحلة من هذه الصفحة."}
+              </p>
+            </div>
+
+            <div className="course-details-banner" aria-label="معلومات إضافية عن الرحلة">
+              <span>
+                <b>المسافة</b>
+                {requestedCourse.estimated_distance_km == null ? "قيد التقدير" : `${requestedCourse.estimated_distance_km} كم`}
+              </span>
+              <span>
+                <b>المركبة</b>
+                {VEHICLE_LABELS[requestedCourse.vehicle_type] || requestedCourse.vehicle_type || "غير محددة"}
+              </span>
+              <span>
+                <b>السعر</b>
+                {requestedCourse.final_price ?? requestedCourse.proposed_price} دج
+                {Number(requestedCourse.surcharge_percent) > 0 && ` · زيادة ${requestedCourse.surcharge_percent}٪`}
+              </span>
+            </div>
 
             {requestedCourse.status === "searching" && !requestedCourse.accepted_drivers?.length && (
               <div className={`driver-wait-state ${responseSecondsLeft === 0 ? "driver-wait-expired" : ""}`} aria-live="polite">
@@ -640,7 +685,7 @@ export default function Couriers() {
                 <div>
                   {responseSecondsLeft > 0 ? (
                     <>
-                      <strong>جارٍ البحث عن سائقين قريبين</strong>
+                      <h3>جارٍ البحث عن سائقين قريبين</h3>
                       <span>بانتظار الردود · {responseSecondsLeft.toLocaleString("ar-DZ")} ثانية</span>
                     </>
                   ) : (
@@ -649,26 +694,6 @@ export default function Couriers() {
                       <span>لا يزال بإمكانك الانتظار، فقد يصل رد لاحقاً، أو إلغاء الطلب.</span>
                     </>
                   )}
-                </div>
-              </div>
-            )}
-
-            {requestedCourse.status === "driver_accepted" && (
-              <div className="course-progress-notice" aria-live="polite">
-                <LoadingSpinner label="" size={28} />
-                <div>
-                  <strong>بانتظار اختيارك للسائق</strong>
-                  <p>اختر أحد السائقين الذين قبلوا الطلب للانتقال إلى تأكيد الرحلة.</p>
-                </div>
-              </div>
-            )}
-
-            {requestedCourse.status === "driver_selected" && (
-              <div className="course-progress-notice" aria-live="polite">
-                <LoadingSpinner label="" size={28} />
-                <div>
-                  <strong>السائق في طريقه إليك</strong>
-                  <p>انتظر وصول السائق، ويمكنك فتح متابعة الرحلة للاطلاع على التفاصيل.</p>
                 </div>
               </div>
             )}
@@ -690,7 +715,7 @@ export default function Couriers() {
                       {selectingDriverId === driver.id ? "جارٍ التأكيد…" : "اختيار"}
                     </button>
                   </article>
-                )) : <p>بانتظار ردود السائقين القريبين…</p>}
+                )) : null}
               </div>
             )}
 
@@ -720,12 +745,26 @@ export default function Couriers() {
                 <button type="submit" disabled={cancellingCourse}>{cancellingCourse ? "جارٍ الإلغاء…" : "إلغاء الطلب"}</button>
               </form>
             )}
+            {["completed", "cancelled"].includes(requestedCourse.status) && (
+              <button
+                className="course-request-submit"
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem("currentClientCourseId");
+                  setRequestedCourse(null);
+                  setRequestedCourseId(null);
+                }}
+              >
+                طلب رحلة جديدة
+              </button>
+            )}
           </div>
         )}
       </section>
+      )}
 
       {!requestedCourseId && !hasDestination && <section className="nearby-couriers" aria-labelledby="nearby-couriers-title">
-        <h2 id="nearby-couriers-title">السائقون المتاحون حولك</h2>
+        <h2 id="nearby-couriers-title" style={{ textAlign: "center"}}>السائقون المتاحون حولك</h2>
         {couriersLoading && <LoadingSpinner label="جاري تحميل السائقين..." />}
         {couriersError && <p className="course-request-error" role="alert">{couriersError}</p>}
         {!couriersLoading && !couriersError && matchingCouriers.length === 0 && (

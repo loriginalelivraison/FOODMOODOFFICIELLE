@@ -141,8 +141,8 @@ export default function LivreurCourse() {
     setError("");
 
     try {
-      await finishCourse(course.id);
-      navigate(`/livreur-dashboard/${course.livreur}`);
+      const updated = await finishCourse(course.id);
+      setCourse(updated);
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
       setFinishing(false);
@@ -175,37 +175,53 @@ export default function LivreurCourse() {
   const hasRouteTarget = routeIsDestination
     ? course.destination_latitude !== null && course.destination_longitude !== null
     : hasClientLocation;
+  const courseStatusClass = isOffer && course.my_offer_response === "accepted"
+    ? "driver_accepted"
+    : course.status;
+  const vehicleLabels = { moto: "دراجة نارية", scooter: "دراجة نارية", voiture: "سيارة", camion: "شاحنة" };
 
   return (
     <section className="page" dir="rtl">
-      <div
-        style={{
-          background: "#fff7ed",
-          border: "1px solid #fed7aa",
-          borderRadius: "24px",
-          padding: "22px",
-          marginBottom: "18px",
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>تفاصيل الرحلة</h2>
-        <p style={{ fontWeight: "700" }}>رقم الرحلة: {course.id}</p>
-        <p style={{ color: "#4b5563" }}>
-          حالة الرحلة: {isOffer ? course.my_offer_response === "accepted" ? "قبلت الرحلة · في انتظار اختيار الزبون" : "طلب جديد" : course.status === "driver_selected" ? "تم اختيارك · توجه إلى الزبون" : course.status === "driver_arrived" ? "وصلت إلى الزبون" : course.status === "in_progress" ? "الرحلة جارية" : course.status === "completed" ? "منتهية" : course.status === "cancelled" ? "ملغاة" : course.active ? "نشطة" : "منتهية"}
-        </p>
-        <p style={{ color: "#4b5563" }}>
-          موقع الزبون: {hasClientLocation ? "متوفر" : "غير متوفر"}
-        </p>
-      </div>
+      <header className="course-follow-header">
+        <div>
+          <span className="course-request-kicker">WinRak · الرحلة رقم {course.id}</span>
+          <h1>تفاصيل الرحلة</h1>
+        </div>
+        <strong className={`course-status-badge status-${courseStatusClass}`}>
+          {course.status === "completed" ? "اكتملت الرحلة" : course.status === "cancelled" ? "أُلغيت الرحلة" : isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد" : course.status === "driver_selected" ? "تم تأكيد السائق" : course.status === "driver_arrived" ? "وصل السائق" : course.status === "in_progress" ? "الرحلة جارية" : "الرحلة نشطة"}
+        </strong>
+      </header>
 
-      {((isOffer && course.my_offer_response === "accepted") || ["driver_selected", "driver_arriving", "driver_arrived", "in_progress"].includes(course.status)) && (
-        <div className="course-progress-notice" aria-live="polite">
-          <LoadingSpinner label="" size={28} />
+      {(isOffer || ["driver_selected", "driver_arriving", "driver_arrived", "in_progress"].includes(course.status)) && (
+        <div className="course-stage-card" aria-live="polite">
+          <span className="course-stage-indicator" aria-hidden="true" />
           <div>
-            <strong>{isOffer ? "بانتظار اختيار الزبون لك" : course.status === "driver_selected" || course.status === "driver_arriving" ? "أنت في الطريق إلى الزبون" : course.status === "driver_arrived" ? "بانتظار بدء الزبون للرحلة" : "الرحلة جارية الآن"}</strong>
-            <p>{isOffer ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : course.status === "driver_selected" || course.status === "driver_arriving" ? "توجه إلى موقع الزبون، وسيتم تحديث حالة الرحلة عند وصولك." : course.status === "driver_arrived" ? "أبلغ الزبون بوصولك وانتظر بدء الرحلة." : "توجه إلى الوجهة المحددة لإكمال الرحلة."}</p>
+            <strong>{isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب رحلة جديد" : course.status === "driver_selected" || course.status === "driver_arriving" ? "أنت في الطريق إلى العميل" : course.status === "driver_arrived" ? "بانتظار بدء الرحلة" : "الرحلة جارية الآن"}</strong>
+            <p>{isOffer ? course.my_offer_response === "accepted" ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : course.status === "driver_selected" || course.status === "driver_arriving" ? "توجه إلى موقع العميل، وسيتم تحديث الحالة عند وصولك." : course.status === "driver_arrived" ? "أبلغ العميل بوصولك وانتظر بدء الرحلة." : "توجه إلى الوجهة المحددة لإكمال الرحلة."}</p>
           </div>
         </div>
       )}
+      {course.status === "completed" && (
+        <div className="course-terminal-message course-terminal-completed" role="status">
+          <strong>اكتملت الرحلة بنجاح</strong>
+          <span>تم تحديث حالة الرحلة للعميل أيضاً. شكراً لك.</span>
+          <button className="secondary-btn" type="button" onClick={() => navigate(`/livreur-dashboard/${course.livreur}`)}>
+            العودة إلى لوحة السائق
+          </button>
+        </div>
+      )}
+      {course.status === "cancelled" && (
+        <div className="course-terminal-message course-terminal-cancelled" role="status">
+          <strong>أُلغيت الرحلة</strong>
+          <span>تم تحديث حالة الرحلة للعميل أيضاً.</span>
+        </div>
+      )}
+      <div className="course-details-banner" aria-label="معلومات إضافية عن الرحلة">
+        <span><b>موقع العميل</b>{hasClientLocation ? "متوفر" : "غير متوفر"}</span>
+        <span><b>المسافة</b>{course.estimated_distance_km == null ? "غير متوفرة" : `${course.estimated_distance_km} كم`}</span>
+        <span><b>المركبة</b>{vehicleLabels[course.vehicle_type] || course.vehicle_type || "غير محددة"}</span>
+        <span><b>السعر</b>{course.final_price ?? course.proposed_price} دج</span>
+      </div>
 
       {isOffer && course.my_offer_response !== "accepted" && (
         <div className="driver-offer-actions" dir="rtl">
@@ -214,7 +230,7 @@ export default function LivreurCourse() {
         </div>
       )}
 
-      {course.livreur && <button
+      {course.livreur && !["completed", "cancelled"].includes(course.status) && <button
         className="primary-btn full"
         type="button"
         onClick={startRoute}
@@ -239,7 +255,7 @@ export default function LivreurCourse() {
         </button>
       )}
 
-      {course.active && (course.status === "in_progress" || !course.destination) && (
+      {course.status !== "completed" && course.active && (course.status === "in_progress" || !course.destination) && (
         <button
           className="primary-btn full"
           type="button"
