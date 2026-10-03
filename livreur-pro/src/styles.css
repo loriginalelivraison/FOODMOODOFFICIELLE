@@ -2449,6 +2449,31 @@ input::placeholder {
   cursor: pointer;
 }
 .account-delete:disabled { opacity: .6; cursor: wait; }
+.account-points {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 9px;
+  padding: 16px;
+  border: 1px solid #ffd7ab;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff3e0, #ffe7cc);
+  text-align: center;
+}
+.account-points strong {
+  color: #ea580c;
+  font-size: 36px;
+  line-height: 1;
+}
+.account-points-icon { font-size: 26px; line-height: 1; }
+.account-points-label { color: #9a3412; font-size: 14px; font-weight: 800; }
+.account-points-hint {
+  margin: 0;
+  color: #9a3412;
+  font-size: 12px;
+  text-align: center;
+  opacity: .85;
+}
 .account-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

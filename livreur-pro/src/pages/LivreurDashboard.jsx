@@ -558,7 +558,6 @@ export default function LivreurDashboard() {
             <span>📞 {livreur.telephone}</span>
             {profile?.note != null && <span>⭐ {profile.note}</span>}
             {profile?.nombre_livraisons != null && <span>🚚 {profile.nombre_livraisons} رحلة</span>}
-            {profile?.points != null && <span>🏅 {profile.points} نقطة</span>}
           </span>
           <span className={`account-badge ${isAvailable ? "is-online" : "is-offline"}`}>
             {isAvailable ? "متاح" : "غير متاح"}
@@ -621,6 +620,26 @@ export default function LivreurDashboard() {
           </button>
         </section>
       )}
+
+      <section className="account-card">
+        <h2>حالة حسابك</h2>
+        <div className="account-points">
+          <span className="account-points-icon" aria-hidden="true">🏅</span>
+          <strong>{profile?.points ?? 0}</strong>
+          <span className="account-points-label">نقطة</span>
+        </div>
+        <p className="account-points-hint">تُضاف نقاط مكافأة مع كل رحلة مكتملة.</p>
+        <div className="account-stat-grid">
+          <div className="account-stat">
+            <span>رحلات مكتملة</span>
+            <strong>{profile?.nombre_livraisons ?? 0}</strong>
+          </div>
+          <div className="account-stat">
+            <span>التقييم</span>
+            <strong>{profile?.note != null ? `⭐ ${profile.note}` : "—"}</strong>
+          </div>
+        </div>
+      </section>
 
       <section className="account-card">
         <h2>حالة الاستقبال</h2>

@@ -262,6 +262,7 @@ export default function ClientDashboard() {
 
   const initial = (client.nom || "؟").trim().charAt(0) || "؟";
   const reviews = Object.values(comments).flat();
+  const completedCourses = courses.filter((course) => course.status === "completed").length;
 
   return (
     <section className="page account-page" dir="rtl">
@@ -271,7 +272,6 @@ export default function ClientDashboard() {
           <h1>{client.nom}</h1>
           <span className="account-meta">
             <span>📞 {client.telephone}</span>
-            {clientPoints != null && <span>🏅 {clientPoints} نقطة</span>}
           </span>
         </div>
         <button
@@ -321,6 +321,26 @@ export default function ClientDashboard() {
           <p className="account-empty">ليست لديك رحلة نشطة حالياً.</p>
         )}
         {activeCourseError && <p className="course-request-error" role="alert">{activeCourseError}</p>}
+      </section>
+
+      <section className="account-card">
+        <h2>حالة حسابك</h2>
+        <div className="account-points">
+          <span className="account-points-icon" aria-hidden="true">🏅</span>
+          <strong>{clientPoints ?? 0}</strong>
+          <span className="account-points-label">نقطة</span>
+        </div>
+        <p className="account-points-hint">تُضاف نقاط مكافأة مع كل رحلة مكتملة.</p>
+        <div className="account-stat-grid">
+          <div className="account-stat">
+            <span>رحلات مكتملة</span>
+            <strong>{completedCourses}</strong>
+          </div>
+          <div className="account-stat">
+            <span>إجمالي الرحلات</span>
+            <strong>{courses.length}</strong>
+          </div>
+        </div>
       </section>
 
       {editingProfile && (
