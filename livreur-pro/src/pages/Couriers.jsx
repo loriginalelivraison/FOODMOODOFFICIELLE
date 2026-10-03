@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bike, CarFront, Minus, Plus, Truck } from "lucide-react";
+import { Bike, CarFront, Minus, Plus, Star, Truck } from "lucide-react";
 import {
+  createCommentaireLivreur,
   createCourseRequest,
   cancelCourse,
   getCourse,
@@ -12,6 +13,7 @@ import {
 import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import defaultAvatar from "../assets/pasdephoto.png";
 import {
   getLocationErrorMessage,
   isIOSDevice,
@@ -20,23 +22,33 @@ import {
 
 const MIN_COURSE_PRICE_DZD = 100;
 const PRICE_ADJUSTMENT_DZD = 50;
-const DRIVER_RESPONSE_WINDOW_SECONDS = 50;
 const VEHICLE_TYPES = [
   { value: "moto", label: "دراجة نارية", icon: Bike },
   { value: "voiture", label: "سيارة", icon: CarFront },
   { value: "camion", label: "شاحنة", icon: Truck },
 ];
-const COURSE_STATUS_LABELS = {
-  searching: "جارٍ البحث عن سائق",
-  driver_accepted: "بانتظار اختيار السائق",
-  driver_selected: "تم تأكيد السائق",
-  driver_arriving: "السائق في الطريق إليك",
-  driver_arrived: "وصل السائق",
-  in_progress: "الرحلة جارية",
-  completed: "انتهت الرحلة",
-  cancelled: "أُلغيت الرحلة",
+const COURSE_STEPS = ["الطلب", "السائق", "في الطريق", "وصل", "انتهت"];
+const VEHICLE_LABELS = {
+  moto: "دراجة نارية",
+  scooter: "دراجة نارية",
+  voiture: "سيارة",
+  camion: "شاحنة",
 };
-const VEHICLE_LABELS = Object.fromEntries(VEHICLE_TYPES.map(({ value, label }) => [value, label]));
+
+function hasCoordinates(latitude, longitude) {
+  return latitude !== null && latitude !== undefined
+    && longitude !== null && longitude !== undefined
+    && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
+}
+
+function getCourseStepIndex(status) {
+  if (status === "searching") return 0;
+  if (["driver_accepted", "driver_selected"].includes(status)) return 1;
+  if (status === "driver_arriving") return 2;
+  if (["driver_arrived", "in_progress"].includes(status)) return 3;
+  if (status === "completed") return 4;
+  return -1;
+}
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const radians = (degrees) => (degrees * Math.PI) / 180;
@@ -49,6 +61,289 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
       Math.sin(longitudeDelta / 2) ** 2;
 
   return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function CourseTrackingPanel({
+  course,
+  couriers,
+  onChooseDriver,
+  selectingDriverId,
+  onCancel,
+  cancelling,
+  onReviewSubmit,
+  reviewAlreadySubmitted,
+  reviewRating,
+  setReviewRating,
+  reviewMessage,
+  setReviewMessage,
+  submittingReview,
+  reviewError,
+  onNewRequest,
+}) {
+  const acceptedDrivers = course.accepted_drivers || [];
+  const selectedDriver = acceptedDrivers.find(
+    (driver) => String(driver.id) === String(course.livreur)
+  ) || acceptedDrivers[0];
+  const selectedDriverProfile = couriers.find(
+    (courier) => String(courier.id) === String(selectedDriver?.id)
+  );
+  const stepIndex = getCourseStepIndex(course.status);
+  const hasStart = hasCoordinates(course.client_latitude, course.client_longitude);
+  const hasDestination = hasCoordinates(
+    course.destination_latitude,
+    course.destination_longitude
+  );
+  const hasDriverPosition = hasCoordinates(selectedDriver?.latitude, selectedDriver?.longitude);
+  const trackingCouriers = selectedDriver && hasDriverPosition
+    ? [{
+        id: selectedDriver.id,
+        name: selectedDriver.nom,
+        vehicle: selectedDriver.vehicule,
+        available: true,
+        latitude: Number(selectedDriver.latitude),
+        longitude: Number(selectedDriver.longitude),
+      }]
+    : [];
+  const showMap = course.status === "driver_arriving"
+    ? hasStart && hasDriverPosition
+    : course.status === "in_progress"
+      && hasStart && (hasDestination || course.route_geometry?.length > 1);
+  const vehicleLabels = {
+    moto: "دراجة نارية",
+    scooter: "دراجة نارية",
+    voiture: "سيارة",
+    camion: "شاحنة",
+  };
+
+  return (
+    <div className="course-request-status course-tracking-status">
+      {stepIndex >= 0 && (
+        <nav
+          className="course-stepper"
+          aria-label="مراحل الرحلة"
+          style={{ "--course-progress": `${(stepIndex / (COURSE_STEPS.length - 1)) * 84}%` }}
+        >
+          <ol>
+            {COURSE_STEPS.map((step, index) => (
+              <li
+                className={[
+                  index < stepIndex ? "step-complete" : "",
+                  index === stepIndex ? "step-active" : "",
+                ].filter(Boolean).join(" ")}
+                key={step}
+                aria-current={index === stepIndex ? "step" : undefined}
+              >
+                <span className="course-step-dot" aria-hidden="true">
+                  {index < stepIndex ? "✓" : index + 1}
+                </span>
+                <span className="course-step-label">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
+
+      <div
+        key={course.status}
+        className={`course-tracking-stage status-${course.status}`}
+        aria-live="polite"
+      >
+        {course.status === "searching" && (
+          <div className="course-searching-state">
+            <span className="course-search-pulse" aria-hidden="true" />
+            <strong>جارٍ البحث عن سائق قريب</strong>
+          </div>
+        )}
+
+        {course.status === "driver_accepted" && (
+          <h3 className="course-tracking-title">اختر السائق المناسب</h3>
+        )}
+
+        {["searching", "driver_accepted"].includes(course.status) && (
+          <>
+            {acceptedDrivers.length > 0 && (
+              <div className="accepted-driver-list">
+                {acceptedDrivers.map((driver) => {
+                  const profile = couriers.find(
+                    (courier) => String(courier.id) === String(driver.id)
+                  );
+                  const offerPrice = course.final_price ?? course.proposed_price;
+
+                  return (
+                    <article className="accepted-driver-card" key={driver.id}>
+                      <img src={profile?.photo || defaultAvatar} alt="" />
+                      <div className="accepted-driver-details">
+                        <strong>{driver.nom}</strong>
+                        <span>
+                          {vehicleLabels[driver.vehicule] || driver.vehicule}
+                          {driver.note != null && (
+                            <> · <Star size={14} fill="currentColor" aria-hidden="true" /> {driver.note}</>
+                          )}
+                          {driver.distance_km != null && <> · {driver.distance_km} كم</>}
+                        </span>
+                        {offerPrice != null && <span>{offerPrice} دج</span>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onChooseDriver(driver.id)}
+                        disabled={selectingDriverId !== null}
+                      >
+                        {selectingDriverId === driver.id ? "جارٍ التأكيد…" : "اختيار"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              className="course-cancel-button"
+              type="button"
+              onClick={onCancel}
+              disabled={cancelling}
+            >
+              {cancelling ? "جارٍ الإلغاء…" : "إلغاء الطلب"}
+            </button>
+          </>
+        )}
+
+        {["driver_selected", "driver_arriving", "driver_arrived"].includes(course.status) && (
+          <>
+            {course.status === "driver_selected" && (
+              <h3 className="course-tracking-title">تم تأكيد السائق</h3>
+            )}
+            {course.status === "driver_arriving" && (
+              <h3 className="course-tracking-title">سائقك في الطريق إليك</h3>
+            )}
+            {course.status === "driver_arrived" && (
+              <h3 className="course-arrived-title">وصل سائقك</h3>
+            )}
+            {selectedDriver && (
+              <article className="confirmed-driver-card">
+                <img
+                  src={selectedDriverProfile?.photo || defaultAvatar}
+                  alt=""
+                  className="confirmed-driver-photo"
+                />
+                <div className="confirmed-driver-details">
+                  <strong>{selectedDriver.nom}</strong>
+                  <span>{vehicleLabels[selectedDriver.vehicule] || selectedDriver.vehicule}</span>
+                  {course.status !== "driver_arrived" && (
+                    <span className="confirmed-driver-meta">
+                      {selectedDriver.note != null && <>★ {selectedDriver.note}</>}
+                      {selectedDriver.distance_km != null && (
+                        <>{selectedDriver.note != null ? " · " : ""}{selectedDriver.distance_km} كم</>
+                      )}
+                    </span>
+                  )}
+                </div>
+                {selectedDriver.telephone && (
+                  <a
+                    className="tracking-call-button"
+                    href={`tel:${selectedDriver.telephone}`}
+                    aria-label={`اتصل بـ ${selectedDriver.nom}`}
+                  >
+                    اتصال
+                  </a>
+                )}
+              </article>
+            )}
+            {course.status === "driver_arriving" && showMap && (
+              <div className="course-tracking-map">
+                <CouriersMap
+                  couriers={trackingCouriers}
+                  clientPosition={{
+                    latitude: Number(course.client_latitude),
+                    longitude: Number(course.client_longitude),
+                  }}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {course.status === "in_progress" && (
+          <>
+            <h3 className="course-tracking-title">الرحلة جارية</h3>
+            {course.destination && (
+              <div className="course-destination">
+                <span>الوجهة</span>
+                <strong>{course.destination}</strong>
+              </div>
+            )}
+            {showMap && (
+              <div className="course-tracking-map">
+                <CouriersMap
+                  couriers={trackingCouriers}
+                  clientPosition={{
+                    latitude: Number(course.client_latitude),
+                    longitude: Number(course.client_longitude),
+                  }}
+                  destinationPosition={hasDestination ? {
+                    latitude: Number(course.destination_latitude),
+                    longitude: Number(course.destination_longitude),
+                  } : null}
+                  routeGeometry={course.route_geometry}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {course.status === "completed" && (
+          <section className="course-review-card" aria-label="تقييم الرحلة">
+            {reviewAlreadySubmitted ? (
+              <strong className="course-review-success" role="status">شكراً لك على تقييمك</strong>
+            ) : course.livreur ? (
+              <form onSubmit={onReviewSubmit}>
+                <h3>كيف كانت رحلتك؟</h3>
+                <div className="course-review-stars" role="group" aria-label="تقييم من نجمة إلى خمس نجوم" dir="ltr">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      type="button"
+                      key={rating}
+                      aria-label={`${rating} نجوم`}
+                      aria-pressed={reviewRating === rating}
+                      onClick={() => setReviewRating(rating)}
+                    >
+                      <Star
+                        size={27}
+                        fill={rating <= reviewRating ? "currentColor" : "none"}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  ))}
+                </div>
+                <label>
+                  <span className="visually-hidden">تعليق اختياري</span>
+                  <textarea
+                    value={reviewMessage}
+                    onChange={(event) => setReviewMessage(event.target.value)}
+                    maxLength={1000}
+                    placeholder="تعليق اختياري"
+                  />
+                </label>
+                {reviewError && <p className="course-request-error" role="alert">{reviewError}</p>}
+                <button type="submit" disabled={submittingReview}>
+                  {submittingReview ? "جارٍ الإرسال…" : "إرسال"}
+                </button>
+              </form>
+            ) : (
+              <p className="course-request-error" role="alert">تعذر تحديد السائق لإرسال التقييم.</p>
+            )}
+          </section>
+        )}
+
+        {course.status === "cancelled" && (
+          <div className="course-cancelled-state">
+            <h3>أُلغيت الرحلة</h3>
+            <button className="course-request-submit" type="button" onClick={onNewRequest}>
+              طلب رحلة جديدة
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function Couriers() {
@@ -81,10 +376,13 @@ export default function Couriers() {
   );
   const [requestedCourse, setRequestedCourse] = useState(null);
   const [selectingDriverId, setSelectingDriverId] = useState(null);
-  const [cancellationReason, setCancellationReason] = useState("changed_mind");
-  const [cancellationComment, setCancellationComment] = useState("");
+  const cancellationReason = "changed_mind";
   const [cancellingCourse, setCancellingCourse] = useState(false);
-  const [responseSecondsLeft, setResponseSecondsLeft] = useState(DRIVER_RESPONSE_WINDOW_SECONDS);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const hasDestination = Boolean(destinationPosition || destination.trim());
   const mapDestinationPosition = priceQuote
     ? {
@@ -242,24 +540,6 @@ export default function Couriers() {
     };
   }, [requestedCourseId]);
 
-  useEffect(() => {
-    if (!requestedCourse || !["searching", "driver_accepted"].includes(requestedCourse.status)) return;
-    if (requestedCourse.accepted_drivers?.length) {
-      setResponseSecondsLeft(0);
-      return;
-    }
-
-    const createdAt = new Date(requestedCourse.created_at).getTime();
-    if (!Number.isFinite(createdAt)) return;
-    const updateRemaining = () => {
-      const elapsed = Math.floor((Date.now() - createdAt) / 1000);
-      setResponseSecondsLeft(Math.max(0, DRIVER_RESPONSE_WINDOW_SECONDS - elapsed));
-    };
-    updateRemaining();
-    const interval = setInterval(updateRemaining, 1000);
-    return () => clearInterval(interval);
-  }, [requestedCourse]);
-
   async function handleRequestCourse(event) {
     event.preventDefault();
     if (bookingLoading) return;
@@ -344,8 +624,8 @@ export default function Couriers() {
     setSelectingDriverId(driverId);
     setBookingError("");
     try {
-      await selectCourseDriver(requestedCourse.id, driverId);
-      navigate(`/course/${requestedCourse.id}`);
+      const updatedCourse = await selectCourseDriver(requestedCourse.id, driverId);
+      setRequestedCourse(updatedCourse);
     } catch (err) {
       setBookingError(err.message || "تعذر تأكيد هذا السائق.");
       const latest = await getCourse(requestedCourse.id).catch(() => null);
@@ -355,18 +635,37 @@ export default function Couriers() {
     }
   }
 
-  async function handleCancelRequest(event) {
-    event.preventDefault();
+  async function handleCancelRequest() {
     if (!requestedCourse || cancellingCourse) return;
     setCancellingCourse(true);
     setBookingError("");
     try {
-      const updated = await cancelCourse(requestedCourse.id, cancellationReason, cancellationComment);
+      const updated = await cancelCourse(requestedCourse.id, cancellationReason);
       setRequestedCourse(updated);
     } catch (err) {
       setBookingError(err.message || "تعذر إلغاء الطلب.");
     } finally {
       setCancellingCourse(false);
+    }
+  }
+
+  async function handleReviewSubmit(event) {
+    event.preventDefault();
+    if (!requestedCourse?.livreur || submittingReview || reviewSubmitted) return;
+    setSubmittingReview(true);
+    setReviewError("");
+    try {
+      await createCommentaireLivreur({
+        livreur: requestedCourse.livreur,
+        note: reviewRating,
+        message: reviewMessage.trim() || "بدون تعليق",
+      });
+      localStorage.setItem(`courseReviewSubmitted:${requestedCourse.id}`, "true");
+      setReviewSubmitted(true);
+    } catch (err) {
+      setReviewError(err.message || "تعذر إرسال تقييمك. يرجى المحاولة مجدداً.");
+    } finally {
+      setSubmittingReview(false);
     }
   }
 
@@ -445,6 +744,10 @@ export default function Couriers() {
       }
     };
   }, []);
+
+  const reviewAlreadySubmitted = reviewSubmitted || Boolean(
+    requestedCourse && localStorage.getItem(`courseReviewSubmitted:${requestedCourse.id}`) === "true"
+  );
 
   return (
     <section className="page couriers-page" dir="rtl">
@@ -632,16 +935,40 @@ export default function Couriers() {
         )}
 
         {requestedCourse && (
-          <div className="course-request-status" aria-live="polite">
-            <div className="course-status-heading">
+          <CourseTrackingPanel
+            course={requestedCourse}
+            couriers={couriers}
+            onChooseDriver={handleSelectDriver}
+            selectingDriverId={selectingDriverId}
+            onCancel={handleCancelRequest}
+            cancelling={cancellingCourse}
+            onReviewSubmit={handleReviewSubmit}
+            reviewAlreadySubmitted={reviewAlreadySubmitted}
+            reviewRating={reviewRating}
+            setReviewRating={setReviewRating}
+            reviewMessage={reviewMessage}
+            setReviewMessage={setReviewMessage}
+            submittingReview={submittingReview}
+            reviewError={reviewError}
+            onNewRequest={() => {
+              localStorage.removeItem("currentClientCourseId");
+              setRequestedCourse(null);
+              setRequestedCourseId(null);
+            }}
+          />
+        )}
+
+        {false && requestedCourse && (
+          <div className="course-request-status course-tracking-status" aria-live="polite">
+            <div className="course-status-heading" hidden>
               <h3>الطلب رقم {requestedCourse.id}</h3>
               <span className={`course-status-badge status-${requestedCourse.status}`}>
-                {COURSE_STATUS_LABELS[requestedCourse.status] || requestedCourse.status}
+                {requestedCourse.status}
               </span>
             </div>
 
             <div className={`course-stage-card status-${requestedCourse.status}`} aria-live="polite">
-              <strong>{COURSE_STATUS_LABELS[requestedCourse.status] || "تحديث حالة الرحلة"}</strong>
+              <strong>{requestedCourse.status === "searching" ? "جارٍ البحث عن سائق قريب" : "متابعة الرحلة"}</strong>
               <p>
                 {requestedCourse.status === "searching"
                   ? "يتم إرسال طلبك إلى السائقين القريبين. سنعرض لك ردودهم هنا."
