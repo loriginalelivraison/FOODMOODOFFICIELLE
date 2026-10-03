@@ -165,28 +165,38 @@ export default function ClientCourse() {
   const active = !["completed", "cancelled"].includes(course.status);
   const reviewAlreadySubmitted = reviewSubmitted
     || localStorage.getItem(`courseReviewSubmitted:${course.id}`) === "true";
-  const showMap = course.status === "driver_arriving"
-    ? hasStart && hasDriverPosition
-    : course.status === "driver_selected"
-      ? arrivalConfirmed && hasStart
-      : course.status === "in_progress"
-        && hasStart && (hasDestination || course.route_geometry?.length > 1);
+  const showMap = hasStart && [
+    "driver_accepted",
+    "driver_selected",
+    "driver_arriving",
+    "driver_arrived",
+    "in_progress",
+    "completed",
+  ].includes(course.status);
   const driverRoute = hasStart && hasDriverPosition
     ? [
         [Number(selectedDriver.longitude), Number(selectedDriver.latitude)],
         [Number(course.client_longitude), Number(course.client_latitude)],
       ]
     : null;
-  const mapCouriers = selectedDriver && hasDriverPosition
-    ? [{
-        id: selectedDriver.id,
-        name: selectedDriver.nom,
-        vehicle: selectedDriver.vehicule,
-        available: true,
-        latitude: Number(selectedDriver.latitude),
-        longitude: Number(selectedDriver.longitude),
-      }]
-    : [];
+  const mapDrivers = course.livreur
+    ? [selectedDriver].filter(Boolean)
+    : course.status === "driver_accepted"
+      ? acceptedDrivers
+      : [];
+  const mapCouriers = mapDrivers
+    .filter((driver) => positionIsValid(driver.latitude, driver.longitude))
+    .map((driver) => ({
+      id: driver.id,
+      name: driver.nom,
+      vehicle: driver.vehicule,
+      available: true,
+      latitude: Number(driver.latitude),
+      longitude: Number(driver.longitude),
+    }));
+  const routeGeometry = course.route_geometry?.length > 1
+    ? course.route_geometry
+    : driverRoute;
   const cancelIsInCallChoice = course.status === "driver_selected" && called && !arrivalConfirmed;
 
   return (
@@ -224,7 +234,7 @@ export default function ClientCourse() {
         </nav>
       )}
 
-      <div key={course.status} className="course-tracking-stage" aria-live="polite">
+      <div className="course-tracking-stage" aria-live="polite">
         {course.status === "searching" && (
           <div className="course-searching-state">
             <span className="course-search-pulse" aria-hidden="true" />
@@ -312,22 +322,6 @@ export default function ClientCourse() {
               </div>
             )}
 
-            {showMap && (
-              <div className="course-tracking-map">
-                <CouriersMap
-                  couriers={mapCouriers}
-                  clientPosition={{
-                    latitude: Number(course.client_latitude),
-                    longitude: Number(course.client_longitude),
-                  }}
-                  routeGeometry={course.status === "in_progress" ? course.route_geometry : driverRoute}
-                  destinationPosition={course.status === "in_progress" && hasDestination ? {
-                    latitude: Number(course.destination_latitude),
-                    longitude: Number(course.destination_longitude),
-                  } : null}
-                />
-              </div>
-            )}
           </>
         )}
 
@@ -340,23 +334,24 @@ export default function ClientCourse() {
                 <strong>{course.destination}</strong>
               </div>
             )}
-            {showMap && (
-              <div className="course-tracking-map">
-                <CouriersMap
-                  couriers={mapCouriers}
-                  clientPosition={{
-                    latitude: Number(course.client_latitude),
-                    longitude: Number(course.client_longitude),
-                  }}
-                  destinationPosition={hasDestination ? {
-                    latitude: Number(course.destination_latitude),
-                    longitude: Number(course.destination_longitude),
-                  } : null}
-                  routeGeometry={course.route_geometry}
-                />
-              </div>
-            )}
           </>
+        )}
+
+        {showMap && (
+          <div className="course-tracking-map">
+            <CouriersMap
+              couriers={mapCouriers}
+              clientPosition={{
+                latitude: Number(course.client_latitude),
+                longitude: Number(course.client_longitude),
+              }}
+              destinationPosition={hasDestination ? {
+                latitude: Number(course.destination_latitude),
+                longitude: Number(course.destination_longitude),
+              } : null}
+              routeGeometry={routeGeometry}
+            />
+          </div>
         )}
 
         {course.status === "completed" && (
