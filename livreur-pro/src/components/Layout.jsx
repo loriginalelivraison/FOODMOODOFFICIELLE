@@ -62,6 +62,12 @@ export default function Layout() {
     ? `/livreur-dashboard/${auth.user?.id}`
     : "/client-dashboard";
 
+  const homeLink =
+    auth.token && auth.role === "livreur" && auth.user?.id
+      ? `/livreur-dashboard/${auth.user.id}`
+      : "/";
+
+
   return (
     <div className="app-shell">
       <header className="topbar pro-topbar">
@@ -113,7 +119,7 @@ export default function Layout() {
         </div>
 
         <nav className="desktop-nav">
-          <NavLink to="/" className={linkClass}>
+          <NavLink to={homeLink} className={linkClass}>
             الرئيسية
           </NavLink>
 
@@ -145,7 +151,7 @@ export default function Layout() {
       <nav className="bottom-nav">
     
 
-        <NavLink to="/" className={bottomLinkClass}>
+        <NavLink to={homeLink} className={bottomLinkClass}>
           <Home size={20} />
           <span>الرئيسية</span>
         </NavLink>

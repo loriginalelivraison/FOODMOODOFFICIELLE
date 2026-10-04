@@ -15,6 +15,7 @@ import {
 } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import MapActionButton from "../components/MapActionButton.jsx";
+import LivreurOrders from "../components/LivreurOrders.jsx";
 import { useNavigate } from "react-router-dom";
 
 function formatDate(value) {
@@ -199,19 +200,33 @@ export default function LivreurDashboard() {
     }
   }, [showHistory]);
 
-  async function loadHistory() {
-    setLoadingHistory(true);
-    setError("");
+  async function loadHistory(silent = false) {
+    if (!silent) {
+      setLoadingHistory(true);
+      setError("");
+    }
 
     try {
       const data = await getLivreurCourses();
       setCourses(data);
     } catch (err) {
-      setError(err.message || "حدث خطأ أثناء تحميل السجل");
+      if (!silent) {
+        setError(err.message || "حدث خطأ أثناء تحميل السجل");
+      }
     } finally {
-      setLoadingHistory(false);
+      if (!silent) {
+        setLoadingHistory(false);
+      }
     }
   }
+
+  useEffect(() => {
+    if (!livreur?.id) return undefined;
+
+    const interval = setInterval(() => loadHistory(true), 8000);
+
+    return () => clearInterval(interval);
+  }, [livreur?.id]);
 
   async function handleOfferResponse(courseId, response) {
     if (respondingOfferId) return;
@@ -219,11 +234,13 @@ export default function LivreurDashboard() {
     setError("");
     try {
       await respondToCourseOffer(courseId, response);
+      await Promise.all([loadHistory(true), loadActiveCourse()]);
       const updatedOffers = await getCourseOffers();
       setCourseOffers(updatedOffers);
     } catch (err) {
       setError(err.message || "تعذر تحديث طلب الرحلة.");
       getCourseOffers().then(setCourseOffers).catch(() => {});
+      loadHistory(true).catch(() => {});
     } finally {
       setRespondingOfferId(null);
     }
@@ -301,10 +318,9 @@ export default function LivreurDashboard() {
     };
   }, [livreur?.id, trackingEnabled]);
 
- useEffect(() => {
-  if (!livreur?.id) return;
-
   async function loadActiveCourse() {
+    if (!livreur?.id) return;
+
     try {
       const data = await getActiveCoursesForLivreur(livreur.id);
 
@@ -324,12 +340,15 @@ export default function LivreurDashboard() {
     }
   }
 
-  loadActiveCourse();
+  useEffect(() => {
+    if (!livreur?.id) return undefined;
 
-  const interval = setInterval(loadActiveCourse, 5000);
+    loadActiveCourse();
 
-  return () => clearInterval(interval);
-}, [livreur?.id]);
+    const interval = setInterval(loadActiveCourse, 5000);
+
+    return () => clearInterval(interval);
+  }, [livreur?.id]);
 
   useEffect(() => {
     if (!livreur?.id) return;
@@ -452,14 +471,16 @@ export default function LivreurDashboard() {
     localStorage.setItem("livreurTrackingEnabled", "true");
   }
 
-  async function handleFinishCourse() {
-    if (!activeCourse || finishingCourse) return;
+  async function handleFinishCourse(courseId) {
+    const targetCourse = activeCourse || courses.find((course) => course.id === courseId);
+
+    if (!targetCourse || finishingCourse) return;
 
     setFinishingCourse(true);
     setError("");
 
     try {
-      await finishCourse(activeCourse.id);
+      await finishCourse(targetCourse.id);
       setActiveCourse(null);
       setCourseNotification("");
       setMessage("تم إنهاء الرحلة وتسجيلها في السجل.");
@@ -577,49 +598,16 @@ export default function LivreurDashboard() {
         </button>
       </header>
 
-      {activeCourse && (
-        <section className="account-card">
-          <h2>رحلتي الحالية</h2>
-          <div className="account-row">
-            <span className="account-row-label">رقم الرحلة</span>
-            <span className="account-row-value">#{activeCourse.id}</span>
-          </div>
-          {activeCourse.destination && (
-            <div className="account-row">
-              <span className="account-row-label">الوجهة</span>
-              <span className="account-row-value">{activeCourse.destination}</span>
-            </div>
-          )}
-          {activeCourse.client_latitude != null && activeCourse.client_longitude != null && (
-            <div className="account-row">
-              <span className="account-row-label">موقع العميل</span>
-              <span className="account-row-value">{activeCourse.client_latitude}, {activeCourse.client_longitude}</span>
-            </div>
-          )}
-          {(activeCourse.final_price ?? activeCourse.proposed_price) != null && (
-            <div className="account-row">
-              <span className="account-row-label">الأجرة</span>
-              <span className="account-row-value">{activeCourse.final_price ?? activeCourse.proposed_price} دج</span>
-            </div>
-          )}
-          <button
-            className="primary-btn full"
-            type="button"
-            onClick={() => navigate(`/livreur-course/${activeCourse.id}`)}
-          >
-            فتح الرحلة
-          </button>
-          <button
-            className="primary-btn full"
-            type="button"
-            onClick={handleFinishCourse}
-            disabled={finishingCourse}
-            style={{ background: "#dc2626" }}
-          >
-            {finishingCourse ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
-          </button>
-        </section>
-      )}
+      <LivreurOrders
+        livreurId={livreur.id}
+        courses={courses}
+        loading={loadingHistory}
+        respondingOfferId={respondingOfferId}
+        finishingCourseId={finishingCourse ? activeCourse?.id ?? true : null}
+        onAccept={(courseId) => handleOfferResponse(courseId, "accepted")}
+        onReject={(courseId) => handleOfferResponse(courseId, "rejected")}
+        onFinish={handleFinishCourse}
+      />
 
       <section className="account-card">
         <h2>حالة حسابك</h2>
@@ -694,44 +682,6 @@ export default function LivreurDashboard() {
         </section>
       )}
 
-      {courseOffers.length > 0 && (
-        <section className="driver-offers" aria-live="polite">
-          <h2>طلبات الرحلات</h2>
-          {courseOffers.map((offer) => (
-            <article className="driver-offer" key={offer.id}>
-              <div className="driver-offer-head">
-                <strong>طلب رحلة جديد · #{offer.id}</strong>
-                <span>{offer.my_offer_response === "accepted" ? "في انتظار اختيار الزبون" : "طلب جديد"}</span>
-              </div>
-              <p>📍 الانطلاق: {offer.client_latitude}, {offer.client_longitude}</p>
-              <p>🎯 الوجهة: {offer.destination}</p>
-              <p>📏 المسافة التقريبية: {offer.estimated_distance_km == null ? "قيد التقدير" : `${offer.estimated_distance_km} كم`}</p>
-              <p>💰 السعر المقترح: {offer.final_price ?? offer.proposed_price} دج</p>
-              <p>🕒 وقت الطلب: {new Date(offer.created_at).toLocaleTimeString("ar-DZ", { hour: "2-digit", minute: "2-digit" })}</p>
-              {offer.my_offer_response === "accepted" && (
-                <div className="course-progress-notice" aria-live="polite">
-                  <LoadingSpinner label="" size={28} />
-                  <div>
-                    <strong>بانتظار اختيار الزبون لك</strong>
-                    <p>تم إرسال قبولك. سنعرض تحديث الرحلة هنا عند اختيارك.</p>
-                  </div>
-                </div>
-              )}
-              {offer.my_offer_response === "pending" && (
-                <div className="driver-offer-actions">
-                  <button type="button" onClick={() => handleOfferResponse(offer.id, "accepted")} disabled={respondingOfferId !== null}>
-                    {respondingOfferId === offer.id ? "جارٍ الإرسال…" : "قبول"}
-                  </button>
-                  <button type="button" onClick={() => handleOfferResponse(offer.id, "rejected")} disabled={respondingOfferId !== null}>
-                    رفض
-                  </button>
-                </div>
-              )}
-            </article>
-          ))}
-        </section>
-      )}
-
       {message && (
         <p style={{ color: "green", textAlign: "center", fontWeight: "600" }}>
           {message}
@@ -787,8 +737,15 @@ export default function LivreurDashboard() {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+            maxNativeZoom={16}
+          />
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+            maxNativeZoom={16}
           />
 
           <RecenterMap

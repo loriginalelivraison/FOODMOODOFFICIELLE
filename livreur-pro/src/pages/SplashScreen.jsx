@@ -6,6 +6,29 @@ export default function SplashLogo() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const role = localStorage.getItem("role");
+    const livreurStorage = localStorage.getItem("livreur");
+
+    let livreurId = null;
+
+    if (livreurStorage) {
+      try {
+        livreurId = JSON.parse(livreurStorage)?.id ?? null;
+      } catch {
+        livreurId = null;
+      }
+    }
+
+    if (role === "livreur" && livreurId) {
+      navigate(`/livreur-dashboard/${livreurId}`, { replace: true });
+      return undefined;
+    }
+
+    if (role === "client") {
+      navigate("/client-dashboard", { replace: true });
+      return undefined;
+    }
+
     const timer = setTimeout(() => {
       navigate("/livreurs");
     }, 3000);

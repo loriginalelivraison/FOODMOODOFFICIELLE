@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bike, CarFront, Minus, Plus, Star, Truck } from "lucide-react";
+import { Bike, CarFront, MapPin, Minus, Plus, Star, Truck } from "lucide-react";
 import {
   createCommentaireLivreur,
   createCourseRequest,
   cancelCourse,
-  finishCourse,
   getCourse,
   getCourseQuote,
-  getLivreurs,
   selectCourseDriver,
 } from "../livreursapi.js";
-import CourierCard from "../components/CourierCard.jsx";
 import CouriersMap from "../components/CouriersMap.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import defaultAvatar from "../assets/pasdephoto.png";
@@ -67,7 +64,7 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
 
 function CourseTrackingPanel({
   course,
-  couriers,
+  couriers = [],
   onChooseDriver,
   selectingDriverId,
   onCancel,
@@ -85,8 +82,6 @@ function CourseTrackingPanel({
   onDriverCall,
   arrivalConfirmed,
   onConfirmArrival,
-  onFinish,
-  finishing,
 }) {
   const acceptedDrivers = course.accepted_drivers || [];
   const selectedDriver = acceptedDrivers.find(
@@ -333,18 +328,6 @@ function CourseTrackingPanel({
           </>
         )}
 
-        {course.status !== "completed" && course.status !== "cancelled" && (
-          <button
-            className="primary-btn full"
-            type="button"
-            onClick={onFinish}
-            disabled={finishing}
-            style={{ background: "#dc2626", marginTop: "12px" }}
-          >
-            {finishing ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
-          </button>
-        )}
-
         {course.status === "completed" && (
           <section className="course-review-card" aria-label="تقييم الرحلة">
             {reviewAlreadySubmitted ? (
@@ -405,10 +388,6 @@ function CourseTrackingPanel({
 export default function Couriers() {
   const navigate = useNavigate();
 
-  const [couriers, setCouriers] = useState([]);
-  const [couriersLoading, setCouriersLoading] = useState(true);
-  const [couriersError, setCouriersError] = useState("");
-  const [visibleCourierCount, setVisibleCourierCount] = useState(12);
   const clientWatchRef = useRef(null);
   const autoLocationRequestedRef = useRef(false);
   const [clientPosition, setClientPosition] = useState(null);
@@ -418,7 +397,6 @@ export default function Couriers() {
   const [destination, setDestination] = useState("");
   const [destinationConfirmed, setDestinationConfirmed] = useState(false);
   const [selectingDestination, setSelectingDestination] = useState(false);
-  const [finishingCourse, setFinishingCourse] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [proposedPrice, setProposedPrice] = useState("");
   const [priceQuote, setPriceQuote] = useState(null);
@@ -514,69 +492,6 @@ export default function Couriers() {
     });
     return () => cancelAnimationFrame(frame);
   }, [priceQuote]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCouriers() {
-      try {
-        const data = await getLivreurs();
-        const livreurList = Array.isArray(data) ? data : data.results || [];
-        if (cancelled) return;
-
-        setCouriers(livreurList.map((livreur) => ({
-          id: livreur.id,
-          name: livreur.nom,
-          city: livreur.ville,
-          vehicle: livreur.vehicule === "scooter" ? "moto" : livreur.vehicule,
-          available: Boolean(livreur.disponible),
-          rating: livreur.note ?? null,
-          deliveries: livreur.nombre_livraisons,
-          latitude: livreur.latitude == null ? null : Number(livreur.latitude),
-          longitude: livreur.longitude == null ? null : Number(livreur.longitude),
-          phone: livreur.telephone,
-          photo: livreur.photo,
-        })));
-        setCouriersError("");
-      } catch (err) {
-        if (!cancelled) setCouriersError(err.message || "تعذر تحميل السائقين.");
-      } finally {
-        if (!cancelled) setCouriersLoading(false);
-      }
-    }
-
-    loadCouriers();
-    const interval = setInterval(loadCouriers, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const nearbyCouriers = useMemo(() => {
-    let availableCouriers = couriers.filter((courier) => courier.available);
-    if (!clientPosition) return availableCouriers;
-
-    availableCouriers = availableCouriers
-      .filter((courier) => courier.latitude != null && courier.longitude != null)
-      .map((courier) => ({
-        ...courier,
-        distanceKm: getDistanceKm(
-          clientPosition.latitude,
-          clientPosition.longitude,
-          courier.latitude,
-          courier.longitude
-        ),
-      }))
-      .filter((courier) => courier.distanceKm <= 40)
-      .sort((first, second) => first.distanceKm - second.distanceKm);
-
-    return availableCouriers;
-  }, [couriers, clientPosition]);
-  const matchingCouriers = selectedVehicle
-    ? nearbyCouriers.filter((courier) => courier.vehicle === selectedVehicle)
-    : nearbyCouriers;
-  const visibleCouriers = matchingCouriers.slice(0, visibleCourierCount);
 
   useEffect(() => {
     if (!requestedCourseId) return;
@@ -713,21 +628,6 @@ export default function Couriers() {
     }
   }
 
-  async function handleFinishRequest() {
-    if (!requestedCourse || finishingCourse) return;
-    setFinishingCourse(true);
-    setBookingError("");
-    try {
-      const updated = await finishCourse(requestedCourse.id);
-      setRequestedCourse(updated);
-      localStorage.removeItem("currentClientCourseId");
-    } catch (err) {
-      setBookingError(err.message || "تعذر إنهاء الرحلة.");
-    } finally {
-      setFinishingCourse(false);
-    }
-  }
-
   async function handleCancelRequest() {
     if (!requestedCourse || cancellingCourse) return;
     setCancellingCourse(true);
@@ -857,7 +757,6 @@ export default function Couriers() {
 
       {shouldShowMap && <div className="couriers-map-frame">
           <CouriersMap
-            couriers={matchingCouriers}
             clientPosition={clientPosition}
             onRequestClientPosition={handleFindAroundMe}
             isLocating={searchingLocation}
@@ -879,7 +778,7 @@ export default function Couriers() {
 
       {!requestedCourseId && !quoteRequestActive && (
         <section className="course-vehicle-section" aria-labelledby="course-vehicle-title">
-          <h2 id="course-vehicle-title" style={{ fontSize: "13px" ,textAlign: "center"}} >اختر نوع المركبة</h2>
+          <h2 id="course-vehicle-title" className="couriers-step-title">اختر نوع المركبة</h2>
           <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
             {VEHICLE_TYPES.map(({ value, label, icon: Icon }) => (
               <button
@@ -890,7 +789,7 @@ export default function Couriers() {
                 disabled={!clientPosition}
                 onClick={() => setSelectedVehicle(value)}
               >
-                <Icon size={23} aria-hidden="true" />
+                <Icon size={28} aria-hidden="true" />
                 <span>{label}</span>
               </button>
             ))}
@@ -899,13 +798,13 @@ export default function Couriers() {
       )}
 
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && !destinationPosition && (
-        
-        <h2 style={{ fontSize: "13px" ,textAlign: "center"}}>
+        <h2 className="couriers-step-title">
           أدخل وجهتك في الحقل أو اخترها من الخريطة
         </h2>
       )}
 
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && <div className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
+        <div className="destination-combo">
         {!destinationPosition && (
           <label className="destination-text-field">
             <input
@@ -920,16 +819,19 @@ export default function Couriers() {
                 setProposedPrice("");
                 setPriceCalculating(false);
               }}
-              placeholder="الوجهة أو العنوان"
-              aria-label=" الوجهة أو العنوان"
+              placeholder="حدد وجهتك"
+              aria-label="حدد وجهتك"
               maxLength={255}
               disabled={!clientPosition}
             />
           </label>
         )}
+        {!destinationPosition && (
+          <MapPin size={22} aria-hidden="true" className="destination-combo-icon" />
+        )}
         <button
           type="button"
-          className={selectingDestination ? "destination-picker-active" : ""}
+          className={`destination-map-button ${selectingDestination ? "destination-picker-active" : ""}`}
           onClick={handleDestinationSelectionToggle}
           disabled={!clientPosition}
         >
@@ -937,8 +839,9 @@ export default function Couriers() {
             ? "إنهاء التحديد"
             : destinationPosition
             ? "تغيير الوجهة على الخريطة"
-            : "اختيار من الخريطة"}
+            : "من الخريطة"}
         </button>
+        </div>
       </div>}
 
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && hasDestination && !destinationConfirmed && (
@@ -966,8 +869,9 @@ export default function Couriers() {
 
         {!requestedCourseId && priceQuote && !priceCalculating && (
           <form ref={priceFormRef} className="course-request-form" onSubmit={handleRequestCourse}>
-            <label>
-              السعر المقترح (دج)
+            <div className="course-price-block">
+              <span className="course-price-label">السعر المقترح</span>
+
               <span className="course-price-stepper" dir="ltr">
                 <button
                   type="button"
@@ -976,7 +880,7 @@ export default function Couriers() {
                   disabled={bookingLoading}
                   onClick={() => adjustProposedPrice(PRICE_ADJUSTMENT_DZD)}
                 >
-                  <Plus size={17} aria-hidden="true" />
+                  <Plus size={24} aria-hidden="true" />
                 </button>
                 <span className="course-price-field" dir="rtl">
                   <input
@@ -997,14 +901,17 @@ export default function Couriers() {
                   disabled={bookingLoading || Number(proposedPrice) <= MIN_COURSE_PRICE_DZD}
                   onClick={() => adjustProposedPrice(-PRICE_ADJUSTMENT_DZD)}
                 >
-                  <Minus size={17} aria-hidden="true" />
+                  <Minus size={24} aria-hidden="true" />
                 </button>
               </span>
+
               <span className="course-quote-distance">المسافة التقديرية: {priceQuote.estimated_distance_km} كم</span>
+
               {proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD && (
                 <small className="course-price-error">الحد الأدنى للسعر هو {MIN_COURSE_PRICE_DZD} دج.</small>
               )}
-            </label>
+            </div>
+
             <button
               className="course-request-submit"
               type="submit"
@@ -1032,13 +939,10 @@ export default function Couriers() {
         {requestedCourse && (
           <CourseTrackingPanel
             course={requestedCourse}
-            couriers={couriers}
             onChooseDriver={handleSelectDriver}
             selectingDriverId={selectingDriverId}
             onCancel={handleCancelRequest}
             cancelling={cancellingCourse}
-            onFinish={handleFinishRequest}
-            finishing={finishingCourse}
             onReviewSubmit={handleReviewSubmit}
             reviewAlreadySubmitted={reviewAlreadySubmitted}
             reviewRating={reviewRating}
@@ -1191,29 +1095,6 @@ export default function Couriers() {
       </section>
       )}
 
-      {!requestedCourseId && !hasDestination && <section className="nearby-couriers" aria-labelledby="nearby-couriers-title">
-        <h2 id="nearby-couriers-title" style={{ textAlign: "center"}}>السائقون المتاحون حولك</h2>
-        {couriersLoading && <LoadingSpinner label="جاري تحميل السائقين..." />}
-        {couriersError && <p className="course-request-error" role="alert">{couriersError}</p>}
-        {!couriersLoading && !couriersError && matchingCouriers.length === 0 && (
-          <p className="nearby-couriers-empty">لا يوجد سائقون متاحون بالقرب منك حالياً.</p>
-        )}
-        <div className="courier-grid">
-          {visibleCouriers.map((courier) => (
-            <CourierCard courier={courier} key={courier.id} />
-          ))}
-        </div>
-        {matchingCouriers.length > visibleCourierCount && (
-          <button
-            className="course-request-submit nearby-couriers-more"
-            type="button"
-            onClick={() => setVisibleCourierCount((count) => count + 12)}
-          >
-            المزيد
-          </button>
-        )}
-      </section>}
-
-    </section>
+      </section>
   );
 }

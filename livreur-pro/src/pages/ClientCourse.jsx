@@ -4,7 +4,6 @@ import { Star } from "lucide-react";
 import {
   cancelCourse,
   createCommentaireLivreur,
-  finishCourse,
   getCourse,
   selectCourseDriver,
 } from "../livreursapi.js";
@@ -42,7 +41,6 @@ export default function ClientCourse() {
   const [course, setCourse] = useState(null);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
-  const [finishing, setFinishing] = useState(false);
   const [selectingDriverId, setSelectingDriverId] = useState(null);
   const [calledCourseId, setCalledCourseId] = useState(null);
   const [arrivalConfirmedCourseId, setArrivalConfirmedCourseId] = useState(null);
@@ -98,21 +96,6 @@ export default function ClientCourse() {
       setError(err.message || "تعذر إلغاء الرحلة.");
     } finally {
       setCancelling(false);
-    }
-  }
-
-  async function handleFinish() {
-    if (!course || finishing || !active) return;
-    setFinishing(true);
-    setError("");
-    try {
-      const updated = await finishCourse(course.id);
-      setCourse(updated);
-      localStorage.removeItem("currentClientCourseId");
-    } catch (err) {
-      setError(err.message || "تعذر إنهاء الرحلة.");
-    } finally {
-      setFinishing(false);
     }
   }
 
@@ -426,18 +409,6 @@ export default function ClientCourse() {
               العودة إلى الرئيسية
             </button>
           </div>
-        )}
-
-        {active && (
-          <button
-            className="primary-btn full"
-            type="button"
-            onClick={handleFinish}
-            disabled={finishing}
-            style={{ background: "#dc2626", marginBottom: "10px" }}
-          >
-            {finishing ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
-          </button>
         )}
 
         {active && !cancelIsInCallChoice && (
