@@ -124,7 +124,7 @@ export default function Layout() {
           </NavLink>
 
           <NavLink to="/livreurs" className={linkClass}>
-            السائقون
+            توصيلة
           </NavLink>
 
           {!auth.token ? (
@@ -158,7 +158,7 @@ export default function Layout() {
 
         <NavLink to="/livreurs" className={bottomLinkClass}>
           <Users size={20} />
-          <span>السائقون</span>
+          <span>توصيلة</span>
         </NavLink>
 
         {!auth.token ? (

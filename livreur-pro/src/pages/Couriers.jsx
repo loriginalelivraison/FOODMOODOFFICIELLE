@@ -860,11 +860,7 @@ export default function Couriers() {
         </section>
       )}
 
-      {!requestedCourseId && selectedVehicle && !quoteRequestActive && !destinationPosition && (
-        <h2 className="couriers-step-title">
-          أدخل وجهتك في الحقل أو اخترها من الخريطة
-        </h2>
-      )}
+      
 
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && <div ref={destinationSectionRef} className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
         <div className="destination-combo">
@@ -893,7 +889,7 @@ export default function Couriers() {
           disabled={!clientPosition}
         >
           {selectingDestination
-            ? "إنهاء التحديد"
+            ? " "
             : destinationPosition
             ? "تغيير الوجهة على الخريطة"
             : "من الخريطة"}
