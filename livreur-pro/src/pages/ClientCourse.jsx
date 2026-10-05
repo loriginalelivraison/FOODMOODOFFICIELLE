@@ -12,6 +12,18 @@ import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import defaultAvatar from "../assets/pasdephoto.png";
 
 const COURSE_STEPS = ["الطلب", "السائق", "في الطريق", "وصل", "انتهت"];
+// Commande de livraison (livreur) : deux jambes, retrait puis livraison.
+const DELIVERY_STEPS = ["الطلب", "السائق", "في الطريق", "تم الاستلام", "وصل"];
+// Un taxi va directement du client a la destination : vocabulaire inchange.
+const DELIVERY_VEHICLE_TYPES = ["moto", "camion"];
+
+function isDeliveryVehicle(vehicleType) {
+  return DELIVERY_VEHICLE_TYPES.includes(vehicleType);
+}
+
+function getSteps(vehicleType) {
+  return isDeliveryVehicle(vehicleType) ? DELIVERY_STEPS : COURSE_STEPS;
+}
 const VEHICLE_LABELS = {
   moto: "دراجة نارية",
   scooter: "دراجة نارية",
@@ -156,6 +168,9 @@ export default function ClientCourse() {
     (candidate) => String(candidate.id) === String(course.livreur)
   ) || acceptedDrivers[0];
   const stepIndex = getStepIndex(course.status);
+  const isDelivery = isDeliveryVehicle(course.vehicle_type);
+  const steps = getSteps(course.vehicle_type);
+  const hasPickupPoint = positionIsValid(course.pickup_latitude, course.pickup_longitude);
   const hasStart = positionIsValid(course.client_latitude, course.client_longitude);
   const hasDestination = positionIsValid(
     course.destination_latitude,
@@ -183,7 +198,10 @@ export default function ClientCourse() {
   const driverRoute = hasSelectedDriver && hasStart && hasDriverPosition
     ? [
         [Number(selectedDriver.longitude), Number(selectedDriver.latitude)],
-        [Number(course.client_longitude), Number(course.client_latitude)],
+        // Livraison : le livreur rejoint d'abord le magasin.
+        isDelivery && hasPickupPoint
+          ? [Number(course.pickup_longitude), Number(course.pickup_latitude)]
+          : [Number(course.client_longitude), Number(course.client_latitude)],
       ]
     : null;
   const mapDrivers = course.livreur
@@ -201,9 +219,13 @@ export default function ClientCourse() {
       latitude: Number(driver.latitude),
       longitude: Number(driver.longitude),
     }));
-  const routeGeometry = course.route_geometry?.length > 1
-    ? course.route_geometry
-    : driverRoute;
+  const routeGeometry = (
+    isDelivery && course.trip_route_geometry?.length > 1
+      ? course.trip_route_geometry
+      : course.route_geometry?.length > 1
+        ? course.route_geometry
+        : driverRoute
+  );
   const cancelIsInCallChoice = course.status === "driver_selected" && called && !arrivalConfirmed;
 
   return (
@@ -219,10 +241,10 @@ export default function ClientCourse() {
         <nav
           className="course-stepper"
           aria-label="مراحل الرحلة"
-          style={{ "--course-progress": `${(stepIndex / (COURSE_STEPS.length - 1)) * 84}%` }}
+          style={{ "--course-progress": `${(stepIndex / (steps.length - 1)) * 84}%` }}
         >
           <ol>
-            {COURSE_STEPS.map((step, index) => (
+            {steps.map((step, index) => (
               <li
                 className={[
                   index < stepIndex ? "step-complete" : "",
@@ -344,10 +366,18 @@ export default function ClientCourse() {
 
         {course.status === "in_progress" && (
           <>
-            <h2 className="course-tracking-title">الرحلة جارية</h2>
+            <h2 className="course-tracking-title">
+              {isDelivery ? "طلبك في الطريق إليك" : "الرحلة جارية"}
+            </h2>
+            {isDelivery && (course.pickup_name || course.pickup_address) && (
+              <div className="course-destination">
+                <span>تم الاستلام من</span>
+                <strong>{course.pickup_name || course.pickup_address}</strong>
+              </div>
+            )}
             {course.destination && (
               <div className="course-destination">
-                <span>الوجهة</span>
+                <span>{isDelivery ? "التسليم" : "الوجهة"}</span>
                 <strong>{course.destination}</strong>
               </div>
             )}
@@ -358,10 +388,10 @@ export default function ClientCourse() {
           <div className="course-tracking-map">
             <CouriersMap
               couriers={mapCouriers}
-              clientPosition={{
+              clientPosition={hasStart ? {
                 latitude: Number(course.client_latitude),
                 longitude: Number(course.client_longitude),
-              }}
+              } : null}
               destinationPosition={hasDestination ? {
                 latitude: Number(course.destination_latitude),
                 longitude: Number(course.destination_longitude),

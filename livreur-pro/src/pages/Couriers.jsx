@@ -30,6 +30,16 @@ const VEHICLE_TYPES = [
   { value: "camion", label: "شاحنة", icon: Truck },
 ];
 const COURSE_STEPS = ["الطلب", "السائق", "في الطريق", "وصل", "انتهت"];
+// Commande de livraison (livreur) : le trajet comporte deux jambes,
+// retrait chez le commerçant puis livraison chez le client.
+const DELIVERY_STEPS = ["الطلب", "السائق", "في الطريق", "تم الاستلام", "وصل"];
+// Un taxi se déplace directement du client vers sa destination :
+// le vocabulaire historique est conservé tel quel.
+const DELIVERY_VEHICLE_TYPES = ["moto", "camion"];
+
+function isDeliveryVehicle(vehicleType) {
+  return DELIVERY_VEHICLE_TYPES.includes(vehicleType);
+}
 const VEHICLE_LABELS = {
   moto: "دراجة نارية",
   scooter: "دراجة نارية",
@@ -48,7 +58,8 @@ function getCourseStepIndex(status) {
   if (status === "driver_accepted") return 1;
   // Dès que le client confirme le chauffeur, l'étape passe à "في الطريق" (en route).
   if (["driver_selected", "driver_arriving"].includes(status)) return 2;
-  if (["driver_arrived", "in_progress"].includes(status)) return 3;
+  // "picked_up" = commande récupérée chez le commerçant : on part vers le client.
+  if (["driver_arrived", "picked_up", "in_progress"].includes(status)) return 3;
   if (status === "completed") return 4;
   return -1;
 }
@@ -95,6 +106,10 @@ function CourseTrackingPanel({
     (courier) => String(courier.id) === String(selectedDriver?.id)
   );
   const stepIndex = getCourseStepIndex(course.status);
+  const isDelivery = isDeliveryVehicle(course.vehicle_type);
+  const steps = isDelivery ? DELIVERY_STEPS : COURSE_STEPS;
+  // En livraison, la jambe en cours part du magasin vers le client.
+  const hasPickupPoint = hasCoordinates(course.pickup_latitude, course.pickup_longitude);
   const hasStart = hasCoordinates(course.client_latitude, course.client_longitude);
   const hasDestination = hasCoordinates(
     course.destination_latitude,
@@ -117,10 +132,23 @@ function CourseTrackingPanel({
       ? arrivalConfirmed && hasStart
       : course.status === "in_progress"
       && hasStart && (hasDestination || course.route_geometry?.length > 1);
-  const driverToClientRoute = hasStart && hasDriverPosition
+  // En livraison, le livreur rejoint d'abord le magasin : c'est la jambe affichée
+// jusqu'a la prise en charge. En taxi, la cible reste le client.
+  const legTarget = isDelivery && hasPickupPoint
+    ? {
+        latitude: Number(course.pickup_latitude),
+        longitude: Number(course.pickup_longitude),
+      }
+    : hasStart
+      ? {
+          latitude: Number(course.client_latitude),
+          longitude: Number(course.client_longitude),
+        }
+      : null;
+  const driverToClientRoute = legTarget && hasDriverPosition
     ? [
         [Number(selectedDriver.longitude), Number(selectedDriver.latitude)],
-        [Number(course.client_longitude), Number(course.client_latitude)],
+        [legTarget.longitude, legTarget.latitude],
       ]
     : null;
   const vehicleLabels = {
@@ -136,10 +164,10 @@ function CourseTrackingPanel({
         <nav
           className="course-stepper"
           aria-label="مراحل الرحلة"
-          style={{ "--course-progress": `${(stepIndex / (COURSE_STEPS.length - 1)) * 84}%` }}
+          style={{ "--course-progress": `${(stepIndex / (steps.length - 1)) * 84}%` }}
         >
           <ol>
-            {COURSE_STEPS.map((step, index) => (
+            {steps.map((step, index) => (
               <li
                 className={[
                   index < stepIndex ? "step-complete" : "",
@@ -171,6 +199,21 @@ function CourseTrackingPanel({
           <div className="course-searching-state">
             <span className="course-search-pulse" aria-hidden="true" />
             <strong>جارٍ البحث عن سائق قريب</strong>
+          </div>
+        )}
+
+        {isDelivery && hasPickupPoint && (
+          <div className="course-details-banner" aria-label="معلومات المتجر">
+            <span>
+              <b>المتجر</b>
+              {course.pickup_name || course.pickup_address || "موقع محدد على الخريطة"}
+            </span>
+            {course.pickup_phone && (
+              <span>
+                <b>الهاتف</b>
+                {course.pickup_phone}
+              </span>
+            )}
           </div>
         )}
 
@@ -231,10 +274,14 @@ function CourseTrackingPanel({
               <h3 className="course-tracking-title">تم تأكيد السائق</h3>
             )}
             {course.status === "driver_arriving" && (
-              <h3 className="course-tracking-title">سائقك في الطريق إليك</h3>
+              <h3 className="course-tracking-title">
+                {isDelivery ? "سائقك في الطريق إلى المتجر" : "سائقك في الطريق إليك"}
+              </h3>
             )}
             {course.status === "driver_arrived" && (
-              <h3 className="course-arrived-title">وصل سائقك</h3>
+              <h3 className="course-arrived-title">
+                {isDelivery ? "وصل سائقك إلى المتجر" : "وصل سائقك"}
+              </h3>
             )}
             {selectedDriver && (
               <article className="confirmed-driver-card">
@@ -306,10 +353,18 @@ function CourseTrackingPanel({
 
         {course.status === "in_progress" && (
           <>
-            <h3 className="course-tracking-title">الرحلة جارية</h3>
+            <h3 className="course-tracking-title">
+              {isDelivery ? "الطلب في الطريق إليك" : "الرحلة جارية"}
+            </h3>
+            {isDelivery && (course.pickup_name || course.pickup_address) && (
+              <div className="course-destination">
+                <span>تم الاستلام من</span>
+                <strong>{course.pickup_name || course.pickup_address}</strong>
+              </div>
+            )}
             {course.destination && (
               <div className="course-destination">
-                <span>الوجهة</span>
+                <span>{isDelivery ? "التسليم" : "الوجهة"}</span>
                 <strong>{course.destination}</strong>
               </div>
             )}
@@ -325,7 +380,13 @@ function CourseTrackingPanel({
                     latitude: Number(course.destination_latitude),
                     longitude: Number(course.destination_longitude),
                   } : null}
-                  routeGeometry={course.route_geometry}
+                  routeGeometry={
+                    // Livraison : le trajet affiche va du magasin vers le client.
+                    // Taxi : l'itineraire historique client -> destination.
+                    isDelivery && course.trip_route_geometry?.length > 1
+                      ? course.trip_route_geometry
+                      : course.route_geometry
+                  }
                 />
               </div>
             )}
@@ -401,6 +462,11 @@ export default function Couriers() {
   const [destination, setDestination] = useState("");
   const [destinationConfirmed, setDestinationConfirmed] = useState(false);
   const [selectingDestination, setSelectingDestination] = useState(false);
+  const [pickup, setPickup] = useState("");
+  const [pickupPhone, setPickupPhone] = useState("");
+  const [pickupPosition, setPickupPosition] = useState(null);
+  const [pickupConfirmed, setPickupConfirmed] = useState(false);
+  const [selectingPickup, setSelectingPickup] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [proposedPrice, setProposedPrice] = useState("");
   const [priceQuote, setPriceQuote] = useState(null);
@@ -428,7 +494,18 @@ export default function Couriers() {
   const [reviewError, setReviewError] = useState("");
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const hasDestination = Boolean(destinationPosition || destination.trim());
-  const mapDestinationPosition = priceQuote
+  // Une commande de livraison passe par le magasin : celui-ci devient le point de
+  // depart affiche sur la carte, et la destination reste le point d'arrivee.
+  const isDelivery = isDeliveryVehicle(selectedVehicle);
+  const hasPickup = isDelivery && Boolean(pickupPosition || pickup.trim());
+  const pickupPickingPhase = selectingPickup
+    ? "choosing"
+    : pickupPosition && !pickupConfirmed
+      ? "chosen"
+      : null;
+  const mapDestinationPosition = isDelivery
+    ? pickupPosition
+    : priceQuote
     ? {
         latitude: priceQuote.destination_latitude,
         longitude: priceQuote.destination_longitude,
@@ -478,6 +555,15 @@ export default function Couriers() {
           }),
           client_latitude: clientPosition.latitude,
           client_longitude: clientPosition.longitude,
+          ...(isDelivery && hasPickup && {
+            pickup_name: pickup.trim(),
+            pickup_address: pickup.trim(),
+            ...(pickupPhone.trim() && { pickup_phone: pickupPhone.trim() }),
+            ...(pickupPosition && {
+              pickup_latitude: pickupPosition.latitude,
+              pickup_longitude: pickupPosition.longitude,
+            }),
+          }),
         });
         if (cancelled) return;
         setPriceQuote(quote);
@@ -496,7 +582,7 @@ export default function Couriers() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [clientPosition, destination, destinationConfirmed, destinationPosition, hasDestination, quoteRevision, requestedCourseId, selectedVehicle]);
+  }, [clientPosition, destination, destinationConfirmed, destinationPosition, hasDestination, hasPickup, isDelivery, pickup, pickupPhone, pickupPosition, quoteRevision, requestedCourseId, selectedVehicle]);
 
   // 1. À l'ouverture de la demande, l'écran revient en haut
   useEffect(() => scrollToPageTopWhenReady(), []);
@@ -572,6 +658,12 @@ export default function Couriers() {
       setBookingError("اختر الوجهة على الخريطة أو أدخلها كتابةً.");
       return;
     }
+    // En livraison, la commande part du magasin : sans lui, aucun livreur ne peut
+    // etre diffuse (le retrait est la premiere jambe du parcours).
+    if (isDelivery && !hasPickup) {
+      setBookingError("اختر اسم المتجر أو حدده على الخريطة.");
+      return;
+    }
     if (!clientPosition || !selectedVehicle || !priceQuote || priceCalculating) {
       setBookingError("يرجى تفعيل موقعك وانتظار اكتمال حساب السعر.");
       return;
@@ -616,6 +708,15 @@ export default function Couriers() {
         client_longitude: position.coords.longitude,
         vehicle_type: selectedVehicle,
         request_key: requestKey,
+        ...(isDelivery && hasPickup && {
+          pickup_name: pickup.trim(),
+          pickup_address: pickup.trim(),
+          ...(pickupPhone.trim() && { pickup_phone: pickupPhone.trim() }),
+          ...(pickupPosition && {
+            pickup_latitude: pickupPosition.latitude,
+            pickup_longitude: pickupPosition.longitude,
+          }),
+        }),
       });
       sessionStorage.removeItem("pendingCourseRequestKey");
       localStorage.setItem("currentClientCourseId", String(course.id));
@@ -625,6 +726,10 @@ export default function Couriers() {
       setDestinationPosition(null);
       setDestination("");
       setSelectingDestination(false);
+      setPickupPosition(null);
+      setPickup("");
+      setPickupPhone("");
+      setSelectingPickup(false);
     } catch (err) {
       const gpsErrors = {
         1: "يرجى السماح بالوصول إلى موقعك الجغرافي ثم أعد المحاولة.",
@@ -787,7 +892,41 @@ export default function Couriers() {
   function handleDestinationSelectionToggle() {
     const nextSelecting = !selectingDestination;
     setSelectingDestination(nextSelecting);
+    setSelectingPickup(false);
     if (nextSelecting && !clientPosition) handleFindAroundMe();
+  }
+
+  // Magasin (point de retrait) : uniquement pour les commandes de livraison.
+  function handlePickupInputChange(event) {
+    const value = event.target.value;
+
+    setPickup(value);
+    setPickupPosition(null);
+    setPickupConfirmed(false);
+    setSelectingPickup(false);
+    setPriceQuote(null);
+    setProposedPrice("");
+    setPriceCalculating(false);
+  }
+
+  function handlePickupSelectionToggle() {
+    const nextSelecting = !selectingPickup;
+    setSelectingPickup(nextSelecting);
+    setSelectingDestination(false);
+    if (nextSelecting && !clientPosition) handleFindAroundMe();
+  }
+
+  function handleVehicleChange(value) {
+    setSelectedVehicle(value);
+    // Le magasin n'a de sens que pour une livraison : on le vide si le client
+    // repasse en mode taxi pour ne pas envoyer de retrait parasite.
+    if (!isDeliveryVehicle(value)) {
+      setPickup("");
+      setPickupPhone("");
+      setPickupPosition(null);
+      setPickupConfirmed(false);
+      setSelectingPickup(false);
+    }
   }
 
   useEffect(() => {
@@ -822,15 +961,23 @@ export default function Couriers() {
             clientPosition={clientPosition}
             onRequestClientPosition={handleFindAroundMe}
             isLocating={searchingLocation}
-            selectingDestination={selectingDestination}
+            selectingDestination={isDelivery ? selectingPickup : selectingDestination}
             destinationPosition={mapDestinationPosition}
-            pickingPhase={destinationPickingPhase}
+            pickingPhase={isDelivery ? pickupPickingPhase : destinationPickingPhase}
             routeGeometry={priceQuote?.route_geometry}
             onSelectDestination={(position) => {
-              setDestinationPosition(position);
-              setDestination("");
-              setDestinationConfirmed(false);
-              setSelectingDestination(false);
+              // En livraison, le point choisi sur la carte est le magasin (retrait).
+              if (isDelivery) {
+                setPickupPosition(position);
+                setPickup("");
+                setPickupConfirmed(false);
+                setSelectingPickup(false);
+              } else {
+                setDestinationPosition(position);
+                setDestination("");
+                setDestinationConfirmed(false);
+                setSelectingDestination(false);
+              }
               setPriceQuote(null);
               setProposedPrice("");
               setPriceCalculating(false);
@@ -850,7 +997,7 @@ export default function Couriers() {
                 key={value}
                 aria-pressed={selectedVehicle === value}
                 disabled={!clientPosition}
-                onClick={() => setSelectedVehicle(value)}
+                onClick={() => handleVehicleChange(value)}
               >
                 <Icon size={28} aria-hidden="true" />
                 <span>{label}</span>
@@ -862,6 +1009,56 @@ export default function Couriers() {
 
       
 
+      {!requestedCourseId && isDelivery && !quoteRequestActive && (
+        <div className={`destination-picker-controls ${pickupPosition ? "destination-only" : ""}`} dir="rtl">
+          <h3 className="couriers-step-title">من أين نستلم الطلب؟</h3>
+          <div className="destination-combo">
+            {!pickupPosition && (
+              <label className="destination-text-field">
+                <input
+                  type="text"
+                  value={pickup}
+                  onChange={handlePickupInputChange}
+                  placeholder="اسم المتجر"
+                  aria-label="اسم المتجر"
+                  maxLength={120}
+                  disabled={!clientPosition}
+                />
+              </label>
+            )}
+            {!pickupPosition && (
+              <MapPin size={22} aria-hidden="true" className="destination-combo-icon" />
+            )}
+            <button
+              type="button"
+              className={`destination-map-button ${selectingPickup ? "destination-picker-active" : ""}`}
+              onClick={handlePickupSelectionToggle}
+              disabled={!clientPosition}
+            >
+              {selectingPickup
+                ? " "
+                : pickupPosition
+                ? "تغيير المتجر على الخريطة"
+                : "من الخريطة"}
+            </button>
+          </div>
+
+          {!pickupPosition && (
+            <label className="destination-text-field" style={{ marginTop: "10px" }}>
+              <input
+                type="tel"
+                value={pickupPhone}
+                onChange={(event) => setPickupPhone(event.target.value.replace(/\D/g, ""))}
+                placeholder="هاتف المتجر (اختياري)"
+                aria-label="هاتف المتجر"
+                maxLength={15}
+                disabled={!clientPosition}
+              />
+            </label>
+          )}
+        </div>
+      )}
+
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && <div ref={destinationSectionRef} className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
         <div className="destination-combo">
         {!destinationPosition && (
@@ -872,8 +1069,8 @@ export default function Couriers() {
               value={destination}
               onFocus={handleDestinationInputFocus}
               onChange={handleDestinationInputChange}
-              placeholder="حدد وجهتك"
-              aria-label="حدد وجهتك"
+              placeholder={isDelivery ? "إلى أين نوصل الطلب؟" : "حدد وجهتك"}
+              aria-label={isDelivery ? "عنوان التسليم" : "حدد وجهتك"}
               maxLength={255}
               disabled={!clientPosition}
             />
@@ -897,6 +1094,20 @@ export default function Couriers() {
         </div>
       </div>}
 
+      {!requestedCourseId && selectedVehicle && !quoteRequestActive && hasPickup && !pickupConfirmed && (
+        <button
+          className="destination-confirm-button"
+          type="button"
+          disabled={!clientPosition}
+          onClick={() => {
+            setBookingError("");
+            setPickupConfirmed(true);
+          }}
+        >
+          تأكيد المتجر
+        </button>
+      )}
+
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && hasDestination && !destinationConfirmed && (
         <button
           className="destination-confirm-button"
@@ -907,7 +1118,7 @@ export default function Couriers() {
             setDestinationConfirmed(true);
           }}
         >
-          تأكيد الوجهة
+          {isDelivery ? "تأكيد عنوان التسليم" : "تأكيد الوجهة"}
         </button>
       )}
 
