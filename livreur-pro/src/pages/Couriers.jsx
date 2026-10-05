@@ -861,7 +861,7 @@ export default function Couriers() {
       )}
 
       {!requestedCourseId && selectedVehicle && !quoteRequestActive && !destinationPosition && (
-        <h2 className="couriers-step-title">
+        <h2 className="couriers-step-title destination-step-title">
           أدخل وجهتك في الحقل أو اخترها من الخريطة
         </h2>
       )}
