@@ -65,7 +65,7 @@ export default function Layout() {
   const homeLink =
     auth.token && auth.role === "livreur" && auth.user?.id
       ? `/livreur-dashboard/${auth.user.id}`
-      : "/";
+      : "/livreurs";
 
 
   return (

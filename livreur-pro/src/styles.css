@@ -498,6 +498,80 @@
 }
 .destination-map-picking,
 .destination-map-picking .leaflet-container { cursor: crosshair; }
+
+/* Animation "en cours de choix de la destination" (choix sur la carte) */
+.map-pick-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 650;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.map-pick-crosshair {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  animation: map-pick-bounce 1.6s ease-in-out infinite;
+}
+.map-pick-pin {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 6px 8px rgba(15, 23, 42, .35));
+}
+.map-pick-halo {
+  position: absolute;
+  inset: 0;
+  border: 3px solid rgba(249, 115, 22, .7);
+  border-radius: 50%;
+  animation: map-pick-ripple 1.6s ease-out infinite;
+}
+.map-pick-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 28px);
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(194, 65, 12, .92);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .3);
+  animation: map-pick-banner-in .3s ease both;
+}
+.map-pick-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, .22);
+  animation: driver-wait-pulse 1.4s ease-in-out infinite;
+}
+.map-pick-overlay.is-chosen .map-pick-banner { background: rgba(23, 107, 83, .92); }
+.map-pick-overlay.is-chosen .map-pick-dot {
+  background: #86efac;
+  box-shadow: 0 0 0 4px rgba(134, 239, 172, .22);
+}
+@keyframes map-pick-bounce {
+  0%, 100% { transform: translateY(-9px); }
+  50% { transform: translateY(0); }
+}
+@keyframes map-pick-ripple {
+  0% { transform: scale(.5); opacity: 1; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+@keyframes map-pick-banner-in {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 .driver-wait-state {
   display: flex;
   align-items: center;
@@ -2408,6 +2482,9 @@ input::placeholder {
   .course-search-pulse { animation: none; }
   .course-live-bar::after { animation: none; width: 100%; opacity: .6; }
   .course-tracking-stage { animation: none; }
+  .map-pick-crosshair,
+  .map-pick-halo,
+  .map-pick-dot { animation: none; }
 }
 
 /* ---------- Mon compte (Client & Chauffeur) ---------- */

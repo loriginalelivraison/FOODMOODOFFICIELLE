@@ -193,6 +193,32 @@ function DestinationPicker({ active, clientPosition, onSelect }) {
   return null;
 }
 
+function DestinationPickOverlay({ phase }) {
+  if (!phase) return null;
+
+  const isChoosing = phase === "choosing";
+
+  return (
+    <div className={`map-pick-overlay is-${phase}`}>
+      {isChoosing && (
+        <div className="map-pick-crosshair" aria-hidden="true">
+          <span className="map-pick-halo" />
+          <span className="map-pick-pin">📍</span>
+        </div>
+      )}
+
+      <div className="map-pick-banner" role="status" aria-live="polite">
+        <span className="map-pick-dot" aria-hidden="true" />
+        <span>
+          {isChoosing
+            ? "جاري اختيار الوجهة — انقر على الخريطة"
+            : "تم اختيار الوجهة — اضغط تأكيد الوجهة"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function RouteBounds({ positions }) {
   const map = useMap();
   const routeKey = positions.map(([latitude, longitude]) => `${latitude},${longitude}`).join("|");
@@ -215,6 +241,7 @@ export default function CouriersMap({
   destinationPosition = null,
   onSelectDestination,
   routeGeometry = null,
+  pickingPhase = null,
 }) {
   const navigate = useNavigate();
 
@@ -376,6 +403,8 @@ export default function CouriersMap({
           </Marker>
         ))}
       </MapContainer>
+
+      <DestinationPickOverlay phase={pickingPhase} />
     </div>
   );
 }

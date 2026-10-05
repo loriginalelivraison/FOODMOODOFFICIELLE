@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import { scrollToPageTopWhenReady } from "../utils/scroll.js";
 import {
   getLocationErrorMessage,
   isIOSDevice,
@@ -13,6 +14,9 @@ import {
 export default function CourierRegister({ onChooseClient }) {
   const navigate = useNavigate();
   const formRef = useRef(null);
+
+  // L'écran revient en haut à l'ouverture du formulaire d'inscription
+  useEffect(() => scrollToPageTopWhenReady(), []);
 
   const quartiers = [
     "الجزائر العاصمة",

@@ -17,6 +17,10 @@ import {
   isIOSDevice,
   requestUserPosition,
 } from "../utils/geolocation.js";
+import {
+  scrollToPageTopWhenReady,
+  scrollToSection,
+} from "../utils/scroll.js";
 
 const MIN_COURSE_PRICE_DZD = 100;
 const PRICE_ADJUSTMENT_DZD = 50;
@@ -403,6 +407,7 @@ export default function Couriers() {
   const [priceCalculating, setPriceCalculating] = useState(false);
   const [quoteRequestActive, setQuoteRequestActive] = useState(false);
   const priceFormRef = useRef(null);
+  const destinationSectionRef = useRef(null);
   const [quoteRevision, setQuoteRevision] = useState(0);
   const [bookingError, setBookingError] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -428,6 +433,13 @@ export default function Couriers() {
       }
     : destinationPosition;
   const shouldShowMap = !requestedCourseId;
+  // Animation visible uniquement quand la destination est choisie sur la carte :
+  // "choosing" pendant le clic sur la carte, "chosen" jusqu'a la validation.
+  const destinationPickingPhase = selectingDestination
+    ? "choosing"
+    : destinationPosition && !destinationConfirmed
+      ? "chosen"
+      : null;
 
   function adjustProposedPrice(amount) {
     setProposedPrice((currentValue) => {
@@ -484,11 +496,25 @@ export default function Couriers() {
     };
   }, [clientPosition, destination, destinationConfirmed, destinationPosition, hasDestination, quoteRevision, requestedCourseId, selectedVehicle]);
 
+  // 1. À l'ouverture de la demande, l'écran revient en haut
+  useEffect(() => scrollToPageTopWhenReady(), []);
+
+  // 2. Après le choix du type de transport, on descend vers le champ de destination
+  useEffect(() => {
+    if (!selectedVehicle) return undefined;
+
+    const frame = requestAnimationFrame(() => {
+      scrollToSection(destinationSectionRef.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedVehicle]);
+
+  // 3. Une fois le prix calculé, on descend vers la partie prix
   useEffect(() => {
     if (!priceQuote) return undefined;
 
     const frame = requestAnimationFrame(() => {
-      priceFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollToSection(priceFormRef.current);
     });
     return () => cancelAnimationFrame(frame);
   }, [priceQuote]);
@@ -762,6 +788,7 @@ export default function Couriers() {
             isLocating={searchingLocation}
             selectingDestination={selectingDestination}
             destinationPosition={mapDestinationPosition}
+            pickingPhase={destinationPickingPhase}
             routeGeometry={priceQuote?.route_geometry}
             onSelectDestination={(position) => {
               setDestinationPosition(position);
@@ -803,7 +830,7 @@ export default function Couriers() {
         </h2>
       )}
 
-      {!requestedCourseId && selectedVehicle && !quoteRequestActive && <div className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
+      {!requestedCourseId && selectedVehicle && !quoteRequestActive && <div ref={destinationSectionRef} className={`destination-picker-controls ${destinationPosition ? "destination-only" : ""}`} dir="rtl">
         <div className="destination-combo">
         {!destinationPosition && (
           <label className="destination-text-field">
