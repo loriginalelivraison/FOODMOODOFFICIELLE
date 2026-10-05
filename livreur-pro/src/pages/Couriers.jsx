@@ -408,6 +408,8 @@ export default function Couriers() {
   const [quoteRequestActive, setQuoteRequestActive] = useState(false);
   const priceFormRef = useRef(null);
   const destinationSectionRef = useRef(null);
+  const destinationInputRef = useRef(null);
+  const destinationFocusedRef = useRef(false);
   const [quoteRevision, setQuoteRevision] = useState(0);
   const [bookingError, setBookingError] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -748,6 +750,40 @@ export default function Couriers() {
     }
   }
 
+  // 2. À la saisie de la destination, l'écran se focalise sur le champ pour qu'il
+  //    devienne l'élément principal (le clic sur le champ ou la 1re frappe suffisent).
+  function centerDestinationInput() {
+    if (!destinationInputRef.current) return;
+    scrollToSection(destinationInputRef.current);
+  }
+
+  function handleDestinationInputFocus() {
+    destinationFocusedRef.current = true;
+    centerDestinationInput();
+  }
+
+  function handleDestinationInputChange(event) {
+    const value = event.target.value;
+
+    setDestination(value);
+    setDestinationPosition(null);
+    setDestinationConfirmed(false);
+    setSelectingDestination(false);
+    setPriceQuote(null);
+    setProposedPrice("");
+    setPriceCalculating(false);
+
+    if (!value.trim()) {
+      destinationFocusedRef.current = false;
+      return;
+    }
+
+    if (!destinationFocusedRef.current) {
+      destinationFocusedRef.current = true;
+      centerDestinationInput();
+    }
+  }
+
   function handleDestinationSelectionToggle() {
     const nextSelecting = !selectingDestination;
     setSelectingDestination(nextSelecting);
@@ -835,17 +871,11 @@ export default function Couriers() {
         {!destinationPosition && (
           <label className="destination-text-field">
             <input
+              ref={destinationInputRef}
               type="text"
               value={destination}
-              onChange={(event) => {
-                setDestination(event.target.value);
-                setDestinationPosition(null);
-                setDestinationConfirmed(false);
-                setSelectingDestination(false);
-                setPriceQuote(null);
-                setProposedPrice("");
-                setPriceCalculating(false);
-              }}
+              onFocus={handleDestinationInputFocus}
+              onChange={handleDestinationInputChange}
               placeholder="حدد وجهتك"
               aria-label="حدد وجهتك"
               maxLength={255}
