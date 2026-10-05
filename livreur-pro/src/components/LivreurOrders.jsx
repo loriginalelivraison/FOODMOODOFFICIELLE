@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 
@@ -11,6 +11,7 @@ const STATUS_LABELS = {
   driver_selected: "تم تأكيد السائق",
   driver_arriving: "في الطريق إلى الزبون",
   driver_arrived: "وصلت إلى الزبون",
+  picked_up: "تم استلام الطلب",
   in_progress: "الرحلة جارية",
   completed: "مكتملة",
   cancelled: "ملغاة",
@@ -19,9 +20,44 @@ const STATUS_LABELS = {
 const ONGOING_HINTS = {
   driver_selected: "الزبون في انتظارك، انطلق نحو موقعه.",
   driver_arriving: "الزبون في انتظارك، أكمل الطريق.",
-  driver_arrived: "أبلغ الزبون بوصولك وانتظر بدء الرحلة.",
+  driver_arrived: "أبلغ الزبون بوصولك ثم أكّد استلام الطلب.",
+  picked_up: "تم استلام الطلب، انطلق الآن نحو الزبون.",
   in_progress: "الرحلة جارية، توجه إلى الوجهة.",
 };
+
+/**
+ * Compte à rebours de l'offre (minuterie façon Uber) : propose au livreur
+ * un nombre de secondes décroissant avant que l'offre ne soit retirée.
+ */
+export function OfferCountdown({ seconds }) {
+  const [remaining, setRemaining] = useState(seconds);
+
+  useEffect(() => {
+    setRemaining(seconds);
+  }, [seconds]);
+
+  useEffect(() => {
+    if (remaining == null) return undefined;
+    if (remaining <= 0) return undefined;
+
+    const interval = setInterval(() => {
+      setRemaining((value) => (value == null ? value : Math.max(0, value - 1)));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [remaining]);
+
+  if (remaining == null) return null;
+
+  return (
+    <span
+      className={`offer-countdown ${remaining <= 10 ? "is-urgent" : ""}`}
+      aria-live="polite"
+    >
+      ⏱ {remaining} ثانية
+    </span>
+  );
+}
 
 export function coursePrice(course) {
   const price = course?.final_price ?? course?.proposed_price;
@@ -107,6 +143,10 @@ function OrderCard({ course, badge, hint, variant, busy = false, children }) {
         <strong>رحلة رقم {course.id}</strong>
         <span className={`order-status order-status-${variant}`}>{badge}</span>
       </div>
+
+      {variant === "offer" && (
+        <OfferCountdown seconds={course.my_offer_expires_in} />
+      )}
 
       <OrderSummary course={course} />
 

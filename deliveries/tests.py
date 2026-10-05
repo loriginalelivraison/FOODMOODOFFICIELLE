@@ -1,10 +1,11 @@
 from unittest.mock import patch
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import Client, Course, CourseEvent, CourseOffer, Livreur
@@ -39,6 +40,7 @@ class CourseRequestTests(TestCase):
 				ville="Alger",
 				vehicule="moto",
 				disponible=available,
+				est_en_ligne=True,
 				latitude=36.75 + index * 0.001,
 				longitude=3.06,
 				fcm_token=f"token-{index}",
@@ -113,6 +115,7 @@ class CourseRequestTests(TestCase):
 				ville="Alger",
 				vehicule=vehicle_type,
 				disponible=True,
+				est_en_ligne=True,
 				latitude=36.751,
 				longitude=3.06,
 				fcm_token=f"token-{vehicle_type}",
@@ -248,3 +251,180 @@ class CourseRequestTests(TestCase):
 		driver_api.force_authenticate(self.drivers[0].user)
 		stale = driver_api.post(f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json")
 		self.assertEqual(stale.status_code, 409)
+
+
+@override_settings(
+	COURSE_MIN_PRICE_DZD="100",
+	COURSE_SEARCH_RADIUS_KM=40,
+	COURSE_OFFER_TTL_SECONDS=60,
+)
+class DriverOnlineOfferTests(TestCase):
+	"""Parcours livreur façon Uber : en ligne, offre chronométrée, commande récupérée."""
+
+	def setUp(self):
+		self.client_user = User.objects.create_user(username="client-uber", password="pass")
+		self.client_profile = Client.objects.create(
+			user=self.client_user,
+			nom="Client Uber",
+			telephone="0555111001",
+		)
+		self.client_api = APIClient()
+		self.client_api.force_authenticate(self.client_user)
+
+		user = User.objects.create_user(username="driver-uber", password="pass")
+		self.driver = Livreur.objects.create(
+			user=user,
+			nom="Livreur Uber",
+			telephone="0555111002",
+			ville="Alger",
+			vehicule="moto",
+			disponible=False,
+			est_en_ligne=False,
+			latitude=36.751,
+			longitude=3.06,
+			fcm_token="token-uber",
+		)
+		self.driver_api = APIClient()
+		self.driver_api.force_authenticate(user)
+
+	def create_request(self, request_key="uber-request-1"):
+		return self.client_api.post("/api/courses/request/", {
+			"destination": "Place des Martyrs, Alger",
+			"proposed_price": 500,
+			"client_latitude": 36.75,
+			"client_longitude": 3.06,
+			"request_key": request_key,
+			"vehicle_type": "moto",
+		}, format="json")
+
+	def set_online(self):
+		return self.driver_api.patch(f"/api/livreurs/{self.driver.id}/set_online/")
+
+	def set_offline(self):
+		return self.driver_api.patch(f"/api/livreurs/{self.driver.id}/set_offline/")
+
+	def request_with_stubs(self, request_key="uber-request-1"):
+		"""Crée une demande en neutralisant les appels réseau et le push FCM."""
+		with patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07)), \
+				patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]])), \
+				patch("deliveries.views.send_livreur_notification"):
+			return self.create_request(request_key)
+
+	def test_offline_driver_receives_no_offer(self):
+		with patch("deliveries.views.send_livreur_notification") as send_notification:
+			response = self.request_with_stubs()
+
+		self.assertEqual(response.status_code, 201)
+		self.assertEqual(CourseOffer.objects.count(), 0)
+		send_notification.assert_not_called()
+
+	def test_going_online_allows_receiving_and_accepting_offers(self):
+		online = self.set_online()
+		self.assertEqual(online.status_code, 200)
+		self.driver.refresh_from_db()
+		self.assertTrue(self.driver.est_en_ligne)
+		self.assertTrue(self.driver.disponible)
+
+		course_id = self.request_with_stubs().data["id"]
+		offers = self.driver_api.get("/api/courses/offers/")
+		self.assertEqual(offers.status_code, 200)
+		self.assertEqual([course["id"] for course in offers.data], [course_id])
+
+		accepted = self.driver_api.post(
+			f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json"
+		)
+		self.assertEqual(accepted.status_code, 200)
+
+	def test_going_offline_withdraws_pending_offers(self):
+		self.set_online()
+		course_id = self.request_with_stubs().data["id"]
+
+		offline = self.set_offline()
+		self.assertEqual(offline.status_code, 200)
+		self.assertEqual(offline.data["withdrawn_offers"], 1)
+		self.driver.refresh_from_db()
+		self.assertFalse(self.driver.est_en_ligne)
+		self.assertEqual(
+			CourseOffer.objects.get(course_id=course_id, livreur=self.driver).response,
+			"withdrawn",
+		)
+		self.assertEqual(self.driver_api.get("/api/courses/offers/").data, [])
+
+	def test_offline_driver_cannot_accept_an_offer(self):
+		self.set_online()
+		course_id = self.request_with_stubs().data["id"]
+		self.set_offline()
+
+		stale = self.driver_api.post(
+			f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json"
+		)
+		self.assertEqual(stale.status_code, 409)
+
+	def test_offer_exposes_countdown_and_expires(self):
+		self.set_online()
+		course_id = self.request_with_stubs().data["id"]
+
+		offered = self.driver_api.get("/api/courses/offers/").data[0]
+		self.assertEqual(offered["my_offer_response"], "pending")
+		self.assertGreater(offered["my_offer_expires_in"], 0)
+		self.assertLessEqual(offered["my_offer_expires_in"], 60)
+
+		CourseOffer.objects.filter(course_id=course_id).update(
+			expires_at=timezone.now() - timedelta(seconds=1)
+		)
+
+		self.assertEqual(self.driver_api.get("/api/courses/offers/").data, [])
+		self.assertEqual(CourseOffer.objects.get(course_id=course_id).response, "withdrawn")
+
+		stale = self.driver_api.post(
+			f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json"
+		)
+		self.assertEqual(stale.status_code, 409)
+
+	def accept_and_assign(self, course_id):
+		self.driver_api.post(f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json")
+		return self.client_api.post(
+			f"/api/courses/{course_id}/select_driver/",
+			{"livreur_id": self.driver.id},
+			format="json",
+		)
+
+	def test_driver_can_confirm_pickup_before_starting_the_delivery(self):
+		self.set_online()
+		course_id = self.request_with_stubs().data["id"]
+		self.accept_and_assign(course_id)
+
+		self.assertEqual(self.driver_api.post(f"/api/courses/{course_id}/enroute/").status_code, 200)
+		self.assertEqual(self.driver_api.post(f"/api/courses/{course_id}/arrive/").status_code, 200)
+
+		pickup = self.driver_api.post(f"/api/courses/{course_id}/pickup/")
+		self.assertEqual(pickup.status_code, 200)
+		self.assertEqual(pickup.data["status"], "picked_up")
+		self.assertIsNotNone(pickup.data["picked_up_at"])
+
+		started = self.driver_api.post(f"/api/courses/{course_id}/start/")
+		self.assertEqual(started.status_code, 200)
+		self.assertEqual(started.data["status"], "in_progress")
+
+	def test_pickup_is_rejected_before_the_driver_arrives(self):
+		self.set_online()
+		course_id = self.request_with_stubs().data["id"]
+		self.accept_and_assign(course_id)
+
+		too_early = self.driver_api.post(f"/api/courses/{course_id}/pickup/")
+		self.assertEqual(too_early.status_code, 409)
+
+	def test_finishing_a_course_sends_the_driver_back_online(self):
+		self.set_online()
+		course_id = self.request_with_stubs().data["id"]
+		self.accept_and_assign(course_id)
+		self.driver_api.post(f"/api/courses/{course_id}/arrive/")
+		self.driver_api.post(f"/api/courses/{course_id}/pickup/")
+		self.driver_api.post(f"/api/courses/{course_id}/start/")
+
+		finished = self.driver_api.patch(f"/api/courses/{course_id}/finish/")
+		self.assertEqual(finished.status_code, 200)
+		self.assertTrue(finished.data["active"] is False)
+		self.driver.refresh_from_db()
+		self.assertTrue(self.driver.est_en_ligne)
+		self.assertTrue(self.driver.disponible)

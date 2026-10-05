@@ -23,6 +23,9 @@ class Livreur(models.Model):
     ville = models.CharField(max_length=100)
     vehicule = models.CharField(max_length=30, choices=VEHICULE_CHOICES)
     disponible = models.BooleanField(default=True)
+    # Bascule "en ligne / hors ligne" façon Uber : un livreur hors ligne
+    # ne reçoit plus aucune offre, même s'il a une position GPS connue.
+    est_en_ligne = models.BooleanField(default=False)
     photo = models.ImageField(upload_to="livreurs/", blank=True, null=True)
 
     latitude = models.FloatField(null=True, blank=True)
@@ -115,6 +118,7 @@ class Course(models.Model):
         ("driver_selected", "Chauffeur sélectionné"),
         ("driver_arriving", "Chauffeur en route"),
         ("driver_arrived", "Chauffeur arrivé"),
+        ("picked_up", "Commande récupérée"),
         ("in_progress", "Course en cours"),
         ("completed", "Terminée"),
         ("cancelled", "Annulée"),
@@ -148,6 +152,23 @@ class Course(models.Model):
     destination = models.CharField(max_length=255, blank=True)
     destination_latitude = models.FloatField(null=True, blank=True)
     destination_longitude = models.FloatField(null=True, blank=True)
+
+    # --- Parcours "livreur Uber de commandes" : commerçant -> client ---
+    # Le retrait se fait chez le commerçant (restaurant / boutique), la
+    # livraison chez le client. `destination*` reste la destination de
+    # livraison (dropoff) pour ne casser ni l'existant ni le suivi client.
+    pickup_name = models.CharField(max_length=120, blank=True)
+    pickup_address = models.CharField(max_length=255, blank=True)
+    pickup_phone = models.CharField(max_length=30, blank=True)
+    pickup_latitude = models.FloatField(null=True, blank=True)
+    pickup_longitude = models.FloatField(null=True, blank=True)
+    pickup_route_geometry = models.JSONField(null=True, blank=True)
+    pickup_distance_km = models.FloatField(null=True, blank=True)
+    trip_route_geometry = models.JSONField(null=True, blank=True)
+    trip_distance_km = models.FloatField(null=True, blank=True)
+    pickup_eta_minutes = models.PositiveIntegerField(null=True, blank=True)
+    dropoff_eta_minutes = models.PositiveIntegerField(null=True, blank=True)
+
     vehicle_type = models.CharField(
         max_length=20,
         choices=[("moto", "Moto"), ("voiture", "Voiture"), ("camion", "Camion")],
@@ -160,6 +181,7 @@ class Course(models.Model):
     final_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=24, choices=STATUS_CHOICES, default="searching")
     arrived_at = models.DateTimeField(null=True, blank=True)
+    picked_up_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancelled_by_type = models.CharField(max_length=16, blank=True)
@@ -168,6 +190,10 @@ class Course(models.Model):
     previous_status = models.CharField(max_length=24, blank=True)
     request_key = models.CharField(max_length=64, unique=True, null=True, blank=True)
     availability_before_course = models.BooleanField(null=True, blank=True)
+    # Vague de diffusion en cours : sert à la rediffusion automatique quand
+    # une vague d'offres expire sans réponse (escalade façon Uber).
+    broadcast_round = models.PositiveIntegerField(default=1)
+    last_offer_at = models.DateTimeField(null=True, blank=True)
 
     client_confirmed = models.BooleanField(default=False)
     active = models.BooleanField(default=True)
@@ -176,6 +202,25 @@ class Course(models.Model):
 
     def __str__(self):
         return f"Course client {self.client_id} -> livreur {self.livreur_id}"
+
+    @property
+    def has_pickup_point(self):
+        """Vrai quand un commerçant a été désigné (sinon on retombe sur le client)."""
+        return self.pickup_latitude is not None and self.pickup_longitude is not None
+
+    @property
+    def pickup_position(self):
+        """Coordonnées du point de retrait, avec repli sur la position du client."""
+        if self.has_pickup_point:
+            return self.pickup_latitude, self.pickup_longitude
+        return self.client_latitude, self.client_longitude
+
+    @property
+    def dropoff_position(self):
+        """Coordonnées de livraison, avec repli sur la position du client."""
+        if self.destination_latitude is not None and self.destination_longitude is not None:
+            return self.destination_latitude, self.destination_longitude
+        return self.client_latitude, self.client_longitude
 
 
 class CourseOffer(models.Model):
@@ -189,6 +234,18 @@ class CourseOffer(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="offers")
     livreur = models.ForeignKey(Livreur, on_delete=models.CASCADE, related_name="course_offers")
     response = models.CharField(max_length=12, choices=RESPONSE_CHOICES, default="pending")
+    # Numéro de vague de diffusion : une offre retirée au profit d'une nouvelle
+    # vague laisse la trace du numéro qui l'a générée.
+    round_number = models.PositiveIntegerField(default=1)
+    # Distance / ETA calculés au moment de la diffusion pour ce livreur :
+    # c'est ce qui s'affiche sur la carte d'offre façon Uber.
+    pickup_distance_km = models.FloatField(null=True, blank=True)
+    pickup_eta_minutes = models.PositiveIntegerField(null=True, blank=True)
+    dropoff_distance_km = models.FloatField(null=True, blank=True)
+    dropoff_eta_minutes = models.PositiveIntegerField(null=True, blank=True)
+    # Date d'expiration de l'offre (minuterie façon Uber). Une offre expirée
+    # n'est plus proposable et passe automatiquement en "withdrawn".
+    expires_at = models.DateTimeField(null=True, blank=True)
     notified_at = models.DateTimeField(auto_now_add=True)
     responded_at = models.DateTimeField(null=True, blank=True)
 

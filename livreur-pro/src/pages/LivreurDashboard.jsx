@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   deleteLivreur,
   updateLivreurPosition,
-  setLivreurUnavailable,
+  setLivreurOnline,
+  setLivreurOffline,
   getLivreurCourses,
   finishCourse,
   getActiveCoursesForLivreur,
@@ -173,14 +174,18 @@ export default function LivreurDashboard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [position, setPosition] = useState(null);
-  const [trackingEnabled, setTrackingEnabled] = useState(() => {
-    const saved = localStorage.getItem("livreurTrackingEnabled");
+  // Bascule "en ligne / hors ligne" façon Uber : c'est le serveur qui fait foi.
+  const [isOnline, setIsOnline] = useState(() => {
+    const saved = localStorage.getItem("livreurOnline");
     return saved === null ? true : saved === "true";
   });
+  const [togglingOnline, setTogglingOnline] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem("livreurTrackingEnabled", String(trackingEnabled));
-  }, [trackingEnabled]);
+    localStorage.setItem("livreurOnline", String(isOnline));
+  }, [isOnline]);
+
+  const trackingEnabled = isOnline;
 
   const [activeCourse, setActiveCourse] = useState(null);
   const [courseOffers, setCourseOffers] = useState([]);
@@ -190,7 +195,6 @@ export default function LivreurDashboard() {
   const [courses, setCourses] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [finishingCourse, setFinishingCourse] = useState(false);
-  const [updatingTracking, setUpdatingTracking] = useState(false);
 
   const navigate = useNavigate();
 
@@ -401,6 +405,30 @@ export default function LivreurDashboard() {
     };
   }, [livreur?.id]);
 
+  // La source de vérité est le serveur : on aligne la bascule locale dessus.
+  useEffect(() => {
+    if (!livreur?.id) return;
+
+    let cancelled = false;
+
+    async function syncOnlineStatus() {
+      try {
+        const data = await getLivreurById(livreur.id);
+        if (!cancelled) setIsOnline(Boolean(data.est_en_ligne));
+      } catch (syncError) {
+        console.error("Erreur synchronisation du statut en ligne :", syncError);
+      }
+    }
+
+    syncOnlineStatus();
+    const interval = setInterval(syncOnlineStatus, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [livreur?.id]);
+
   if (!livreur) {
     return (
       <div style={{ padding: "20px" }} dir="rtl">
@@ -411,6 +439,7 @@ export default function LivreurDashboard() {
 
   const photoUrl = profile?.photo || livreur.photo || livreur.image || null;
   const displayName = profile?.nom || livreur.nom;
+  // « En ligne » = disponible ET pas déjà en course (comme un chauffeur Uber).
   const isAvailable = trackingEnabled && !activeCourse;
   const vehicleLabels = {
     moto: "دراجة نارية",
@@ -448,27 +477,29 @@ export default function LivreurDashboard() {
   }
 
   async function handleTrackingToggle() {
-    if (updatingTracking) return;
+    if (togglingOnline) return;
 
-    if (trackingEnabled) {
-      setUpdatingTracking(true);
-      setTrackingEnabled(false);
-      localStorage.setItem("livreurTrackingEnabled", "false");
+    setTogglingOnline(true);
+    setError("");
 
-      try {
-        await setLivreurUnavailable(livreur.id);
-      } catch (err) {
-        console.error("Erreur désactivation partage localisation :", err);
-        setError("Impossible de modifier votre disponibilité.");
-      } finally {
-        setUpdatingTracking(false);
+    try {
+      if (isOnline) {
+        await setLivreurOffline(livreur.id);
+        setIsOnline(false);
+        localStorage.setItem("livreurOnline", "false");
+        setMessage("أنت الآن غير متصل. لن تصلك أي طلب جديد.");
+      } else {
+        const result = await setLivreurOnline(livreur.id);
+        setIsOnline(Boolean(result.est_en_ligne));
+        localStorage.setItem("livreurOnline", String(Boolean(result.est_en_ligne)));
+        setMessage("أنت الآن متصل. ستصلك الطلبات القريبة.");
       }
-
-      return;
+    } catch (err) {
+      console.error("Erreur changement de statut en ligne :", err);
+      setError(err.message || "تعذر تغيير حالة الاتصال.");
+    } finally {
+      setTogglingOnline(false);
     }
-
-    setTrackingEnabled(true);
-    localStorage.setItem("livreurTrackingEnabled", "true");
   }
 
   async function handleFinishCourse(courseId) {
@@ -632,17 +663,32 @@ export default function LivreurDashboard() {
       <section className="account-card">
         <h2>حالة الاستقبال</h2>
         <div className={`account-badge ${isAvailable ? "is-online" : "is-offline"}`} style={{ justifySelf: "start" }}>
-          {isAvailable ? "متاح لاستقبال الطلبات" : "غير متاح حالياً"}
+          {activeCourse
+            ? "لديك رحلة جارية"
+            : isOnline
+              ? "متصل — تصلك الطلبات القريبة"
+              : "غير متصل"}
         </div>
         <button
           className="primary-btn full"
           type="button"
           onClick={handleTrackingToggle}
-          disabled={updatingTracking}
-          style={{ background: trackingEnabled ? "#dc2626" : "#16a34a" }}
+          disabled={togglingOnline || Boolean(activeCourse)}
+          style={{ background: isOnline ? "#dc2626" : "#16a34a" }}
         >
-          {updatingTracking ? <LoadingSpinner label="جاري تحديث الموقع..." size={20} /> : trackingEnabled ? "إيقاف مشاركة الموقع" : "تشغيل مشاركة الموقع"}
+          {togglingOnline ? (
+            <LoadingSpinner label="جاري التحديث..." size={20} />
+          ) : isOnline ? (
+            "إيقاف استقبال الطلبات"
+          ) : (
+            "بدء استقبال الطلبات"
+          )}
         </button>
+        {Boolean(activeCourse) && (
+          <p className="account-points-hint">
+            أنهِ الرحلة الجارية قبل العودة إلى وضع الاستقبال.
+          </p>
+        )}
       </section>
 
       {editingProfile && (

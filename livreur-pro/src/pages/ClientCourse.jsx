@@ -30,7 +30,8 @@ function getStepIndex(status) {
   if (status === "driver_accepted") return 1;
   // Dès que le client confirme le chauffeur, l'étape passe à "في الطريق" (en route).
   if (["driver_selected", "driver_arriving"].includes(status)) return 2;
-  if (["driver_arrived", "in_progress"].includes(status)) return 3;
+  // "picked_up" = commande récupérée : on part vers la livraison.
+  if (["driver_arrived", "picked_up", "in_progress"].includes(status)) return 3;
   if (status === "completed") return 4;
   return -1;
 }
@@ -171,6 +172,7 @@ export default function ClientCourse() {
     "driver_selected",
     "driver_arriving",
     "driver_arrived",
+    "picked_up",
     "in_progress",
     "completed",
   ].includes(course.status);
@@ -330,6 +332,13 @@ export default function ClientCourse() {
               </div>
             )}
 
+          </>
+        )}
+
+        {course.status === "picked_up" && (
+          <>
+            <h2 className="course-tracking-title">طلبك في الطريق إليك</h2>
+            <p className="muted">تم استلام طلبك وهو الآن في الطريق إليك.</p>
           </>
         )}
 

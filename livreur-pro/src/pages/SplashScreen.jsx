@@ -6,6 +6,7 @@ export default function SplashLogo() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const token = localStorage.getItem("access");
     const role = localStorage.getItem("role");
     const livreurStorage = localStorage.getItem("livreur");
 
@@ -24,8 +25,8 @@ export default function SplashLogo() {
       return undefined;
     }
 
-    if (role === "client") {
-      navigate("/client-dashboard", { replace: true });
+    if (role === "client" && token) {
+      navigate("/livreurs", { replace: true });
       return undefined;
     }
 

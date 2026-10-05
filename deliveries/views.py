@@ -23,11 +23,17 @@ from .serializers import (
 from .firebase import send_livreur_notification
 from .course_services import (
     adjusted_price,
+    broadcast_course_offers,
     current_surcharge_percent,
+    dispatch_expired_courses,
     distance_km,
+    eta_minutes,
+    expire_stale_offers,
+    offer_deadline,
     record_course_event,
     resolve_destination,
     resolve_destination_label,
+    resolve_legs,
     resolve_route,
     suggested_price,
 )
@@ -86,6 +92,57 @@ class LivreurViewSet(ModelViewSet):
             "id": livreur.id,
             "latitude": livreur.latitude,
             "longitude": livreur.longitude,
+            "disponible": livreur.disponible,
+        })
+
+    @action(detail=True, methods=["patch"], url_path="set_offline")
+    def set_offline(self, request, pk=None):
+        livreur = self.get_object()
+
+        if livreur.user != request.user:
+            return Response({"error": "Accès interdit"}, status=403)
+
+        livreur.est_en_ligne = False
+        livreur.disponible = False
+        livreur.save(update_fields=["est_en_ligne", "disponible"])
+
+        # Un livreur qui se déconnecte ne peut plus répondre à une offre.
+        withdrawn = CourseOffer.objects.filter(
+            livreur=livreur,
+            response="pending",
+            course__status__in=["searching", "driver_accepted"],
+            course__livreur__isnull=True,
+        ).update(response="withdrawn", responded_at=timezone.now())
+
+        return Response({
+            "message": "Livreur passé hors ligne",
+            "id": livreur.id,
+            "est_en_ligne": livreur.est_en_ligne,
+            "disponible": livreur.disponible,
+            "withdrawn_offers": withdrawn,
+        })
+
+    @action(detail=True, methods=["patch"], url_path="set_online")
+    def set_online(self, request, pk=None):
+        livreur = self.get_object()
+
+        if livreur.user != request.user:
+            return Response({"error": "Accès interdit"}, status=403)
+
+        if Course.objects.filter(livreur=livreur, active=True).exists():
+            return Response(
+                {"detail": "Terminez la course en cours avant de vous remettre en ligne."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        livreur.est_en_ligne = True
+        livreur.disponible = True
+        livreur.save(update_fields=["est_en_ligne", "disponible"])
+
+        return Response({
+            "message": "Livreur en ligne",
+            "id": livreur.id,
+            "est_en_ligne": livreur.est_en_ligne,
             "disponible": livreur.disponible,
         })
 
@@ -331,21 +388,27 @@ class CourseViewSet(ModelViewSet):
             course_id=course.id,
         )
 
-    @action(detail=False, methods=["post"], url_path="request")
-    def request_course(self, request):
-        client = Client.objects.filter(user=request.user).first()
-        if not client:
-            return Response({"detail": "Un compte client est requis."}, status=403)
-
-        destination = str(request.data.get("destination", "")).strip()
+    @staticmethod
+    def _read_optional_float(request, key):
         try:
-            destination_lat = float(request.data["destination_latitude"])
-            destination_lon = float(request.data["destination_longitude"])
+            return float(request.data[key])
         except (KeyError, TypeError, ValueError):
-            destination_lat = destination_lon = None
+            return None
 
+    def _parse_delivery_legs(self, request):
+        """Valide et normalise une demande de livraison : commerçant puis client.
+
+        Le retrait (`pickup_*`) est facultatif pour rester compatible avec les
+        appels existants : sans commerçant, la commande part de la position du
+        client. La destination de livraison reste obligatoire.
+        """
+        destination = str(request.data.get("destination", "")).strip()
+        destination_lat = self._read_optional_float(request, "destination_latitude")
+        destination_lon = self._read_optional_float(request, "destination_longitude")
         if not destination and destination_lat is None:
-            return Response({"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400)
+            return Response(
+                {"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400
+            )
 
         try:
             start_lat = float(request.data["client_latitude"])
@@ -354,19 +417,92 @@ class CourseViewSet(ModelViewSet):
             if not proposed_price.is_finite():
                 raise InvalidOperation
         except (KeyError, TypeError, ValueError, InvalidOperation):
-            return Response({"detail": "Position GPS et prix valide obligatoires."}, status=400)
+            return Response(
+                {"detail": "Position GPS et prix valide obligatoires."}, status=400
+            )
 
         minimum = Decimal(settings.COURSE_MIN_PRICE_DZD)
         if proposed_price < minimum:
             return Response({"detail": f"Le prix minimum est de {minimum} DZD."}, status=400)
         if not (-90 <= start_lat <= 90 and -180 <= start_lon <= 180):
             return Response({"detail": "Coordonnées GPS invalides."}, status=400)
-        if destination_lat is not None and not (-90 <= destination_lat <= 90 and -180 <= destination_lon <= 180):
+        if destination_lat is not None and not (
+            -90 <= destination_lat <= 90 and -180 <= destination_lon <= 180
+        ):
             return Response({"detail": "Coordonnées de destination invalides."}, status=400)
 
         vehicle_type = str(request.data.get("vehicle_type", "voiture")).strip().lower()
         if vehicle_type not in {"moto", "voiture", "camion"}:
             return Response({"detail": "نوع المركبة غير صالح."}, status=400)
+
+        pickup_name = str(request.data.get("pickup_name", "")).strip()[:120]
+        pickup_address = str(request.data.get("pickup_address", "")).strip()[:255]
+        pickup_phone = str(request.data.get("pickup_phone", "")).strip()[:30]
+        pickup_lat = self._read_optional_float(request, "pickup_latitude")
+        pickup_lon = self._read_optional_float(request, "pickup_longitude")
+        if (pickup_lat is None) != (pickup_lon is None):
+            return Response(
+                {"detail": "Les coordonnées du commerçant sont incomplètes."}, status=400
+            )
+        if pickup_lat is not None and not (-90 <= pickup_lat <= 90 and -180 <= pickup_lon <= 180):
+            return Response(
+                {"detail": "Coordonnées du commerçant invalides."}, status=400
+            )
+
+        if destination_lat is None:
+            destination_position = resolve_destination(destination)
+            if not destination_position:
+                return Response(
+                    {"detail": "Destination introuvable. Vérifiez l’adresse puis réessayez."},
+                    status=422,
+                )
+            destination_lat, destination_lon = destination_position
+        elif not destination:
+            destination = (
+                resolve_destination_label(destination_lat, destination_lon)
+                or "موقع محدد على الخريطة"
+            )[:255]
+
+        if pickup_lat is not None and not pickup_address:
+            pickup_address = (
+                resolve_destination_label(pickup_lat, pickup_lon) or pickup_name
+            )[:255]
+
+        return {
+            "client_latitude": start_lat,
+            "client_longitude": start_lon,
+            "destination": destination,
+            "destination_latitude": destination_lat,
+            "destination_longitude": destination_lon,
+            "pickup_name": pickup_name,
+            "pickup_address": pickup_address,
+            "pickup_phone": pickup_phone,
+            "pickup_latitude": pickup_lat,
+            "pickup_longitude": pickup_lon,
+            "vehicle_type": vehicle_type,
+            "proposed_price": proposed_price,
+        }
+
+    @action(detail=False, methods=["post"], url_path="request")
+    def request_course(self, request):
+        client = Client.objects.filter(user=request.user).first()
+        if not client:
+            return Response({"detail": "Un compte client est requis."}, status=403)
+
+        legs = self._parse_delivery_legs(request)
+        if isinstance(legs, Response):
+            return legs
+
+        start_lat = legs["client_latitude"]
+        start_lon = legs["client_longitude"]
+        destination = legs["destination"]
+        destination_lat = legs["destination_latitude"]
+        destination_lon = legs["destination_longitude"]
+        pickup_name = legs["pickup_name"]
+        pickup_address = legs["pickup_address"]
+        pickup_phone = legs["pickup_phone"]
+        pickup_lat = legs["pickup_latitude"]
+        pickup_lon = legs["pickup_longitude"]
 
         request_key = str(request.data.get("request_key", "")).strip()[:64] or None
         if request_key:
@@ -374,18 +510,18 @@ class CourseViewSet(ModelViewSet):
             if existing:
                 return Response(self.get_serializer(existing).data, status=200)
 
-        if destination_lat is None:
-            destination_position = resolve_destination(destination)
-            if not destination_position:
-                return Response({"detail": "Destination introuvable. Vérifiez l’adresse puis réessayez."}, status=422)
-            destination_lat, destination_lon = destination_position
-        elif not destination:
-            destination = (resolve_destination_label(destination_lat, destination_lon) or "موقع محدد على الخريطة")[:255]
-        estimated_distance, route_geometry = resolve_route(
-            start_lat, start_lon, destination_lat, destination_lon
+        routing = resolve_legs(
+            start_lat,
+            start_lon,
+            pickup_lat,
+            pickup_lon,
+            destination_lat,
+            destination_lon,
+            router=resolve_route,
         )
+        trip_distance = routing["trip_distance_km"]
         surcharge_percent = current_surcharge_percent()
-        final_price = adjusted_price(proposed_price, surcharge_percent)
+        final_price = adjusted_price(legs["proposed_price"], surcharge_percent)
 
         try:
             with transaction.atomic():
@@ -396,10 +532,24 @@ class CourseViewSet(ModelViewSet):
                     destination=destination,
                     destination_latitude=destination_lat,
                     destination_longitude=destination_lon,
-                    vehicle_type=vehicle_type,
-                    estimated_distance_km=estimated_distance,
-                    route_geometry=route_geometry,
-                    proposed_price=proposed_price,
+                    pickup_name=pickup_name,
+                    pickup_address=pickup_address,
+                    pickup_phone=pickup_phone,
+                    pickup_latitude=pickup_lat,
+                    pickup_longitude=pickup_lon,
+                    pickup_distance_km=routing["pickup_distance_km"],
+                    pickup_route_geometry=routing["pickup_route_geometry"],
+                    trip_distance_km=trip_distance,
+                    trip_route_geometry=routing["trip_route_geometry"],
+                    pickup_eta_minutes=eta_minutes(
+                        routing["pickup_distance_km"],
+                        settings.COURSE_ETA_PICKUP_BUFFER_MINUTES,
+                    ),
+                    dropoff_eta_minutes=eta_minutes(trip_distance),
+                    vehicle_type=legs["vehicle_type"],
+                    estimated_distance_km=trip_distance,
+                    route_geometry=routing["trip_route_geometry"],
+                    proposed_price=legs["proposed_price"],
                     surcharge_percent=surcharge_percent,
                     final_price=final_price,
                     status="searching",
@@ -408,39 +558,9 @@ class CourseViewSet(ModelViewSet):
                 )
                 record_course_event(course, "created", "client", client.id, new_status=course.status)
 
-                nearby_drivers = []
-                matching_vehicles = [vehicle_type]
-                if vehicle_type == "moto":
-                    matching_vehicles.append("scooter")
-                for driver in Livreur.objects.select_related("user").filter(
-                    user__is_active=True,
-                    fcm_token__gt="",
-                    latitude__isnull=False,
-                    longitude__isnull=False,
-                    vehicule__in=matching_vehicles,
-                ):
-                    driver_distance = distance_km(start_lat, start_lon, driver.latitude, driver.longitude)
-                    if driver_distance <= settings.COURSE_SEARCH_RADIUS_KM:
-                        nearby_drivers.append(driver)
-
-                CourseOffer.objects.bulk_create([
-                    CourseOffer(course=course, livreur=driver) for driver in nearby_drivers
-                ])
-                record_course_event(
-                    course,
-                    "drivers_notified",
-                    details={"livreur_ids": [driver.id for driver in nearby_drivers]},
-                )
-
-                notification_price = format(final_price.normalize(), "f")
-                for driver in nearby_drivers:
-                    transaction.on_commit(lambda driver=driver: send_livreur_notification(
-                        driver,
-                        "رحلة جديدة",
-                        f"{notification_price} دج",
-                        course_id=course.id,
-                        notification_type="course_offer",
-                    ))
+                # Première vague d'offres : on notifie les livreurs éligibles
+                # (en ligne, bon véhicule, proches du commerçant).
+                broadcast_course_offers(course, notifier=send_livreur_notification)
         except Exception as exc:
             if request_key:
                 existing = Course.objects.filter(client=client, request_key=request_key).first()
@@ -478,17 +598,34 @@ class CourseViewSet(ModelViewSet):
         elif not destination:
             destination = (resolve_destination_label(destination_lat, destination_lon) or "موقع محدد على الخريطة")[:255]
 
-        estimated_distance, route_geometry = resolve_route(
-            start_lat, start_lon, destination_lat, destination_lon
+        routing = resolve_legs(
+            start_lat,
+            start_lon,
+            self._read_optional_float(request, "pickup_latitude"),
+            self._read_optional_float(request, "pickup_longitude"),
+            destination_lat,
+            destination_lon,
+            router=resolve_route,
         )
+        estimated_distance = routing["trip_distance_km"]
         price = suggested_price(estimated_distance)
         surcharge_percent = current_surcharge_percent()
         return Response({
             "destination": destination,
             "destination_latitude": destination_lat,
             "destination_longitude": destination_lon,
+            "pickup_latitude": self._read_optional_float(request, "pickup_latitude"),
+            "pickup_longitude": self._read_optional_float(request, "pickup_longitude"),
+            "pickup_distance_km": routing["pickup_distance_km"],
+            "pickup_route_geometry": routing["pickup_route_geometry"],
+            "trip_distance_km": routing["trip_distance_km"],
+            "trip_route_geometry": routing["trip_route_geometry"],
+            "pickup_eta_minutes": eta_minutes(
+                routing["pickup_distance_km"], settings.COURSE_ETA_PICKUP_BUFFER_MINUTES
+            ),
+            "dropoff_eta_minutes": eta_minutes(routing["trip_distance_km"]),
             "estimated_distance_km": estimated_distance,
-            "route_geometry": route_geometry,
+            "route_geometry": routing["trip_route_geometry"],
             "proposed_price": price,
             "surcharge_percent": surcharge_percent,
             "final_price": adjusted_price(price, surcharge_percent),
@@ -499,6 +636,11 @@ class CourseViewSet(ModelViewSet):
         driver = Livreur.objects.filter(user=request.user, user__is_active=True).first()
         if not driver:
             return Response({"detail": "Compte chauffeur invalide."}, status=403)
+
+        expire_stale_offers()
+        # Une commande dont personne n'a voulu la vague précédente repart
+        # immédiatement chez d'autres livreurs plus proches.
+        dispatch_expired_courses()
 
         offers = CourseOffer.objects.filter(
             livreur=driver,
@@ -531,6 +673,13 @@ class CourseViewSet(ModelViewSet):
                 return Response({"status": course.status, "response": offer.response})
             if offer.response != "pending":
                 return Response({"detail": "Cette offre a déjà été traitée."}, status=409)
+            if offer.expires_at and offer.expires_at <= timezone.now():
+                offer.response = "withdrawn"
+                offer.responded_at = timezone.now()
+                offer.save(update_fields=["response", "responded_at"])
+                return Response({"detail": "Cette offre a expiré."}, status=409)
+            if response_value == "accepted" and not driver.est_en_ligne:
+                return Response({"detail": "Remettez-vous en ligne pour accepter une course."}, status=409)
             if response_value == "accepted" and Course.objects.filter(livreur=driver, active=True).exclude(pk=course.pk).exists():
                 return Response({"detail": "Vous avez déjà une course en cours."}, status=409)
 
@@ -541,9 +690,31 @@ class CourseViewSet(ModelViewSet):
             if response_value == "accepted":
                 course.status = "driver_accepted"
                 course.save(update_fields=["status"])
-            elif not course.offers.filter(response="accepted").exists():
-                course.status = "searching"
-                course.save(update_fields=["status"])
+            else:
+                if not course.offers.filter(response="accepted").exists():
+                    course.status = "searching"
+                    course.save(update_fields=["status"])
+                # Un refus ne doit pas laisser la commande en attente : on passe
+                # à la vague suivante dès qu'aucun livreur n'a d'offre en cours.
+                if not course.offers.filter(response="pending").exists():
+                    previous_round = course.broadcast_round
+                    course.broadcast_round = previous_round + 1
+                    course.status = "searching"
+                    course.save(update_fields=["broadcast_round", "status"])
+                    record_course_event(
+                        course,
+                        "offers_rebroadcast",
+                        details={
+                            "previous_round": previous_round,
+                            "round": course.broadcast_round,
+                            "trigger": "offer_rejected",
+                        },
+                    )
+                    transaction.on_commit(
+                        lambda: broadcast_course_offers(
+                            course, notifier=send_livreur_notification
+                        )
+                    )
             record_course_event(
                 course,
                 response_value,
@@ -612,8 +783,13 @@ class CourseViewSet(ModelViewSet):
         return self._transition(request, pk, "driver_arrived", ["driver_selected", "driver_arriving"], "arrived_at")
 
     @action(detail=True, methods=["post"])
+    def pickup(self, request, pk=None):
+        """Le livreur a récupéré la commande chez le commerçant."""
+        return self._transition(request, pk, "picked_up", ["driver_arrived"], "picked_up_at")
+
+    @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
-        return self._transition(request, pk, "in_progress", ["driver_arrived"], "started_at")
+        return self._transition(request, pk, "in_progress", ["driver_arrived", "picked_up"], "started_at")
 
     def _transition(self, request, pk, new_status, allowed_statuses, timestamp_field):
         driver = Livreur.objects.filter(user=request.user, user__is_active=True).first()
@@ -657,7 +833,7 @@ class CourseViewSet(ModelViewSet):
             actor_id = client.id if actor_type == "client" else driver.id
             if course.status in ["completed", "cancelled"] or not course.active:
                 return Response({"detail": "Cette course ne peut plus être annulée."}, status=409)
-            if actor_type == "livreur" and course.status not in ["driver_selected", "driver_arriving", "driver_arrived", "in_progress"]:
+            if actor_type == "livreur" and course.status not in ["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"]:
                 return Response({"detail": "Vous ne pouvez pas annuler cette demande."}, status=403)
 
             previous_status = course.status
@@ -698,7 +874,8 @@ class CourseViewSet(ModelViewSet):
                 course.livreur.disponible = False if has_other_active_course else (
                     course.availability_before_course if course.availability_before_course is not None else True
                 )
-                course.livreur.save(update_fields=["disponible"])
+                course.livreur.est_en_ligne = course.livreur.disponible
+                course.livreur.save(update_fields=["disponible", "est_en_ligne"])
         return Response(self.get_serializer(course).data)
 
     @action(detail=False, methods=["get"])
@@ -775,7 +952,7 @@ class CourseViewSet(ModelViewSet):
                 return Response(self.get_serializer(course).data)
             if course.destination and course.status != "in_progress":
                 return Response({"detail": "Seule une course en cours peut être terminée."}, status=409)
-            if course.livreur_id and course.status not in ["in_progress", "driver_selected", "driver_arrived", "driver_arriving"]:
+            if course.livreur_id and course.status not in ["in_progress", "driver_selected", "driver_arrived", "driver_arriving", "picked_up"]:
                 return Response({"detail": "La course ne peut pas être terminée dans cet état."}, status=409)
 
             previous_status = course.status
@@ -801,7 +978,8 @@ class CourseViewSet(ModelViewSet):
                 livreur.disponible = False if has_other_active_course else (
                     course.availability_before_course if course.availability_before_course is not None else True
                 )
-                livreur.save(update_fields=["nombre_livraisons", "disponible", "points"])
+                livreur.est_en_ligne = livreur.disponible
+                livreur.save(update_fields=["nombre_livraisons", "disponible", "est_en_ligne", "points"])
 
             client.points = (client.points or 0) + points_earned
             client.save(update_fields=["points"])

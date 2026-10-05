@@ -149,6 +149,19 @@ COURSE_SURCHARGE_PERCENT = os.getenv("COURSE_SURCHARGE_PERCENT", "15")
 COURSE_TARIFF_TIME_ZONE = os.getenv("COURSE_TARIFF_TIME_ZONE", "Africa/Algiers")
 COURSE_SEARCH_RADIUS_KM = float(os.getenv("COURSE_SEARCH_RADIUS_KM", "40"))
 COURSE_COMPLETION_POINTS = int(os.getenv("COURSE_COMPLETION_POINTS", "10"))
+# Durée de validité d'une offre envoyée au livreur (minuterie façon Uber).
+COURSE_OFFER_TTL_SECONDS = int(os.getenv("COURSE_OFFER_TTL_SECONDS", "60"))
+# --- Expérience "livreur Uber de commandes" -------------------------------
+# VITESSE moyenne retenue pour estimer une durée de trajet (ETA).
+COURSE_ETA_SPEED_KMH = float(os.getenv("COURSE_ETA_SPEED_KMH", "20"))
+# Tampon ajouté à l'ETA de retrait : le temps de se garer / récupérer la commande.
+COURSE_ETA_PICKUP_BUFFER_MINUTES = int(os.getenv("COURSE_ETA_PICKUP_BUFFER_MINUTES", "6"))
+# Nombre maximum de vagues de diffusion avant d'abandonner la recherche.
+COURSE_OFFER_MAX_ROUNDS = int(os.getenv("COURSE_OFFER_MAX_ROUNDS", "4"))
+# Délai avant de rediffuser à la vague suivante quand personne n'a répondu.
+COURSE_OFFER_ROUND_DELAY_SECONDS = int(os.getenv("COURSE_OFFER_ROUND_DELAY_SECONDS", "15"))
+# Nombre maximum de livreurs sollicités par vague (les plus proches d'abord).
+COURSE_OFFER_MAX_DRIVERS_PER_ROUND = int(os.getenv("COURSE_OFFER_MAX_DRIVERS_PER_ROUND", "8"))
 
 
 # Static files (CSS, JavaScript, Images)

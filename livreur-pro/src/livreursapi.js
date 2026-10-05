@@ -221,6 +221,48 @@ export async function setLivreurUnavailable(id) {
   return data;
 }
 
+export async function setLivreurOnline(id) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/set_online/`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(
+      toArabicMessage(
+        data.detail || data.error,
+        "تعذر التبديل إلى وضع الاتصال."
+      )
+    );
+  }
+
+  return data;
+}
+
+export async function setLivreurOffline(id) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/set_offline/`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(
+      toArabicMessage(
+        data.detail || data.error,
+        "تعذر التبديل إلى وضع عدم الاتصال."
+      )
+    );
+  }
+
+  return data;
+}
+
 export async function getCommentairesLivreur(livreurId) {
   const response = await fetch(
     `${API_BASE_URL}/commentaires-livreurs/?livreur=${livreurId}`
@@ -552,6 +594,10 @@ export function cancelCourse(courseId, reason, comment = "") {
 
 export function markCourseArrived(courseId) {
   return courseAction(courseId, "arrive");
+}
+
+export function pickupCourse(courseId) {
+  return courseAction(courseId, "pickup");
 }
 
 export function markCourseEnroute(courseId) {

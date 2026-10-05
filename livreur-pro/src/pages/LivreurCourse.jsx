@@ -6,10 +6,12 @@ import {
   getCourse,
   markCourseArrived,
   markCourseEnroute,
+  pickupCourse,
   respondToCourseOffer,
   startCourse as startCourseAction,
 } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import { OfferCountdown } from "../components/LivreurOrders.jsx";
 
 function getGoogleMapsUrl(latitude, longitude) {
   const destination = `${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
@@ -63,7 +65,7 @@ export default function LivreurCourse() {
       }
     }
 
-    const destinationIsTripEnd = course.status === "in_progress";
+    const destinationIsTripEnd = ["picked_up", "in_progress"].includes(course.status);
     const latitude = destinationIsTripEnd ? course.destination_latitude : course.client_latitude;
     const longitude = destinationIsTripEnd ? course.destination_longitude : course.client_longitude;
 
@@ -80,9 +82,14 @@ export default function LivreurCourse() {
     setUpdatingStatus(true);
     setError("");
     try {
-      const updated = action === "arrive"
-        ? await markCourseArrived(course.id)
-        : await startCourseAction(course.id);
+      let updated;
+      if (action === "arrive") {
+        updated = await markCourseArrived(course.id);
+      } else if (action === "pickup") {
+        updated = await pickupCourse(course.id);
+      } else {
+        updated = await startCourseAction(course.id);
+      }
       setCourse(updated);
     } catch (err) {
       setError(err.message || "تعذر تحديث حالة الرحلة.");
@@ -170,7 +177,8 @@ export default function LivreurCourse() {
 
   const hasClientLocation =
     course.client_latitude !== null && course.client_longitude !== null;
-  const routeIsDestination = course.status === "in_progress";
+  // La destination est la cible une fois la commande récupérée.
+  const routeIsDestination = ["picked_up", "in_progress"].includes(course.status);
   const isOffer = !course.livreur && ["searching", "driver_accepted"].includes(course.status);
   const hasRouteTarget = routeIsDestination
     ? course.destination_latitude !== null && course.destination_longitude !== null
@@ -188,16 +196,23 @@ export default function LivreurCourse() {
           <h1>تفاصيل الرحلة</h1>
         </div>
         <strong className={`course-status-badge status-${courseStatusClass}`}>
-          {course.status === "completed" ? "اكتملت الرحلة" : course.status === "cancelled" ? "أُلغيت الرحلة" : isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد" : course.status === "driver_selected" ? "تم تأكيد السائق" : course.status === "driver_arrived" ? "وصل السائق" : course.status === "in_progress" ? "الرحلة جارية" : "الرحلة نشطة"}
+          {course.status === "completed" ? "اكتملت الرحلة" : course.status === "cancelled" ? "أُلغيت الرحلة" : isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد" : course.status === "driver_selected" ? "تم تأكيد السائق" : course.status === "driver_arrived" ? "وصل السائق" : course.status === "picked_up" ? "تم استلام الطلب" : course.status === "in_progress" ? "الرحلة جارية" : "الرحلة نشطة"}
         </strong>
       </header>
 
-      {(isOffer || ["driver_selected", "driver_arriving", "driver_arrived", "in_progress"].includes(course.status)) && (
+      {isOffer && course.my_offer_response === "pending" && (
+        <div className="offer-countdown-banner">
+          <OfferCountdown seconds={course.my_offer_expires_in} />
+          <span>اقبل الطلب قبل انتهاء المهلة.</span>
+        </div>
+      )}
+
+      {(isOffer || ["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"].includes(course.status)) && (
         <div className="course-stage-card" aria-live="polite">
           <span className="course-stage-indicator" aria-hidden="true" />
           <div>
-            <strong>{isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب رحلة جديد" : course.status === "driver_selected" || course.status === "driver_arriving" ? "أنت في الطريق إلى العميل" : course.status === "driver_arrived" ? "بانتظار بدء الرحلة" : "الرحلة جارية الآن"}</strong>
-            <p>{isOffer ? course.my_offer_response === "accepted" ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : course.status === "driver_selected" || course.status === "driver_arriving" ? "توجه إلى موقع العميل، وسيتم تحديث الحالة عند وصولك." : course.status === "driver_arrived" ? "أبلغ العميل بوصولك وانتظر بدء الرحلة." : "توجه إلى الوجهة المحددة لإكمال الرحلة."}</p>
+            <strong>{isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب رحلة جديد" : course.status === "driver_selected" || course.status === "driver_arriving" ? "أنت في الطريق إلى نقطة الانطلاق" : course.status === "driver_arrived" ? "وصلت: أكّد استلام الطلب" : course.status === "picked_up" ? "تم استلام الطلب" : "الرحلة جارية الآن"}</strong>
+            <p>{isOffer ? course.my_offer_response === "accepted" ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : course.status === "driver_selected" || course.status === "driver_arriving" ? "توجه إلى نقطة الانطلاق، وسيتم تحديث الحالة عند وصولك." : course.status === "driver_arrived" ? "استلم الطلب ثم اضغط على «تم استلام الطلب» للمتابعة." : course.status === "picked_up" ? "انطلق نحو عنوان الزبون لتسليم الطلب." : "توجه إلى الوجهة المحددة لإكمال الرحلة."}</p>
           </div>
         </div>
       )}
@@ -245,17 +260,23 @@ export default function LivreurCourse() {
 
       {["driver_selected", "driver_arriving"].includes(course.status) && (
         <button className="primary-btn full" type="button" onClick={() => handleStatusAction("arrive")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
-          {updatingStatus ? "جارٍ تحديث الحالة…" : "وصلت إلى الزبون"}
+          {updatingStatus ? "جارٍ تحديث الحالة…" : course.destination ? "وصلت إلى نقطة الاستلام" : "وصلت إلى الزبون"}
         </button>
       )}
 
       {course.status === "driver_arrived" && (
-        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("start")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
-          {updatingStatus ? "جارٍ تحديث الحالة…" : "بدء الرحلة"}
+        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("pickup")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
+          {updatingStatus ? "جارٍ تحديث الحالة…" : course.destination ? "تم استلام الطلب" : "بدء الرحلة"}
         </button>
       )}
 
-      {course.status !== "completed" && course.active && (course.status === "in_progress" || !course.destination) && (
+      {course.status === "picked_up" && (
+        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("start")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
+          {updatingStatus ? "جارٍ تحديث الحالة…" : "بدء التوصيل إلى الزبون"}
+        </button>
+      )}
+
+      {course.status !== "completed" && course.active && ["in_progress", "picked_up"].includes(course.status) && (
         <button
           className="primary-btn full"
           type="button"
