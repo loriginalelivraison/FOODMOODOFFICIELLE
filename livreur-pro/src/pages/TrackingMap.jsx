@@ -1,3 +1,4 @@
+import { getVehicleMarkerIcon } from "../utils/vehicleMarkers.js";
 import React, { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
@@ -24,36 +25,6 @@ const clientIcon = createMarkerIcon({
   iconAnchor: [10, 10],
 });
 
-function getVehicleMarkerIcon(vehicle) {
-  const map = {
-    moto: { emoji: "🛵", bg: "#f97316" },
-    scooter: { emoji: "🛵", bg: "#f97316" },
-    velo: { emoji: "🚴", bg: "#10b981" },
-    voiture: { emoji: "🚘", bg: "#2563eb" },
-    camion: { emoji: "🚚", bg: "#f59e0b" },
-  };
-
-  const config = map[vehicle] || map.moto;
-
-  return createMarkerIcon({
-    className: "vehicle-marker",
-    html: `
-      <div style="
-        width:34px;
-        height:34px;
-        background:${config.bg};
-        border:4px solid white;
-        border-radius:50%;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:18px;
-      ">${config.emoji}</div>
-    `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-  });
-}
 
 function hasPosition(position) {
   return (

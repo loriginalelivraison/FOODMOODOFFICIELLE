@@ -27,8 +27,8 @@ import {
 const MIN_COURSE_PRICE_DZD = 100;
 const PRICE_ADJUSTMENT_DZD = 50;
 const VEHICLE_TYPES = [
-  { value: "moto", label: "عامل توصيل", icon: Bike },
-  { value: "voiture", label: "سيارة", icon: CarFront },
+  { value: "moto", label: "دراجة نارية", description: "خدمة التوصيل", icon: Bike },
+  { value: "voiture", label: "سيارة", description: "تنقل الأشخاص", icon: CarFront },
   { value: "camion", label: "شاحنة", icon: Truck },
 ];
 const COURSE_STEPS = ["الطلب", "السائق", "في الطريق", "وصل", "انتهت"];
@@ -1016,7 +1016,7 @@ export default function Couriers() {
           <h2 id="course-vehicle-title" className="couriers-step-title">اختر نوع المركبة</h2>
           <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
             {/* Camion masqué temporairement ; sa définition et sa logique restent disponibles. */}
-            {VEHICLE_TYPES.filter(({ value }) => value !== "camion").map(({ value, label, icon: Icon }) => (
+            {VEHICLE_TYPES.filter(({ value }) => value !== "camion").map(({ value, label, description, icon: Icon }) => (
               <button
                 className={`vehicle-type-option ${selectedVehicle === value ? "selected" : ""}`}
                 type="button"
@@ -1025,8 +1025,12 @@ export default function Couriers() {
                 disabled={!clientPosition || bookingLoading}
                 onClick={() => handleVehicleChange(value)}
               >
-                <Icon size={28} aria-hidden="true" />
-                <span>{label}</span>
+                {value === "voiture" || value === "moto" ? (
+                  <span className={`vehicle-choice-image is-${value}`} aria-hidden="true" />
+                ) : <Icon size={28} aria-hidden="true" />}
+                <span className="vehicle-choice-label">{label}</span>
+                {description && <span className="vehicle-choice-description">{description}</span>}
+                {selectedVehicle === value && <span className="vehicle-choice-check" aria-hidden="true">✓</span>}
               </button>
             ))}
           </div>
