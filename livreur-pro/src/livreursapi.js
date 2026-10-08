@@ -31,6 +31,42 @@ function authHeaders(extra = {}) {
   };
 }
 
+function requireClientRole() {
+  if (localStorage.getItem("role") !== "client" || !getCleanToken()) {
+    throw new Error("يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل.");
+  }
+}
+
+export async function getDriverDocuments(id) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/documents/`, { headers: authHeaders() });
+  const data = await response.json();
+  if (!response.ok) throw new Error(toArabicMessage(data.detail, "تعذر تحميل الوثائق."));
+  return data;
+}
+
+export async function uploadDriverDocument(id, kind, file) {
+  const form = new FormData();
+  form.append("kind", kind);
+  form.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/documents/`, {
+    method: "POST", headers: authHeaders(), body: form,
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(toArabicMessage(data.detail, "تعذر إرسال الوثيقة."));
+  return data;
+}
+
+export async function downloadDriverDocument(id, kind) {
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/documents/${kind}/download/`, { headers: authHeaders() });
+  if (!response.ok) throw new Error("تعذر فتح الوثيقة.");
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${kind}.${response.headers.get("Content-Type")?.includes("png") ? "png" : "jpg"}`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 export async function getLivreurs() {
   const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
 
@@ -42,7 +78,9 @@ export async function getLivreurs() {
 }
 
 export async function getLivreurById(id) {
-  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/?format=json`);
+  const response = await fetch(`${API_BASE_URL}/livreurs/${id}/?format=json`, {
+    headers: getCleanToken() ? authHeaders() : {},
+  });
 
   if (!response.ok) {
     throw new Error(toArabicMessage(null, "لم يتم العثور على السائق."));
@@ -69,7 +107,10 @@ export async function loginJWT(credentials) {
     throw new Error(toArabicMessage(data.detail, "تعذر تسجيل الدخول."));
   }
 
-  const livreur = await getLivreurBytelephone(credentials.telephone);
+  const profileResponse = await fetch(`${API_BASE_URL}/livreurs/me/`, {
+    headers: { Authorization: `Bearer ${data.access}` },
+  });
+  const livreur = profileResponse.ok ? await profileResponse.json() : null;
 
   if (!livreur) {
     localStorage.clear();
@@ -173,6 +214,15 @@ export async function clearLivreurFcmToken(id) {
 }
 
 export async function clearCurrentDriverFcmToken() {
+  if (localStorage.getItem("role") === "client") {
+    const client = JSON.parse(localStorage.getItem("client") || "null");
+    if (client?.id) {
+      await fetch(`${API_BASE_URL}/clients/${client.id}/update_fcm_token/`, {
+        method: "DELETE", headers: authHeaders(),
+      });
+    }
+    return;
+  }
   if (localStorage.getItem("role") !== "livreur") return;
 
   let livreur;
@@ -186,18 +236,17 @@ export async function clearCurrentDriverFcmToken() {
 }
 
 export async function getLivreurBytelephone(telephone) {
-  const response = await fetch(`${API_BASE_URL}/livreurs/?format=json`);
+  const response = await fetch(`${API_BASE_URL}/livreurs/me/`, { headers: authHeaders() });
 
   if (!response.ok) {
     throw new Error(toArabicMessage(null, "حدث خطأ أثناء جلب معلومات السائق."));
   }
 
   const data = await response.json();
-  const livreurs = Array.isArray(data) ? data : data.results || [];
 
   const clean = (value) => String(value || "").replace(/\s/g, "");
 
-  return livreurs.find((l) => clean(l.telephone) === clean(telephone));
+  return clean(data.telephone) === clean(telephone) ? data : null;
 }
 
 export async function setLivreurUnavailable(id) {
@@ -489,6 +538,7 @@ export async function getClientProfile() {
 }
 
 export async function createCourse(data) {
+  requireClientRole();
   const response = await fetch(`${API_BASE_URL}/courses/`, {
     method: "POST",
     headers: authHeaders({
@@ -531,6 +581,7 @@ async function courseAction(courseId, action, method = "POST", body = {}) {
 }
 
 export async function createCourseRequest(request) {
+  requireClientRole();
   const response = await fetch(`${API_BASE_URL}/courses/request/`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),

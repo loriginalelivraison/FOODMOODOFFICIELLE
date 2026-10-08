@@ -48,11 +48,16 @@ export default function LivreurCourse() {
       }
     }
     refreshCourse();
+    const handlePush = (event) => {
+      if (String(event.detail?.course_id) === String(id)) refreshCourse();
+    };
+    window.addEventListener("winrakPush", handlePush);
     const interval = setInterval(refreshCourse, 5000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("winrakPush", handlePush);
     };
   }, [id]);
 
@@ -177,7 +182,7 @@ export default function LivreurCourse() {
     course.client_latitude !== null && course.client_longitude !== null;
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
   if (course.status === "cancelled") {
-    return <CourseCancelledState isDelivery={isDelivery} isDriver onContinue={() => navigate(`/livreur-dashboard/${course.livreur || JSON.parse(localStorage.getItem("livreur") || "{}").id}`, { replace: true })} />;
+    return <CourseCancelledState isDelivery={isDelivery} isDriver cancelledBy={course.cancelled_by_type} onContinue={() => navigate(`/livreur-dashboard/${course.livreur || JSON.parse(localStorage.getItem("livreur") || "{}").id}`, { replace: true })} />;
   }
   const routeIsDestination = isDropoffStage(course.status);
   const routeTarget = getCourseTarget(course);

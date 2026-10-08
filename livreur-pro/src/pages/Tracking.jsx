@@ -12,6 +12,7 @@ import {
 import TrackingMap from "./TrackingMap.jsx";
 import pasdephoto from "../assets/pasdephoto.png";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import CourseCancelledState from "../components/CourseCancelledState.jsx";
 import {
   getLocationErrorMessage,
   isIOSDevice,
@@ -40,6 +41,7 @@ export default function Tracking() {
   const navigate = useNavigate();
 
   const [courier, setCourier] = useState(null);
+  const [cancelledCourse, setCancelledCourse] = useState(null);
   const [comments, setComments] = useState([]);
 
   const [showCommentForm, setShowCommentForm] = useState(false);
@@ -96,6 +98,13 @@ export default function Tracking() {
     async function checkCourseStatus() {
       try {
         const course = await getCourse(activeCourseId);
+        if (course.status === "cancelled") {
+          if (clientWatchRef.current !== null) navigator.geolocation.clearWatch(clientWatchRef.current);
+          clientWatchRef.current = null;
+          localStorage.removeItem(`activeTrackingCourse_${id}`);
+          setCancelledCourse(course);
+          return;
+        }
 
         if (!course.active) {
           if (clientWatchRef.current !== null) {
@@ -132,7 +141,7 @@ export default function Tracking() {
           name: livreur.nom,
           city: livreur.ville,
           vehicle: livreur.vehicule,
-          available: Boolean(livreur.disponible),
+          available: Boolean(livreur.disponible) && livreur.est_en_ligne !== false,
           phone: livreur.telephone,
           photo: livreur.photo,
           whatsapp: livreur.telephone
@@ -183,7 +192,11 @@ export default function Tracking() {
     const token = localStorage.getItem("access");
     const role = localStorage.getItem("role");
 
-    if (!token || role !== "client") {
+    if (token && role !== "client") {
+      setError("يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل.");
+      return false;
+    }
+    if (!token) {
       localStorage.setItem("redirectAfterLogin", `/tracking/${id}`);
       navigate("/connexion-client");
       return false;
@@ -204,6 +217,7 @@ export default function Tracking() {
   }
 
   async function handleCourseAccepted() {
+    if (!requireClientAuth()) return;
     const clientStorage = localStorage.getItem("client");
     const client = clientStorage ? JSON.parse(clientStorage) : null;
 
@@ -492,6 +506,12 @@ export default function Tracking() {
     }
   }
 
+  if (cancelledCourse) {
+    return <CourseCancelledState isDelivery={["moto", "camion"].includes(cancelledCourse.vehicle_type)}
+      cancelledBy={cancelledCourse.cancelled_by_type}
+      onContinue={() => navigate("/livreurs", { replace: true })} />;
+  }
+
   if (loading) {
     return (
       <section className="page" dir="rtl">
@@ -598,7 +618,13 @@ export default function Tracking() {
       </div>
 
       <div className="card-bottom">
+        {!courier.phone && !courseStarted && !courseFinished && <>
+          <p>تظهر بيانات التواصل بعد تأكيد السائق.</p>
+          <button className="primary-btn small" type="button" disabled={!courier.available}
+            onClick={handleCourseAccepted}>{courier.available ? "تأكيد طلب الرحلة" : "السائق غير متاح حالياً"}</button>
+        </>}
         {!callButtonsHidden &&
+          courier.phone &&
           !showAcceptedQuestion &&
           !courseStarted &&
           !courseFinished && (

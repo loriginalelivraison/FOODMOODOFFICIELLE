@@ -59,10 +59,15 @@ export default function ClientCourse() {
     }
 
     refreshCourse();
+    const handlePush = (event) => {
+      if (String(event.detail?.course_id) === String(id)) refreshCourse();
+    };
+    window.addEventListener("winrakPush", handlePush);
     const interval = setInterval(refreshCourse, 4000);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("winrakPush", handlePush);
     };
   }, [id]);
 
@@ -143,7 +148,7 @@ export default function ClientCourse() {
   const stepIndex = getCourseStepIndex(course.status);
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
   if (course.status === "cancelled") {
-    return <CourseCancelledState isDelivery={isDelivery} onContinue={() => navigate("/livreurs", { replace: true })} />;
+    return <CourseCancelledState isDelivery={isDelivery} cancelledBy={course.cancelled_by_type} onContinue={() => navigate("/livreurs", { replace: true })} />;
   }
   const steps = getCourseSteps(course.vehicle_type);
   const pickupPosition = getPickupPosition(course);

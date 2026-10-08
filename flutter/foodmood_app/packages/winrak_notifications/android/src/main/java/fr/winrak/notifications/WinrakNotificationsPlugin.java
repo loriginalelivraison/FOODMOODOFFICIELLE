@@ -6,6 +6,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.media.AudioAttributes;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.widget.RemoteViews;
 import androidx.core.app.NotificationCompat;
@@ -14,11 +16,16 @@ import io.flutter.plugin.common.MethodChannel;
 
 /** Registered with every Flutter engine, including the FCM background isolate. */
 public final class WinrakNotificationsPlugin implements FlutterPlugin {
+    private static final String CHANNEL_ID = "winrak_events_v2";
     private MethodChannel channel;
     @Override public void onAttachedToEngine(FlutterPluginBinding binding) {
         Context context = binding.getApplicationContext();
         channel = new MethodChannel(binding.getBinaryMessenger(), "winrak/course_notifications");
         channel.setMethodCallHandler((call, result) -> {
+            if (call.method.equals("claimEvent")) {
+                result.success(claimEvent(context, call.argument("event_id")));
+                return;
+            }
             if (!call.method.equals("showOffer")) { result.notImplemented(); return; }
             try {
                 int id = ((Number) call.argument("id")).intValue();
@@ -27,21 +34,26 @@ public final class WinrakNotificationsPlugin implements FlutterPlugin {
                 String pickup = call.argument("pickup");
                 String destination = call.argument("destination");
                 NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                Uri sound = Uri.parse("android.resource://" + context.getPackageName() + "/raw/winrak_notification");
                 if (Build.VERSION.SDK_INT >= 26) {
-                    manager.createNotificationChannel(new NotificationChannel("high_importance_channel", "إشعارات التوصيل", NotificationManager.IMPORTANCE_HIGH));
+                    NotificationChannel notifications = new NotificationChannel(CHANNEL_ID, "إشعارات WinRak", NotificationManager.IMPORTANCE_HIGH);
+                    notifications.setSound(sound, new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+                    manager.createNotificationChannel(notifications);
                 }
                 PendingIntent open = intent(context, id, payload, null);
                 PendingIntent accept = intent(context, id, payload, "accept");
                 PendingIntent reject = intent(context, id, payload, "reject");
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "high_importance_channel")
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_winrak_offer)
-                    .setColor(0xFF087F5B)
+                    .setColor(0xFFF97316)
+                    .setSound(sound)
                     .setContentTitle("رحلة جديدة · " + price)
                     .setContentText("الانطلاق: " + pickup + " · الوصول: " + destination)
                     .setContentIntent(open).setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_EVENT)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     .setShowWhen(false)
                     .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
                     .setCustomContentView(view(context, R.layout.offer_compact, price, pickup, destination, accept, reject))
@@ -53,6 +65,18 @@ public final class WinrakNotificationsPlugin implements FlutterPlugin {
                 result.error("offer_notification", error.getMessage(), null);
             }
         });
+    }
+    private static synchronized boolean claimEvent(Context context, String eventId) {
+        if (eventId == null) return true;
+        SharedPreferences events = context.getSharedPreferences("winrak_push_events", Context.MODE_PRIVATE);
+        long now = System.currentTimeMillis();
+        if (now - events.getLong(eventId, 0) < 86400000L) return false;
+        SharedPreferences.Editor editor = events.edit();
+        for (String key : events.getAll().keySet()) {
+            if (now - events.getLong(key, 0) >= 86400000L) editor.remove(key);
+        }
+        editor.putLong(eventId, now).commit();
+        return true;
     }
     private static RemoteViews view(Context context, int layout, String price, String pickup, String destination, PendingIntent accept, PendingIntent reject) {
         RemoteViews view = new RemoteViews(context.getPackageName(), layout);

@@ -4,6 +4,19 @@ import base64
 import firebase_admin
 
 from firebase_admin import credentials, messaging
+from .models import Client, Livreur
+
+
+def save_fcm_token(account, token):
+    if token:
+        Livreur.objects.filter(fcm_token=token).update(fcm_token=None)
+        Client.objects.filter(fcm_token=token).update(fcm_token=None)
+    account.fcm_token = token
+    account.save(update_fields=["fcm_token"])
+
+
+def send_client_notification(client, title, body, **kwargs):
+    return send_livreur_notification(client, title, body, recipient_role="client", **kwargs)
 
 
 def init_firebase():
@@ -22,7 +35,7 @@ def init_firebase():
     firebase_admin.initialize_app(cred)
 
 
-def send_livreur_notification(livreur, title, body, course_id=None, notification_type="course_accepted", extra_data=None):
+def send_livreur_notification(livreur, title, body, course_id=None, notification_type="course_accepted", extra_data=None, recipient_role="livreur"):
     if not livreur.fcm_token:
         print("AUCUN FCM TOKEN POUR CE LIVREUR")
         return False
@@ -35,6 +48,9 @@ def send_livreur_notification(livreur, title, body, course_id=None, notification
                 "type": notification_type,
                 "title": title,
                 "body": body,
+                "recipient_role": recipient_role,
+                "account_id": str(livreur.id),
+                "event_id": f"{recipient_role}:{livreur.id}:{notification_type}:{course_id}:{(extra_data or {}).get('round', 1)}",
                 **({"course_id": str(course_id)} if course_id is not None else {}),
                 **{key: str(value) for key, value in (extra_data or {}).items()},
             },
@@ -42,12 +58,13 @@ def send_livreur_notification(livreur, title, body, course_id=None, notification
                 priority="high",
             ),
             apns=messaging.APNSConfig(
-                headers={"apns-priority": "10"},
+                headers={"apns-priority": "10", "apns-collapse-id": f"course-{course_id}"},
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(
                         alert=messaging.ApsAlert(title=title, body=body),
-                        sound="default",
-                        category="COURSE_OFFER" if notification_type == "course_offer" else None,
+                        sound="winrak_notification.wav",
+                        category="COURSE_OFFER" if notification_type == "course_offer" else "COURSE_EVENT",
+                        thread_id=f"course-{course_id}",
                     ),
                 ),
             ),
@@ -60,6 +77,9 @@ def send_livreur_notification(livreur, title, body, course_id=None, notification
 
         return True
 
-    except Exception as e:
-        print("ERREUR ENVOI FCM :", str(e))
+    except messaging.UnregisteredError:
+        type(livreur).objects.filter(pk=livreur.pk, fcm_token=livreur.fcm_token).update(fcm_token=None)
+        return False
+    except Exception:
+        print("ERREUR ENVOI FCM")
         return False

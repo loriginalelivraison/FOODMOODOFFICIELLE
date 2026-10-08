@@ -19,6 +19,8 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
+PRIVATE_DOCUMENT_ROOT = Path(os.getenv("PRIVATE_DOCUMENT_ROOT", str(BASE_DIR / "private_documents")))
+PRIVATE_DOCUMENT_BACKEND = os.getenv("PRIVATE_DOCUMENT_BACKEND", "cloudinary")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
@@ -119,15 +121,15 @@ SIMPLE_JWT = {
 }
 
 CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": "dzijt4xbh",
-    "API_KEY": "822486142918698",
-    "API_SECRET": "IO6vLgZrtydSQRCIbs8UalvX_7o",
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME", ""),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY", ""),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
 }
 
 cloudinary.config(
-    cloud_name="dzijt4xbh",
-    api_key="822486142918698",
-    api_secret="IO6vLgZrtydSQRCIbs8UalvX_7o",
+    cloud_name=CLOUDINARY_STORAGE["CLOUD_NAME"],
+    api_key=CLOUDINARY_STORAGE["API_KEY"],
+    api_secret=CLOUDINARY_STORAGE["API_SECRET"],
     secure=True
 )
 # Internationalization

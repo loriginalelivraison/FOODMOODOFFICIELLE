@@ -4,6 +4,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import PermissionDenied, ValidationError, MethodNotAllowed
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from PIL import Image, UnidentifiedImageError
+import warnings
 
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -12,7 +17,7 @@ from django.db import transaction
 from django.db.models import Avg, Q
 from decimal import Decimal, InvalidOperation
 
-from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course, CourseOffer
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course, CourseOffer, DriverDocument
 from .serializers import (
     LivreurSerializer,
     DemandeLivraisonSerializer,
@@ -20,7 +25,7 @@ from .serializers import (
     ClientSerializer,
     CourseSerializer,
 )
-from .firebase import send_livreur_notification
+from .firebase import send_livreur_notification, send_client_notification, save_fcm_token
 from .course_services import (
     adjusted_price,
     broadcast_course_offers,
@@ -42,6 +47,59 @@ from .course_services import (
 class LivreurViewSet(ModelViewSet):
     serializer_class = LivreurSerializer
 
+    @action(detail=False, methods=["get"])
+    def me(self, request):
+        driver = get_object_or_404(Livreur, user=request.user)
+        return Response(self.get_serializer(driver).data)
+
+    @action(detail=True, methods=["get", "post"], parser_classes=[MultiPartParser, FormParser])
+    def documents(self, request, pk=None):
+        driver = self.get_object()
+        if request.method == "POST":
+            kind = request.data.get("kind")
+            upload = request.FILES.get("file")
+            if kind not in {"license", "vehicle"} or not upload:
+                raise ValidationError({"detail": "اختر نوع الوثيقة وأرفق صورة واضحة."})
+            if upload.size > 5 * 1024 * 1024:
+                raise ValidationError({"detail": "الحد الأقصى للصورة 5 ميغابايت."})
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", Image.DecompressionBombWarning)
+                    image = Image.open(upload)
+                    if image.format not in {"JPEG", "PNG"}:
+                        raise ValueError()
+                    image.verify()
+                upload.seek(0)
+            except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+                raise ValidationError({"detail": "أرفق صورة JPEG أو PNG صالحة."})
+            upload.name = "document.jpg" if image.format == "JPEG" else "document.png"
+            with transaction.atomic():
+                Livreur.objects.select_for_update().get(pk=driver.pk)
+                document, _ = DriverDocument.objects.get_or_create(
+                    livreur=driver, kind=kind, defaults={"file": ""}
+                )
+                previous_file = document.file.name
+                document.file = upload
+                document.status = "pending"
+                document.save()
+                if previous_file:
+                    transaction.on_commit(lambda: document.file.storage.delete(previous_file), robust=True)
+        documents = {doc.kind: doc for doc in driver.documents.all()}
+        return Response([{
+            "kind": kind, "status": documents[kind].status if kind in documents else "missing",
+            "uploaded_at": documents[kind].uploaded_at if kind in documents else None,
+        } for kind in ("license", "vehicle")])
+
+    @action(detail=True, methods=["get"], url_path="documents/(?P<kind>license|vehicle)/download")
+    def download_document(self, request, pk=None, kind=None):
+        driver = self.get_object()
+        document = get_object_or_404(DriverDocument, livreur=driver, kind=kind)
+        response = FileResponse(document.file.open("rb"), as_attachment=True,
+                                filename=f"{kind}{'.png' if document.file.name.endswith('.png') else '.jpg'}")
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
     def perform_destroy(self, instance):
         user = instance.user
 
@@ -56,6 +114,8 @@ class LivreurViewSet(ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        if self.action == "download_document" and self.request.user.has_perm("deliveries.view_driverdocument"):
+            return Livreur.objects.all()
         if self.action in ["list", "retrieve"]:
             return Livreur.objects.all().order_by("-disponible", "-note")
 
@@ -85,7 +145,7 @@ class LivreurViewSet(ModelViewSet):
         livreur.latitude = latitude
         livreur.longitude = longitude
         livreur.disponible = not has_active_course
-        livreur.save()
+        livreur.save(update_fields=["latitude", "longitude", "disponible"])
 
         return Response({
             "message": "Position mise à jour",
@@ -177,9 +237,7 @@ class LivreurViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        Livreur.objects.exclude(pk=livreur.pk).filter(fcm_token=token).update(fcm_token=None)
-        livreur.fcm_token = token
-        livreur.save(update_fields=["fcm_token"])
+        save_fcm_token(livreur, token)
 
         return Response({
             "success": True,
@@ -202,6 +260,21 @@ class DemandeLivraisonViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
     queryset = DemandeLivraison.objects.all().order_by("-created_at")
     serializer_class = DemandeLivraisonSerializer
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    def create(self, request, *args, **kwargs):
+        if not Client.objects.filter(user=request.user).exists():
+            raise PermissionDenied("يلزم حساب عميل لطلب توصيل.")
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        if not Client.objects.filter(user=self.request.user).exists():
+            raise PermissionDenied("يلزم حساب عميل لطلب توصيل.")
+        serializer.save()
 
 
 @api_view(["POST"])
@@ -297,6 +370,15 @@ class ClientViewSet(ModelViewSet):
     serializer_class = ClientSerializer
     permission_classes = [IsAuthenticated]
 
+    @action(detail=True, methods=["patch", "delete"])
+    def update_fcm_token(self, request, pk=None):
+        client = self.get_object()
+        token = request.data.get("fcm_token") if request.method == "PATCH" else None
+        if request.method == "PATCH" and not token:
+            raise ValidationError({"detail": "fcm_token obligatoire"})
+        save_fcm_token(client, token)
+        return Response({"success": True})
+
     def get_queryset(self):
         return Client.objects.filter(user=self.request.user)
 
@@ -342,6 +424,18 @@ def register_client(request):
 class CourseViewSet(ModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated]
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
+
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
+
+    def create(self, request, *args, **kwargs):
+        if not Client.objects.filter(user=request.user).exists():
+            raise PermissionDenied("يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل.")
+        # Keep the existing direct-driver booking contract.
+        with transaction.atomic():
+            return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         user = self.request.user
@@ -365,28 +459,33 @@ class CourseViewSet(ModelViewSet):
         client = serializer.validated_data.get("client")
         livreur = serializer.validated_data.get("livreur")
 
-        if client.user != self.request.user:
-            raise PermissionError("Accès interdit")
+        if not client or client.user != self.request.user:
+            raise PermissionDenied("يلزم حساب عميل لطلب رحلة.")
+        if not livreur:
+            raise ValidationError("اختر سائقاً متاحاً.")
+        livreur = Livreur.objects.select_for_update().get(pk=livreur.pk)
 
         existing_course = Course.objects.filter(
             livreur=livreur,
             active=True,
         ).exists()
 
-        if existing_course:
-            raise PermissionError("Ce livreur est déjà en livraison")
+        if existing_course or not livreur.disponible or not livreur.est_en_ligne:
+            raise ValidationError("هذا السائق غير متاح حالياً.")
 
-        course = serializer.save(active=True, client_confirmed=True, status="driver_selected")
+        course = serializer.save(active=True, client_confirmed=True, status="driver_selected",
+                                 availability_before_course=livreur.disponible,
+                                 vehicle_type=livreur.vehicule if livreur.vehicule in {"voiture", "moto", "camion"} else "moto")
 
         livreur.disponible = False
         livreur.save(update_fields=["disponible"])
 
-        send_livreur_notification(
+        transaction.on_commit(lambda: send_livreur_notification(
             livreur,
-            "Nouvelle demande de livraison",
-            "Un client a confirmé la course. Ouvrez WinRak.",
+            "طلب جديد",
+            "أكد العميل الطلب. افتح WinRak للاطلاع على التفاصيل.",
             course_id=course.id,
-        )
+        ))
 
     @staticmethod
     def _read_optional_float(request, key):
@@ -502,7 +601,7 @@ class CourseViewSet(ModelViewSet):
     def request_course(self, request):
         client = Client.objects.filter(user=request.user).first()
         if not client:
-            return Response({"detail": "Un compte client est requis."}, status=403)
+            return Response({"detail": "يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل."}, status=403)
 
         legs = self._parse_delivery_legs(request)
         if isinstance(legs, Response):
@@ -791,6 +890,11 @@ class CourseViewSet(ModelViewSet):
             ).select_related("livreur").first()
             if not offer:
                 return Response({"detail": "Ce chauffeur n’a pas accepté la course."}, status=409)
+            offer.livreur = Livreur.objects.select_for_update().get(pk=offer.livreur_id)
+            if not offer.livreur.est_en_ligne or Course.objects.filter(
+                livreur=offer.livreur, active=True
+            ).exists():
+                return Response({"detail": "هذا السائق غير متاح حالياً. اختر سائقاً آخر."}, status=409)
 
             previous_status = course.status
             course.livreur = offer.livreur
@@ -880,7 +984,9 @@ class CourseViewSet(ModelViewSet):
                 return Response({"detail": "Course introuvable."}, status=404)
             actor_type = "client" if client and course.client_id == client.id else "livreur"
             actor_id = client.id if actor_type == "client" else driver.id
-            if course.status in ["completed", "cancelled"] or not course.active:
+            if course.status == "cancelled":
+                return Response(self.get_serializer(course).data)
+            if course.status == "completed" or not course.active:
                 return Response({"detail": "Cette course ne peut plus être annulée."}, status=409)
             if actor_type == "livreur" and course.status not in ["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"]:
                 return Response({"detail": "Vous ne pouvez pas annuler cette demande."}, status=403)
@@ -907,15 +1013,25 @@ class CourseViewSet(ModelViewSet):
                 course, "cancelled", actor_type, actor_id, previous_status, "cancelled",
                 {"reason": reason, "comment": comment},
             )
-            for affected_offer in active_offers:
-                if actor_type == "client" or affected_offer.livreur_id != course.livreur_id:
-                    transaction.on_commit(lambda affected_offer=affected_offer: send_livreur_notification(
-                        affected_offer.livreur,
-                        "تم إلغاء الطلب" if course.is_delivery else "تم إلغاء الرحلة",
-                        f"تم إلغاء الطلب رقم {course.id}. لم يعد متاحاً." if course.is_delivery else f"تم إلغاء طلب الرحلة رقم {course.id}. لم يعد متاحاً.",
-                        course_id=course.id,
-                        notification_type="course_cancelled",
-                    ))
+            recipients = {offer.livreur_id: offer.livreur for offer in active_offers}
+            if actor_type == "client" and course.livreur_id:
+                recipients[course.livreur_id] = course.livreur
+            recipients.pop(driver.id if actor_type == "livreur" else None, None)
+            for recipient in recipients.values():
+                transaction.on_commit(lambda recipient=recipient: send_livreur_notification(
+                    recipient,
+                    "تم إلغاء الطلب" if course.is_delivery else "تم إلغاء الرحلة",
+                    "ألغى العميل الطلب. يمكنك استقبال طلبات جديدة." if actor_type == "client" else "تم إلغاء الطلب. يمكنك استقبال طلبات جديدة.",
+                    course_id=course.id,
+                    notification_type="course_cancelled",
+                    extra_data={"open_home": str(recipient.id != course.livreur_id).lower()},
+                ))
+            if actor_type == "livreur":
+                transaction.on_commit(lambda: send_client_notification(
+                    course.client, "تم إلغاء الرحلة",
+                    "نعتذر، ألغى السائق الرحلة. يمكنك طلب سائق آخر.",
+                    course_id=course.id, notification_type="course_cancelled",
+                ))
             if course.livreur_id:
                 has_other_active_course = Course.objects.filter(
                     livreur=course.livreur, active=True
@@ -975,7 +1091,8 @@ class CourseViewSet(ModelViewSet):
 
         course.client_latitude = latitude
         course.client_longitude = longitude
-        course.save()
+        # GPS writes must never overwrite a cancellation committed concurrently.
+        course.save(update_fields=["client_latitude", "client_longitude"])
 
         return Response({
             "message": "Position client mise à jour",

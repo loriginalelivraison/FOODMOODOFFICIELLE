@@ -298,6 +298,7 @@ def broadcast_course_offers(course, now=None, notifier=None):
                 course_id=course.id,
                 notification_type="course_offer",
                 extra_data={
+                    "round": course.broadcast_round,
                     "price": notification_price,
                     "pickup_address": course.pickup_address or course.pickup_name or "موقع العميل",
                     "destination": course.destination or "تفاصيل الرحلة",

@@ -3054,3 +3054,41 @@ input::placeholder {
 .local-destination-results button:hover, .local-destination-results button:focus-visible { background: #fff3e8; }
 .local-destination-results small { display: block; margin-top: 4px; color: #64748b; }
 .local-destination-results p { padding: 6px 10px; font-size: 13px; color: #64748b; }
+/* WinRak account and request cards */
+.account-page { max-width: 760px; margin-inline: auto; }
+.account-header { background: linear-gradient(135deg, #fff7ed, #fff); border: 1px solid #ffedd5; border-radius: 24px; padding: 22px; }
+.account-role { display: inline-block; color: #c2410c; background: #ffedd5; padding: 5px 12px; border-radius: 999px; font-size: 13px; margin-block: 6px; font-weight: 700; }
+.account-card { border: 1px solid #eee; border-radius: 20px; box-shadow: 0 4px 18px #10182805; }
+.document-card { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid #f1f1f1; }
+.document-card > svg { color: #f97316; }
+.document-card p { color: #667085; font-size: 13px; margin: 5px 0; }
+.document-status { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: #f2f4f7; color: #667085; display: inline-block; }
+.document-status.is-pending { background: #fff7ed; color: #c2410c; }
+.document-status.is-verified, .document-success { color: #15803d; }
+.document-status.is-rejected { color: #b91c1c; background: #fef2f2; }
+.document-upload { position: relative; overflow: hidden; background: #f97316; color: white; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+.document-upload input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.document-upload:focus-within { outline: 3px solid #fdba74; outline-offset: 3px; }
+.document-open { grid-column: 3; border: 0; background: transparent; color: #c2410c; padding: 8px; cursor: pointer; }
+.driver-documents > small { display: block; color: #667085; margin-top: 12px; }
+.orders-empty { text-align: center; padding: 38px 12px; }
+.orders-empty-car { display: inline-grid; place-items: center; width: 120px; height: 100px; border-radius: 50%; background: #fff7ed; font-size: 56px; }
+.orders-empty h3 { color: #101828; margin: 20px 0 8px; }
+.orders-empty p { color: #667085; line-height: 1.9; }
+.order-card-offer { border-color: #fed7aa; background: #fff; }
+.order-card-offer .order-card-price { font-size: 28px; font-weight: 800; color: #f97316; }
+.account-sections { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 16px; }
+.account-sections a { color: #475467; text-decoration: none; background: #fff; border: 1px solid #eaecf0; padding: 10px 15px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+.account-sections a:hover, .account-sections a:focus-visible { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+.account-card[id] { scroll-margin-top: 90px; }
+.driver-rewards-card { display: flex; gap: 12px; align-items: center; padding: 20px; border: 1px solid #ffedd5; border-radius: 20px; background: #fff; color: #f97316; cursor: pointer; font: inherit; }
+.driver-rewards-card > span:first-child { font-size: 26px; }
+.driver-rewards-card > span:last-child { margin-inline-start: auto; font-size: 13px; color: #667085; }
+.bottom-nav { right: auto; }
+.orders-empty-car { color: #fdba74; }
+.orders-tile.is-ongoing > svg { color: #3b82f6; }
+.orders-tile.is-offer > svg { color: #f97316; }
+.orders-tile.is-waiting > svg { color: #ea580c; }
+.order-card-pickup > svg { flex-shrink: 0; color: #16a34a; }
+.order-card-dropoff > svg { flex-shrink: 0; color: #f97316; }
+@media (min-width: 861px) { .bottom-nav { display: none; } }

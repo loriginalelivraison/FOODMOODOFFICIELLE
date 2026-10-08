@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Bell, CarFront, Clock, MapPin } from "lucide-react";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import { canFinishCourse, getCourseStatusLabel, getDriverCourseHint, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
 
@@ -88,16 +89,17 @@ function OrderSummary({ course }) {
 
   return (
     <div className="order-card-summary">
+      {price && <strong className="order-card-line order-card-price">{price}</strong>}
+      <span className="order-card-line order-card-pickup">
+        <MapPin size={20} aria-hidden="true" />
+        {delivery ? "الاستلام" : "الانطلاق"}: {course.pickup_address || course.pickup_name
+          || (pickup ? "موقع الانطلاق على الخريطة" : "الموقع غير متوفر")}
+      </span>
       {course.destination && (
-        <span className="order-card-line">
-          <span aria-hidden="true">🎯</span> {delivery ? "نقطة التسليم" : "نقطة الوصول"}: {course.destination}
+        <span className="order-card-line order-card-dropoff">
+          <MapPin size={20} aria-hidden="true" /> {delivery ? "التسليم" : "الوصول"}: {course.destination}
         </span>
       )}
-      <span className="order-card-line">
-        <span aria-hidden="true">📍</span>{" "}
-        {delivery ? "نقطة الاستلام" : "نقطة الانطلاق"}: {course.pickup_address || course.pickup_name
-          || (pickup ? `${pickup.latitude}, ${pickup.longitude}` : "الموقع غير متوفر")}
-      </span>
       {course.estimated_distance_km != null && (
         <span className="order-card-line">
           <span aria-hidden="true">📏</span> {course.estimated_distance_km} كم
@@ -106,11 +108,6 @@ function OrderSummary({ course }) {
       <span className="order-card-line">
         <span aria-hidden="true">🕒</span> {formatOrderTime(course.created_at)}
       </span>
-      {price && (
-        <span className="order-card-line order-card-price">
-          <span aria-hidden="true">💰</span> {price}
-        </span>
-      )}
     </div>
   );
 }
@@ -185,17 +182,17 @@ export default function LivreurOrders({
 
       <div className="orders-board-summary">
         <div className="orders-tile is-ongoing">
-          <span aria-hidden="true">🚗</span>
+          <CarFront size={24} aria-hidden="true" />
           <strong>{ongoing.length}</strong>
           <small>رحلات جارية</small>
         </div>
         <div className="orders-tile is-offer">
-          <span aria-hidden="true">🔔</span>
+          <Bell size={24} aria-hidden="true" />
           <strong>{toAccept.length}</strong>
           <small>طلبات يمكنني قبولها</small>
         </div>
         <div className="orders-tile is-waiting">
-          <span aria-hidden="true">⏳</span>
+          <Clock size={24} aria-hidden="true" />
           <strong>{waiting.length}</strong>
           <small>في انتظار الزبون</small>
         </div>
@@ -204,9 +201,11 @@ export default function LivreurOrders({
       {loading && <LoadingSpinner label="جاري تحميل الطلبات..." />}
 
       {!loading && toAccept.length === 0 && ongoing.length === 0 && waiting.length === 0 && (
-        <p className="account-empty">
-          لا توجد طلبات حالياً. فعّل مشاركة الموقع لتصل إليك الرحلات الجديدة.
-        </p>
+        <div className="orders-empty">
+          <span aria-hidden="true" className="orders-empty-car"><CarFront size={62} strokeWidth={1.5} /></span>
+          <h3>لا توجد طلبات حالياً</h3>
+          <p>ستظهر الطلبات الجديدة هنا.<br />فعّل استقبال الطلبات والإشعارات.</p>
+        </div>
       )}
 
       {toAccept.length > 0 && (

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from .private_storage import PrivateDocumentStorage, document_path
 
 
 class Livreur(models.Model):
@@ -105,10 +106,23 @@ class Client(models.Model):
     nom = models.CharField(max_length=100)
     telephone = models.CharField(max_length=20, unique=True)
     points = models.PositiveIntegerField(default=0)
+    fcm_token = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.nom
+
+class DriverDocument(models.Model):
+    KIND_CHOICES = [("license", "Permis de conduire"), ("vehicle", "Véhicule et plaque")]
+    STATUS_CHOICES = [("pending", "قيد المراجعة"), ("verified", "تم التحقق"), ("rejected", "مرفوض")]
+    livreur = models.ForeignKey(Livreur, on_delete=models.CASCADE, related_name="documents")
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES)
+    file = models.FileField(storage=PrivateDocumentStorage(), upload_to=document_path)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="pending")
+    uploaded_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["livreur", "kind"], name="unique_driver_document_kind")]
 
 #table de position client 
 class Course(models.Model):

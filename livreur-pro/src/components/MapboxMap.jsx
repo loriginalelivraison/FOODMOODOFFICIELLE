@@ -20,7 +20,7 @@ export function MapContainer({ center, zoom, style, children }) {
     let started = false;
     const token = import.meta.env.VITE_MAPBOX_TOKEN?.trim();
     if (!token || !token.startsWith("pk.")) {
-      setError("Configurez un token public Mapbox dans VITE_MAPBOX_TOKEN.");
+      setError("الخريطة غير متاحة حالياً. أعد المحاولة لاحقاً.");
       return;
     }
     async function initialize() {
@@ -35,7 +35,7 @@ export function MapContainer({ center, zoom, style, children }) {
           center: lngLat(initial.current.center), zoom: initial.current.zoom,
         });
         map.addControl(new gl.NavigationControl({ showCompass: false }), "top-left");
-        map.on("error", () => setError("La carte est indisponible. Vérifiez le réseau et les restrictions du token Mapbox."));
+        map.on("error", () => setError("تعذر تحميل الخريطة. تحقق من اتصال الإنترنت."));
         map.on("load", () => setError(""));
         resize = new ResizeObserver(() => map.resize());
         resize.observe(container.current);
@@ -51,7 +51,7 @@ export function MapContainer({ center, zoom, style, children }) {
           whenReady: (callback) => callback(),
         });
       } catch {
-        if (!disposed) setError("Impossible de charger la carte Mapbox.");
+        if (!disposed) setError("تعذر تحميل الخريطة. أعد المحاولة." );
       }
     }
     const visibility = new IntersectionObserver((entries) => {
@@ -86,24 +86,29 @@ export function useMapEvents(events) {
   }, [map]);
 }
 
-export function Marker({ position, icon, children }) {
+export function Marker({ position = [], icon, children }) {
   const map = useMap();
   const instance = useRef(null);
   const [marker, setMarker] = useState(null);
   const iconKey = JSON.stringify(icon);
+  const validPosition = position[0] != null && position[1] != null
+    && Number.isFinite(Number(position[0])) && Number.isFinite(Number(position[1]))
+    && Math.abs(Number(position[0])) <= 90 && Math.abs(Number(position[1])) <= 180;
   useEffect(() => {
+    if (!validPosition) { setMarker(null); return; }
     const element = icon ? document.createElement("div") : undefined;
     if (element) {
       element.className = icon.className || "";
       element.innerHTML = icon.html || "";
+      element.addEventListener("click", (event) => event.stopPropagation());
     }
     const next = new map.gl.Marker(element ? { element } : { color: "#f97316" })
       .setLngLat(lngLat(position)).addTo(map.raw);
     instance.current = next;
     setMarker(next);
     return () => { next.remove(); instance.current = null; };
-  }, [map, iconKey]);
-  useEffect(() => { instance.current?.setLngLat(lngLat(position)); }, [position[0], position[1]]);
+  }, [map, iconKey, validPosition]);
+  useEffect(() => { if (validPosition) instance.current?.setLngLat(lngLat(position)); }, [position[0], position[1], validPosition]);
   return marker && <MarkerContext.Provider value={marker}>{children}</MarkerContext.Provider>;
 }
 

@@ -18,7 +18,8 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import MapActionButton from "../components/MapActionButton.jsx";
 import LivreurOrders from "../components/LivreurOrders.jsx";
-import { useNavigate } from "react-router-dom";
+import DriverDocuments from "../components/DriverDocuments.jsx";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 function formatDate(value) {
   if (!value) return "غير متوفر";
@@ -115,6 +116,9 @@ function CenterOnInitialPosition({ position }) {
 }
 
 export default function LivreurDashboard() {
+  const [searchParams] = useSearchParams();
+  const accountView = searchParams.get("section") === "account";
+  const [showMap, setShowMap] = useState(false);
   const [livreur, setLivreur] = useState(() => {
     const stored = localStorage.getItem("livreur");
     return stored ? JSON.parse(stored) : null;
@@ -185,8 +189,10 @@ export default function LivreurDashboard() {
     if (!livreur?.id) return undefined;
 
     const interval = setInterval(() => loadHistory(true), 8000);
+    const handlePush = () => { loadHistory(true); loadActiveCourse(); };
+    window.addEventListener("winrakPush", handlePush);
 
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); window.removeEventListener("winrakPush", handlePush); };
   }, [livreur?.id]);
 
   async function handleOfferResponse(courseId, response) {
@@ -558,11 +564,12 @@ export default function LivreurDashboard() {
           {photoUrl ? (
             <img src={photoUrl} alt={displayName} />
           ) : (
-            <span>🛵</span>
+            <span>{(profile?.vehicule || livreur.vehicule) === "voiture" ? "🚘" : "🛵"}</span>
           )}
         </div>
         <div className="account-identity">
           <h1>{displayName}</h1>
+          <span className="account-role">{(profile?.vehicule || livreur.vehicule) === "voiture" ? "حساب سائق" : "حساب عامل توصيل"} · {vehicleLabels[profile?.vehicule || livreur.vehicule] || "مركبة"}</span>
           <span className="account-meta">
             <span>📞 {livreur.telephone}</span>
             {profile?.note != null && <span>⭐ {profile.note}</span>}
@@ -576,17 +583,26 @@ export default function LivreurDashboard() {
           type="button"
           className="account-edit-btn"
           onClick={() => {
+            if (!accountView) {
+              navigate(`/livreur-dashboard/${livreur.id}?section=account`);
+              return;
+            }
             setEditNom(livreur.nom || "");
             setEditVille(livreur.ville || "");
             setEditVehicule(livreur.vehicule || "moto");
             setEditingProfile((value) => !value);
           }}
         >
-          تعديل
+          {accountView ? "تعديل" : "حسابي"}
         </button>
       </header>
 
-      <LivreurOrders
+      {accountView && <nav className="account-sections" aria-label="أقسام الحساب">
+        <a href="#personal-info">المعلومات</a><a href="#vehicle-info">المركبة</a>
+        <a href="#driver-documents">الوثائق</a><a href="#account-settings">الإعدادات</a>
+      </nav>}
+
+      {!accountView && <LivreurOrders
         livreurId={livreur.id}
         courses={courses}
         loading={loadingHistory}
@@ -595,9 +611,13 @@ export default function LivreurDashboard() {
         onAccept={(courseId) => handleOfferResponse(courseId, "accepted")}
         onReject={(courseId) => handleOfferResponse(courseId, "rejected")}
         onFinish={handleFinishCourse}
-      />
+      />}
 
-      <section className="account-card">
+      {!accountView && <button className="driver-rewards-card" type="button"
+        onClick={() => navigate(`/livreur-dashboard/${livreur.id}?section=account`)}>
+        <span aria-hidden="true">🏆</span><strong>{profile?.points ?? 0} نقطة</strong><span>مكافآتك</span>
+      </button>}
+      {accountView && <section className="account-card">
         <h2>حالة حسابك</h2>
         <div className="account-points">
           <span className="account-points-icon" aria-hidden="true">🏅</span>
@@ -615,9 +635,9 @@ export default function LivreurDashboard() {
             <strong>{profile?.note != null ? `⭐ ${profile.note}` : "—"}</strong>
           </div>
         </div>
-      </section>
+      </section>}
 
-      <section className="account-card">
+      {!accountView && <section className="account-card">
         <h2>حالة الاستقبال</h2>
         <div className={`account-badge ${isAvailable ? "is-online" : "is-offline"}`} style={{ justifySelf: "start" }}>
           {activeCourse
@@ -646,9 +666,9 @@ export default function LivreurDashboard() {
             أنهِ الرحلة الجارية قبل العودة إلى وضع الاستقبال.
           </p>
         )}
-      </section>
+      </section>}
 
-      {editingProfile && (
+      {accountView && editingProfile && (
         <section className="account-card">
           <h2>تعديل المعلومات</h2>
           <form className="account-form" onSubmit={handleProfileSave}>
@@ -697,7 +717,9 @@ export default function LivreurDashboard() {
         </p>
       )}
 
-      <div
+      {!accountView && <button type="button" className="account-link"
+        onClick={() => setShowMap((value) => !value)}>{showMap ? "إخفاء الخريطة" : "عرض الخريطة"}</button>}
+      {!accountView && (showMap || activeCourse) && <div
         style={{
           height: "360px",
           borderRadius: "22px",
@@ -788,8 +810,9 @@ export default function LivreurDashboard() {
   )}
         
         </MapContainer>
-      </div>
-      <section className="account-card">
+      </div>}
+      {accountView && <>
+      <section className="account-card" id="personal-info">
         <h2>المعلومات الشخصية</h2>
         <div className="account-row">
           <span className="account-row-label">الاسم</span>
@@ -808,7 +831,7 @@ export default function LivreurDashboard() {
       </section>
 
       {livreur.vehicule && (
-        <section className="account-card">
+        <section className="account-card" id="vehicle-info">
           <h2>المركبة</h2>
           <div className="account-row">
             <span className="account-row-label">النوع</span>
@@ -857,6 +880,8 @@ export default function LivreurDashboard() {
         </section>
       )}
 
+      <DriverDocuments driverId={livreur.id} />
+
       <section className="account-card">
         <h2>المساعدة والدعم</h2>
         <a className="account-link" href="https://www.winrak.fr" target="_blank" rel="noreferrer">
@@ -864,8 +889,8 @@ export default function LivreurDashboard() {
         </a>
       </section>
 
-      <section className="account-card">
-        <h2>الخصوصية والأمان</h2>
+      <section className="account-card" id="account-settings">
+        <h2>الإعدادات والخصوصية</h2>
         <button className="account-link" type="button" onClick={() => navigate("/privacy")}>
           سياسة الخصوصية
         </button>
@@ -878,6 +903,7 @@ export default function LivreurDashboard() {
       <button className="account-delete" type="button" onClick={handleDeleteAccount}>
         حذف الحساب نهائياً
       </button>
+      </>}
     </section>
   );
 }

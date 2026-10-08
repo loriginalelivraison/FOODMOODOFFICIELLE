@@ -607,6 +607,10 @@ export default function Couriers() {
     if (bookingInFlightRef.current) return;
     setBookingError("");
 
+    if (localStorage.getItem("access") && localStorage.getItem("role") !== "client") {
+      setBookingError("يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل.");
+      return;
+    }
     if (proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD) {
       setBookingError(`الحد الأدنى للسعر هو ${MIN_COURSE_PRICE_DZD} دج.`);
       return;

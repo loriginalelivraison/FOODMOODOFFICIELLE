@@ -25,7 +25,21 @@ def navigation_stage(course):
 class LivreurSerializer(serializers.ModelSerializer):
     class Meta:
         model = Livreur
-        fields = "__all__"
+        exclude = ["fcm_token"]
+        read_only_fields = ["user", "telephone", "note", "nombre_livraisons", "points", "created_at"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = request.user if request else None
+        owner = user and user.is_authenticated and instance.user_id == user.id
+        selected = user and user.is_authenticated and instance.courses.filter(
+            client__user=user, active=True, client_confirmed=True
+        ).exists()
+        if not owner and not selected:
+            data.pop("telephone", None)
+        data.pop("user", None)
+        return data
 
 
 class DemandeLivraisonSerializer(serializers.ModelSerializer):
@@ -94,7 +108,7 @@ class CourseSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated or obj.client.user_id != request.user.id:
             return []
 
-        accepted = obj.offers.filter(response="accepted").select_related("livreur")
+        accepted = obj.offers.filter(response="accepted", livreur__est_en_ligne=True).select_related("livreur")
         accepted_drivers = {offer.livreur_id: offer.livreur for offer in accepted}
         if obj.livreur:
             accepted_drivers[obj.livreur_id] = obj.livreur
@@ -108,7 +122,9 @@ class CourseSerializer(serializers.ModelSerializer):
                 "id": driver.id,
                 "nom": driver.nom,
                 "vehicule": driver.vehicule,
-                "telephone": driver.telephone,
+                "telephone": driver.telephone if obj.active and obj.livreur_id == driver.id else None,
+                "est_en_ligne": driver.est_en_ligne,
+                "photo": driver.photo.url if driver.photo else None,
                 "note": driver.note,
                 "latitude": driver.latitude,
                 "longitude": driver.longitude,
@@ -303,8 +319,3 @@ class CourseSerializer(serializers.ModelSerializer):
             "my_offer_dropoff_eta_minutes",
             "navigation",
         ]
-
-class LivreurSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Livreur
-        fields = "__all__"

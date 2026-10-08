@@ -270,6 +270,7 @@ export default function ClientDashboard() {
         <div className="account-avatar">{initial}</div>
         <div className="account-identity">
           <h1>{client.nom}</h1>
+          <span className="account-role">حساب عميل</span>
           <span className="account-meta">
             <span>📞 {client.telephone}</span>
           </span>
@@ -285,6 +286,10 @@ export default function ClientDashboard() {
           تعديل
         </button>
       </header>
+
+      <nav className="account-sections" aria-label="أقسام الحساب">
+        <a href="#personal-info">المعلومات</a><a href="#trip-history">رحلاتي</a><a href="#account-settings">الإعدادات</a>
+      </nav>
 
       <section className="account-card">
         <h2>رحلتي الحالية</h2>
@@ -371,7 +376,7 @@ export default function ClientDashboard() {
         </section>
       )}
 
-      <section className="account-card">
+      <section className="account-card" id="personal-info">
         <h2>المعلومات الشخصية</h2>
         <div className="account-row">
           <span className="account-row-label">الاسم</span>
@@ -383,7 +388,7 @@ export default function ClientDashboard() {
         </div>
       </section>
 
-      <section className="account-card">
+      <section className="account-card" id="trip-history">
         <h2>رحلاتي</h2>
         {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
         {!loadingHistory && courses.length === 0 && (
@@ -434,8 +439,8 @@ export default function ClientDashboard() {
         </a>
       </section>
 
-      <section className="account-card">
-        <h2>الخصوصية والأمان</h2>
+      <section className="account-card" id="account-settings">
+        <h2>الإعدادات والخصوصية</h2>
         <button className="account-link" type="button" onClick={() => navigate("/privacy")}>
           سياسة الخصوصية
         </button>

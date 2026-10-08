@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate, useNavigation } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate, useNavigation, useLocation } from "react-router-dom";
 import { Home, Users, User, LogIn, Lock, ArrowLeft } from "lucide-react";
 
 import LogoutButton from "./LogoutButton";
@@ -9,6 +9,8 @@ import logo from "../assets/logo3.png";
 export default function Layout() {
   const navigate = useNavigate();
   const navigation = useNavigation();
+  const location = useLocation();
+  const driverAccountView = new URLSearchParams(location.search).get("section") === "account";
 
   const [auth, setAuth] = useState({
     token: null,
@@ -59,7 +61,7 @@ export default function Layout() {
   const dashboardLink = !auth.token
     ? "/connexion-client"
     : auth.role === "livreur"
-    ? `/livreur-dashboard/${auth.user?.id}`
+    ? `/livreur-dashboard/${auth.user?.id}?section=account`
     : "/client-dashboard";
 
   const homeLink =
@@ -118,7 +120,7 @@ export default function Layout() {
         </div>
 
         <nav className="desktop-nav">
-          <NavLink to={homeLink} className={linkClass}>
+          <NavLink to={homeLink} className={({ isActive }) => linkClass({ isActive: isActive && !(auth.role === "livreur" && driverAccountView) })}>
             الرئيسية
           </NavLink>
 
@@ -133,7 +135,7 @@ export default function Layout() {
               </NavLink>
             </>
           ) : (
-            <NavLink to={dashboardLink} className={linkClass}>
+            <NavLink to={dashboardLink} className={({ isActive }) => linkClass({ isActive: isActive && (auth.role !== "livreur" || driverAccountView) })}>
               حسابي
             </NavLink>
           )}
@@ -150,7 +152,7 @@ export default function Layout() {
       <nav className="bottom-nav">
     
 
-        <NavLink to={homeLink} className={bottomLinkClass}>
+        <NavLink to={homeLink} className={({ isActive }) => bottomLinkClass({ isActive: isActive && !(auth.role === "livreur" && driverAccountView) })}>
           <Home size={20} />
           <span>الرئيسية</span>
         </NavLink>
@@ -166,7 +168,7 @@ export default function Layout() {
             <span>تسجيل</span>
           </NavLink>
    ) : (
-  <NavLink to={dashboardLink} className={bottomLinkClass}>
+  <NavLink to={dashboardLink} className={({ isActive }) => bottomLinkClass({ isActive: isActive && (auth.role !== "livreur" || driverAccountView) })}>
     <User size={20} />
     <span>حسابي</span>
   </NavLink>

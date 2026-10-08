@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -21,40 +21,87 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 const String backendUrl =
     "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
 const String courseOfferCategory = "COURSE_OFFER";
+const String courseEventCategory = "COURSE_EVENT";
 const String acceptCourseAction = "accept";
 const String rejectCourseAction = "reject";
+const String winrakNotificationChannel = 'winrak_events_v2';
+const String winrakNotificationSound = 'winrak_notification.wav';
+final Set<String> _shownPushEvents = {};
+
+Map<String, dynamic> notificationPayload(Map<String, dynamic> data) => {
+  'type': data['type']?.toString() ?? 'course_accepted',
+  'course_id': data['course_id']?.toString(),
+  if (data['recipient_role'] != null) 'recipient_role': data['recipient_role'],
+  if (data['open_home'] != null) 'open_home': data['open_home'],
+  if (data['account_id'] != null) 'account_id': data['account_id'],
+};
+
+Uri? notificationDestination(Map<String, dynamic> data, {String? action}) {
+  final courseId = data['course_id']?.toString();
+  if (courseId == null || !RegExp(r'^\d+$').hasMatch(courseId)) return null;
+  final isClient = data['recipient_role'] == 'client';
+  if (data['open_home'] == 'true' && !isClient) {
+    final accountId = data['account_id']?.toString();
+    if (accountId != null && RegExp(r'^\d+$').hasMatch(accountId)) {
+      return Uri.https('www.winrak.fr', '/livreur-dashboard/$accountId');
+    }
+  }
+  return Uri.https(
+    'www.winrak.fr',
+    '${isClient ? '/course' : '/livreur-course'}/$courseId',
+    !isClient &&
+            data['type'] == 'course_offer' &&
+            [acceptCourseAction, rejectCourseAction].contains(action)
+        ? {'offer_action': action!}
+        : null,
+  );
+}
 
 InitializationSettings get notificationSettings => InitializationSettings(
-      android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(
-        notificationCategories: [
-          DarwinNotificationCategory(
-            courseOfferCategory,
-            actions: [
-              DarwinNotificationAction.plain(
-                acceptCourseAction,
-                'قبول',
-                options: {DarwinNotificationActionOption.foreground},
-              ),
-              DarwinNotificationAction.plain(
-                rejectCourseAction,
-                'رفض',
-                options: {DarwinNotificationActionOption.foreground},
-              ),
-            ],
+  android: const AndroidInitializationSettings('ic_winrak_offer'),
+  iOS: DarwinInitializationSettings(
+    notificationCategories: [
+      DarwinNotificationCategory(
+        courseEventCategory,
+        actions: [
+          DarwinNotificationAction.plain(
+            'open_course',
+            'فتح',
+            options: {DarwinNotificationActionOption.foreground},
           ),
         ],
       ),
-    );
+      DarwinNotificationCategory(
+        courseOfferCategory,
+        actions: [
+          DarwinNotificationAction.plain(
+            acceptCourseAction,
+            'قبول',
+            options: {DarwinNotificationActionOption.foreground},
+          ),
+          DarwinNotificationAction.plain(
+            rejectCourseAction,
+            'رفض',
+            options: {DarwinNotificationActionOption.foreground},
+          ),
+        ],
+      ),
+    ],
+  ),
+);
 
 AndroidNotificationDetails notificationDetails({required bool courseOffer}) =>
     AndroidNotificationDetails(
-      'high_importance_channel',
-      'إشعارات التوصيل',
+      winrakNotificationChannel,
+      'إشعارات WinRak',
       channelDescription: 'إشعارات طلبات الرحلات الجديدة',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
+      sound: const RawResourceAndroidNotificationSound('winrak_notification'),
+      icon: 'ic_winrak_offer',
+      color: const Color(0xFFF97316),
+      visibility: NotificationVisibility.private,
       actions: courseOffer
           ? const [
               AndroidNotificationAction(
@@ -75,10 +122,13 @@ NotificationDetails notificationPlatformDetails({required bool courseOffer}) =>
     NotificationDetails(
       android: notificationDetails(courseOffer: courseOffer),
       iOS: DarwinNotificationDetails(
-        categoryIdentifier: courseOffer ? courseOfferCategory : null,
+        categoryIdentifier: courseOffer
+            ? courseOfferCategory
+            : courseEventCategory,
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: winrakNotificationSound,
       ),
     );
 
@@ -86,13 +136,33 @@ Future<void> showPushNotification(
   FlutterLocalNotificationsPlugin notifications,
   RemoteMessage message,
 ) async {
+  final eventId = message.data['event_id']?.toString() ?? message.messageId;
+  if (eventId != null) {
+    if (_shownPushEvents.contains(eventId)) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final claimed = await const MethodChannel(
+          'winrak/course_notifications',
+        ).invokeMethod<bool>('claimEvent', {'event_id': eventId});
+        if (claimed == false) return;
+      } on PlatformException catch (_) {
+        // Memory deduplication remains available if the native plugin fails.
+      } on MissingPluginException catch (_) {}
+    }
+    if (_shownPushEvents.length >= 128) {
+      _shownPushEvents.remove(_shownPushEvents.first);
+    }
+    _shownPushEvents.add(eventId);
+  }
   final type = message.data['type']?.toString() ?? 'course_accepted';
   final courseId = message.data['course_id']?.toString();
   final isCourseOffer = type == 'course_offer';
-  final title = message.notification?.title ??
+  final title =
+      message.notification?.title ??
       message.data['title']?.toString() ??
       'طلب رحلة جديد';
-  final body = message.notification?.body ??
+  final body =
+      message.notification?.body ??
       message.data['body']?.toString() ??
       'افتح WinRak للاطلاع على تفاصيل الرحلة.';
 
@@ -110,7 +180,7 @@ Future<void> showPushNotification(
         'pickup': message.data['pickup_address']?.toString() ?? 'موقع العميل',
         'destination':
             message.data['destination']?.toString() ?? 'تفاصيل الرحلة',
-        'payload': jsonEncode({'type': type, 'course_id': courseId}),
+        'payload': jsonEncode(notificationPayload(message.data)),
       });
       return;
     } on PlatformException catch (error) {
@@ -123,11 +193,15 @@ Future<void> showPushNotification(
   }
 
   await notifications.show(
-    id: int.tryParse(courseId ?? '') ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    id:
+        int.tryParse(courseId ?? '') ??
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
     title: title,
     body: body,
-    notificationDetails: notificationPlatformDetails(courseOffer: isCourseOffer),
-    payload: jsonEncode({"type": type, "course_id": courseId}),
+    notificationDetails: notificationPlatformDetails(
+      courseOffer: isCourseOffer,
+    ),
+    payload: jsonEncode(notificationPayload(message.data)),
   );
 }
 
@@ -162,10 +236,11 @@ Future<void> initializeBackgroundService() async {
   );
 
   const AndroidNotificationChannel fcmChannel = AndroidNotificationChannel(
-    'high_importance_channel',
-    'إشعارات التوصيل',
+    winrakNotificationChannel,
+    'إشعارات WinRak',
     description: 'إشعارات طلبات الرحلات الجديدة',
     importance: Importance.high,
+    sound: RawResourceAndroidNotificationSound('winrak_notification'),
   );
 
   final FlutterLocalNotificationsPlugin notifications =
@@ -173,12 +248,14 @@ Future<void> initializeBackgroundService() async {
 
   await notifications
       .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+        AndroidFlutterLocalNotificationsPlugin
+      >()
       ?.createNotificationChannel(locationChannel);
 
   await notifications
       .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+        AndroidFlutterLocalNotificationsPlugin
+      >()
       ?.createNotificationChannel(fcmChannel);
 
   final service = FlutterBackgroundService();
@@ -192,14 +269,9 @@ Future<void> initializeBackgroundService() async {
       initialNotificationTitle: 'WinRak نشط',
       initialNotificationContent: 'جارٍ مشاركة الموقع',
       foregroundServiceNotificationId: 888,
-      foregroundServiceTypes: [
-        AndroidForegroundType.location,
-      ],
+      foregroundServiceTypes: [AndroidForegroundType.location],
     ),
-    iosConfiguration: IosConfiguration(
-      autoStart: false,
-      onForeground: onStart,
-    ),
+    iosConfiguration: IosConfiguration(autoStart: false, onForeground: onStart),
   );
 }
 
@@ -238,7 +310,7 @@ void onStart(ServiceInstance service) async {
     }
 
     final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
 
     try {
@@ -265,6 +337,7 @@ class FoodMoodApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'WinRak',
       debugShowCheckedModeBanner: false,
       home: home,
     );
@@ -285,8 +358,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   final FlutterLocalNotificationsPlugin localNotifications =
       FlutterLocalNotificationsPlugin();
   String? fcmToken;
-  bool fcmTokenSent = false;
   Timer? syncTimer;
+  StreamSubscription<String>? tokenSubscription;
+  StreamSubscription<RemoteMessage>? messageSubscription;
+  StreamSubscription<RemoteMessage>? openedSubscription;
 
   Future<void> initializeLocalNotifications() async {
     await localNotifications.initialize(
@@ -294,7 +369,8 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
       onDidReceiveNotificationResponse: handleNotificationResponse,
     );
 
-    final launchDetails = await localNotifications.getNotificationAppLaunchDetails();
+    final launchDetails = await localNotifications
+        .getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp == true &&
         launchDetails?.notificationResponse != null) {
       await handleNotificationResponse(launchDetails!.notificationResponse!);
@@ -302,30 +378,24 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   }
 
   Future<void> handleNotificationResponse(NotificationResponse response) async {
-    final action = response.actionId == acceptCourseAction ||
+    final action =
+        response.actionId == acceptCourseAction ||
             response.actionId == rejectCourseAction
         ? response.actionId
         : null;
     await openCourseFromNotification(response.payload, action: action);
   }
 
-  Future<void> openCourseFromNotification(String? payload, {String? action}) async {
+  Future<void> openCourseFromNotification(
+    String? payload, {
+    String? action,
+  }) async {
     if (payload == null || payload.isEmpty) return;
 
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
-      final courseId = data["course_id"]?.toString();
-
-      if (courseId == null || courseId.isEmpty) return;
-
-      final query = action != null && data['type'] == 'course_offer'
-          ? {"offer_action": action}
-          : <String, String>{};
-      await controller.loadRequest(Uri.https(
-        "www.winrak.fr",
-        "/livreur-course/$courseId",
-        query.isEmpty ? null : query,
-      ));
+      final destination = notificationDestination(data, action: action);
+      if (destination != null) await controller.loadRequest(destination);
     } catch (e) {
       debugPrint("Erreur navigation notification : $e");
     }
@@ -355,133 +425,101 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     }
   }
 
-  Future<void> sendFcmTokenToBackend({
-    required String tokenJwt,
-    required String livreurId,
-  }) async {
-    if (fcmToken == null || fcmTokenSent) return;
+  String? _syncedAccount;
+  bool _syncingAuth = false;
 
+  Future<void> syncAuthFromWebView() async {
+    if (_syncingAuth) return;
+    _syncingAuth = true;
     try {
-      final response = await http.patch(
-        Uri.parse("$backendUrl/livreurs/$livreurId/update_fcm_token/"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $tokenJwt",
-        },
-        body: jsonEncode({
-          "fcm_token": fcmToken,
-        }),
-      );
-
-      debugPrint("URL FCM = $backendUrl/livreurs/$livreurId/update_fcm_token/");
-      debugPrint("STATUS FCM = ${response.statusCode}");
-      debugPrint("BODY FCM = ${response.body}");
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        fcmTokenSent = true;
-        debugPrint("FCM TOKEN ENVOYÉ AU BACKEND");
-      } else {
-        debugPrint("Erreur backend FCM token : ${response.body}");
+      final currentUrl = Uri.tryParse(await controller.currentUrl() ?? '');
+      if (currentUrl?.scheme != 'https' ||
+          !{'www.winrak.fr', 'winrak.fr'}.contains(currentUrl?.host)) {
+        return;
       }
-    } catch (e) {
-      debugPrint("Erreur envoi FCM token : $e");
+      dynamic auth = await controller.runJavaScriptReturningResult("""
+        JSON.stringify({token: localStorage.getItem('access'),
+          role: localStorage.getItem('role'),
+          account: localStorage.getItem(localStorage.getItem('role') === 'client' ? 'client' : 'livreur')})
+      """);
+      for (var i = 0; i < 2 && auth is String; i++) {
+        auth = jsonDecode(auth);
+      }
+      if (auth is! Map ||
+          auth['token'] == null ||
+          auth['account'] == null ||
+          !['client', 'livreur'].contains(auth['role'])) {
+        _syncedAccount = null;
+        return;
+      }
+      final account = jsonDecode(auth['account'] as String) as Map;
+      final token = fcmToken ?? await FirebaseMessaging.instance.getToken();
+      if (token == null || account['id'] == null) return;
+      final identity = '${auth['role']}:${account['id']}:$token';
+      if (_syncedAccount == identity) return;
+      final collection = auth['role'] == 'client' ? 'clients' : 'livreurs';
+      final response = await http.patch(
+        Uri.parse('$backendUrl/$collection/${account['id']}/update_fcm_token/'),
+        headers: {
+          'Authorization': 'Bearer ${auth['token']}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'fcm_token': token}),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _syncedAccount = identity;
+      }
+    } catch (_) {
+      debugPrint('WinRak notification registration will retry.');
+    } finally {
+      _syncingAuth = false;
     }
   }
 
-Future<void> syncAuthFromWebView() async {
-  try {
-    final token = await controller.runJavaScriptReturningResult(
-      "localStorage.getItem('access');",
-    );
-
-    final livreurRaw = await controller.runJavaScriptReturningResult(
-      "localStorage.getItem('livreur');",
-    );
-
-    final fcmToken = await FirebaseMessaging.instance.getToken();
-
-    print("JWT WEBVIEW = $token");
-    print("LIVREUR RAW = $livreurRaw");
-    print("FCM TOKEN LOCAL = $fcmToken");
-
-    if (token == null ||
-        livreurRaw == null ||
-        fcmToken == null) {
-      return;
-    }
-
-    final cleanToken =
-        token.toString().replaceAll('"', '');
-
-    String cleanLivreur = livreurRaw.toString();
-
-    if (cleanLivreur.startsWith('"')) {
-      cleanLivreur =
-          cleanLivreur.substring(1, cleanLivreur.length - 1);
-
-      cleanLivreur =
-          cleanLivreur.replaceAll(r'\"', '"');
-    }
-
-    final livreur = jsonDecode(cleanLivreur);
-
-    final livreurId = livreur["id"];
-
-    print("LIVREUR ID MATCH = $livreurId");
-
-    final response = await http.patch(
-      Uri.parse(
-        "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api/livreurs/$livreurId/update_fcm_token/",
-      ),
-      headers: {
-        "Authorization": "Bearer $cleanToken",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "fcm_token": fcmToken,
-      }),
-    );
-
-    print("STATUS FCM = ${response.statusCode}");
-    print("BODY FCM = ${response.body}");
-  } catch (e) {
-    print("Erreur syncAuthFromWebView : $e");
-  }
-}
   Future<void> openExternal(String url) async {
     final uri = Uri.parse(url);
 
     try {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint("Impossible d'ouvrir : $url");
     }
   }
 
   void listenFirebaseMessages() {
+    // Foreground notifications are rendered once by our local plugin on iOS.
+    FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: false,
+      sound: false,
+    );
     FirebaseMessaging.instance.getToken().then((token) {
       fcmToken = token;
-      fcmTokenSent = false;
-      debugPrint("FCM TOKEN LIVREUR = $token");
+      _syncedAccount = null;
     });
 
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+    tokenSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((
+      token,
+    ) {
       fcmToken = token;
-      fcmTokenSent = false;
-      debugPrint("NOUVEAU FCM TOKEN LIVREUR = $token");
+      _syncedAccount = null;
     });
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    messageSubscription = FirebaseMessaging.onMessage.listen((
+      RemoteMessage message,
+    ) {
       debugPrint(
         "NOTIFICATION REÇUE FOREGROUND : ${message.notification?.title}",
       );
       showForegroundNotification(message);
+      controller.runJavaScript(
+        'window.dispatchEvent(new CustomEvent("winrakPush", {detail: ${jsonEncode(notificationPayload(message.data))}}));',
+      );
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
+      RemoteMessage message,
+    ) {
       debugPrint("NOTIFICATION CLIQUÉE : ${message.notification?.title}");
       openCourseFromNotification(jsonEncode(message.data));
     });
@@ -505,11 +543,13 @@ Future<void> syncAuthFromWebView() async {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
+            if (!mounted) return;
             setState(() {
               isLoading = true;
             });
           },
           onPageFinished: (String url) async {
+            if (!mounted) return;
             setState(() {
               isLoading = false;
             });
@@ -541,52 +581,49 @@ Future<void> syncAuthFromWebView() async {
           },
         ),
       )
-      ..loadRequest(
-        Uri.parse("https://www.winrak.fr"),
-      );
-final androidController =
-    controller.platform as AndroidWebViewController;
-   
-androidController.setOnShowFileSelector(
-  (params) async {
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
+      ..loadRequest(Uri.parse("https://www.winrak.fr"));
+    if (controller.platform is AndroidWebViewController) {
+      final androidController = controller.platform as AndroidWebViewController;
 
-    if (image == null) {
-      return [];
+      androidController.setOnShowFileSelector((params) async {
+        final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+        );
+
+        if (image == null) {
+          return [];
+        }
+
+        return [Uri.file(image.path).toString()];
+      });
+
+      androidController.setGeolocationPermissionsPromptCallbacks(
+        onShowPrompt: (request) async {
+          final status = await Permission.location.request();
+
+          return GeolocationPermissionsResponse(
+            allow: status.isGranted,
+            retain: true,
+          );
+        },
+      );
     }
 
-    return [Uri.file(image.path).toString()];
-  },
-);
-
-    androidController.setGeolocationPermissionsPromptCallbacks(
-      onShowPrompt: (request) async {
-        final status = await Permission.location.request();
-
-        return GeolocationPermissionsResponse(
-          allow: status.isGranted,
-          retain: true,
-        );
-      },
-    );
-
-    syncTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (timer) async {
-        await syncAuthFromWebView();
-      },
-    );
+    syncTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      await syncAuthFromWebView();
+    });
 
     initializeLocalNotifications().then((_) {
-      listenFirebaseMessages();
+      if (mounted) listenFirebaseMessages();
     });
   }
 
   @override
   void dispose() {
     syncTimer?.cancel();
+    tokenSubscription?.cancel();
+    messageSubscription?.cancel();
+    openedSubscription?.cancel();
     super.dispose();
   }
 
@@ -597,10 +634,7 @@ androidController.setOnShowFileSelector(
         child: Stack(
           children: [
             WebViewWidget(controller: controller),
-            if (isLoading)
-              const Center(
-                child: CircularProgressIndicator(),
-              ),
+            if (isLoading) const Center(child: CircularProgressIndicator()),
           ],
         ),
       ),

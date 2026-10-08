@@ -23,3 +23,5 @@ venv/
 
 # Frontend build
 dist/
+private_documents/
+verification/

@@ -11,7 +11,6 @@ import {
   createMarkerIcon,
 } from "./MapboxMap.jsx";
 
-import { useNavigate } from "react-router-dom";
 import MapActionButton from "./MapActionButton.jsx";
 
 const ALGERIA_CENTER = [36.0339, 3.6596];
@@ -225,9 +224,8 @@ export default function CouriersMap({
   pickLabel = "الوجهة",
   onPickConfirm = null,
 }) {
-  const navigate = useNavigate();
-
-  const availableCouriers = couriers.filter((c) => {
+  const availableCouriers = (Array.isArray(couriers) ? couriers : []).filter((c) => {
+    if (!c || c.id == null || c.est_en_ligne === false) return false;
     const isAvailable = c.available === true || c.disponible === true;
 
     const hasPosition =
@@ -238,7 +236,9 @@ export default function CouriersMap({
       !isNaN(Number(c.latitude)) &&
       !isNaN(Number(c.longitude));
 
-    return isAvailable && hasPosition;
+    return isAvailable && hasPosition && Number.isFinite(Number(c.latitude))
+      && Number.isFinite(Number(c.longitude)) && Math.abs(Number(c.latitude)) <= 90
+      && Math.abs(Number(c.longitude)) <= 180;
   });
 
   const hasClientPosition = hasPosition(clientPosition);
@@ -361,7 +361,7 @@ export default function CouriersMap({
           >
             <Popup>
               <div style={{ textAlign: "center" }}>
-                <strong>{courier.name || courier.nom}</strong>
+                <strong>{courier.name || courier.nom || "سائق"}</strong>
                 <br />
                 {vehicleLabels[courier.vehicle || courier.vehicule] ||
                   courier.vehicle ||
@@ -370,20 +370,7 @@ export default function CouriersMap({
                 {courier.city || courier.ville}
                 <br />
 
-                <button
-                  onClick={() => navigate(`/tracking/${courier.id}`)}
-                  style={{
-                    marginTop: "8px",
-                    padding: "6px 10px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "#16a34a",
-                    color: "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  تتبع السائق
-                </button>
+                <small>تظهر تفاصيل التواصل بعد تأكيد السائق.</small>
               </div>
             </Popup>
           </Marker>
