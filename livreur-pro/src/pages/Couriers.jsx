@@ -11,7 +11,9 @@ import {
   selectCourseDriver,
 } from "../livreursapi.js";
 import CouriersMap from "../components/CouriersMap.jsx";
-import DepartureField, { MY_LOCATION_LABEL } from "../components/DepartureField.jsx";
+import { MY_LOCATION_LABEL } from "../components/DepartureField.jsx";
+import DestinationField from "../components/DestinationField.jsx";
+import { destinationCoordinates } from "../utils/destinationSearch.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import defaultAvatar from "../assets/pasdephoto.png";
 import {
@@ -514,7 +516,7 @@ export default function Couriers() {
 
   useEffect(() => {
     if (!clientPosition || !selectedVehicle || !effectiveStart || !hasPickup
-      || !hasDestination || requestedCourseId) {
+      || !hasDestination || !pickupPosition || !destinationPosition || requestedCourseId) {
       setPriceQuote(null);
       setProposedPrice("");
       setPriceCalculating(false);
@@ -610,13 +612,13 @@ export default function Couriers() {
       setBookingError(`الحد الأدنى للسعر هو ${MIN_COURSE_PRICE_DZD} دج.`);
       return;
     }
-    if (!destinationPosition && !destination.trim()) {
-      setBookingError(`اختر ${destinationLabel} على الخريطة أو أدخل العنوان.`);
+    if (!destinationPosition) {
+      setBookingError(`اختر ${destinationLabel} من القائمة أو على الخريطة.`);
       return;
     }
     // Le lieu de retrait est obligatoire en livraison, comme le départ en taxi.
-    if (!hasPickup) {
-      setBookingError(`اختر ${pickupLabel} على الخريطة أو أدخل العنوان.`);
+    if (!pickupPosition) {
+      setBookingError(`اختر ${pickupLabel} من القائمة أو على الخريطة.`);
       return;
     }
     if (!clientPosition || !selectedVehicle || priceCalculating) {
@@ -827,6 +829,23 @@ export default function Couriers() {
 
   }
 
+  function handleLocalPlaceSelection(place, isPickup) {
+    const position = destinationCoordinates(place);
+    const touched = isPickup ? pickupTouchedRef : destinationTouchedRef;
+    const request = isPickup ? pickupAddressRequestRef : destinationAddressRequestRef;
+    touched.current = true;
+    request.current += 1;
+    (isPickup ? setPickup : setDestination)(place.search_name);
+    (isPickup ? setPickupPosition : setDestinationPosition)(position);
+    setSelectingPickup(isPickup && !position);
+    setSelectingDestination(!isPickup && !position);
+    setPriceQuote(null);
+    setProposedPrice("");
+    setPriceCalculating(false);
+    setBookingError("");
+    if (!position) scrollToSection(document.querySelector(".couriers-map-frame"));
+  }
+
   function handleDestinationSelectionToggle() {
     const nextSelecting = !selectingDestination;
     destinationTouchedRef.current = true;
@@ -936,7 +955,8 @@ export default function Couriers() {
   }, [clientPosition, selectedVehicle, isDelivery]);
 
   const pickupField = (
-    <DepartureField
+    <DestinationField
+      onSelectPlace={(place) => handleLocalPlaceSelection(place, true)}
       id="departure-input"
       label={pickupLabel}
       placeholder={isDelivery ? "عنوان المتجر أو المطعم" : "موقعي الحالي أو عنوان آخر"}
@@ -955,7 +975,9 @@ export default function Couriers() {
   );
   const destinationField = (
     <div ref={destinationSectionRef}>
-      <DepartureField
+      <DestinationField
+        keepHistory
+        onSelectPlace={(place) => handleLocalPlaceSelection(place, false)}
         id="destination-input"
         label={destinationLabel}
         placeholder={isDelivery ? "موقعي الحالي أو عنوان آخر" : "أدخل عنوان الوجهة"}
@@ -983,7 +1005,7 @@ export default function Couriers() {
         </div>
       )}
 
-      {shouldShowMap && <div className="couriers-map-frame">
+      <div className="couriers-map-frame" hidden={!shouldShowMap}>
           <CouriersMap
             clientPosition={clientPosition}
             onRequestClientPosition={handleFindAroundMe}
@@ -1009,7 +1031,7 @@ export default function Couriers() {
               setBookingError("");
             }}
           />
-      </div>}
+      </div>
 
       {!requestedCourseId && (
         <section className="course-vehicle-section" aria-labelledby="course-vehicle-title">

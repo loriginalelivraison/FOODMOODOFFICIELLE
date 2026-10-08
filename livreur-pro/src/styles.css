@@ -3044,3 +3044,10 @@ input::placeholder {
   .vehicle-choice-label { font-size: 15px; }
   .vehicle-choice-description { font-size: 12px; }
 }
+/* Autocomplétion locale arabe/français. */
+.local-destination-field { position: relative; }
+.local-destination-results { max-height: 280px; overflow-y: auto; margin: 6px 0 14px; padding: 6px; border: 1px solid #ddd; border-radius: 12px; background: white; }
+.local-destination-results button { display: block; width: 100%; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: #1f2937; text-align: start; cursor: pointer; }
+.local-destination-results button:hover, .local-destination-results button:focus-visible { background: #fff3e8; }
+.local-destination-results small { display: block; margin-top: 4px; color: #64748b; }
+.local-destination-results p { padding: 6px 10px; font-size: 13px; color: #64748b; }
