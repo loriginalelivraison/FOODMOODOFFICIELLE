@@ -23,6 +23,9 @@ dependencies:
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
 
+  winrak_notifications:
+    path: packages/winrak_notifications
+
   flutter_local_notifications: ^21.0.0
 
   flutter_background_service: ^5.1.0

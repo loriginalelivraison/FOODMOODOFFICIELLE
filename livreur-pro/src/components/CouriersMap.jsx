@@ -1,5 +1,6 @@
 import { getVehicleMarkerIcon } from "../utils/vehicleMarkers.js";
 import React, { useEffect, useRef } from "react";
+import { LocateFixed } from "lucide-react";
 import {
   MapContainer,
   Marker,
@@ -76,7 +77,8 @@ function LocateButton({ clientPosition, onRequestClientPosition, isLocating = fa
   return (
     <div className="map-action-buttons">
       <MapActionButton onClick={handleClick} loading={isLocating}>
-        {isLocating ? "جاري تحديد موقعي..." : "📍 موقعي"}
+        {!isLocating && <LocateFixed size={19} aria-hidden="true" />}
+        <span>موقعي</span>
       </MapActionButton>
     </div>
   );

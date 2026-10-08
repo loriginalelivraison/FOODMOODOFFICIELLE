@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bike, CarFront, Minus, Plus, Star, Truck } from "lucide-react";
+import { Minus, Plus, Star } from "lucide-react";
 import {
   createCommentaireLivreur,
   createCourseRequest,
@@ -29,9 +29,8 @@ import {
 const MIN_COURSE_PRICE_DZD = 100;
 const PRICE_ADJUSTMENT_DZD = 50;
 const VEHICLE_TYPES = [
-  { value: "moto", label: "دراجة نارية", description: "خدمة التوصيل", icon: Bike },
-  { value: "voiture", label: "سيارة", description: "تنقل الأشخاص", icon: CarFront },
-  { value: "camion", label: "شاحنة", icon: Truck },
+  { value: "moto", label: "موصّل" },
+  { value: "voiture", label: "سيارة" },
 ];
 const COURSE_STEPS = ["الطلب", "السائق", "في الطريق", "وصل", "انتهت"];
 // Commande de livraison (livreur) : le trajet comporte deux jambes,
@@ -1037,8 +1036,7 @@ export default function Couriers() {
         <section className="course-vehicle-section" aria-labelledby="course-vehicle-title">
           <h2 id="course-vehicle-title" className="couriers-step-title">اختر نوع المركبة</h2>
           <div className="vehicle-type-selector" role="group" aria-label="نوع المركبة">
-            {/* Camion masqué temporairement ; sa définition et sa logique restent disponibles. */}
-            {VEHICLE_TYPES.filter(({ value }) => value !== "camion").map(({ value, label, description, icon: Icon }) => (
+            {VEHICLE_TYPES.map(({ value, label }) => (
               <button
                 className={`vehicle-type-option ${selectedVehicle === value ? "selected" : ""}`}
                 type="button"
@@ -1047,11 +1045,8 @@ export default function Couriers() {
                 disabled={!clientPosition || bookingLoading}
                 onClick={() => handleVehicleChange(value)}
               >
-                {value === "voiture" || value === "moto" ? (
-                  <span className={`vehicle-choice-image is-${value}`} aria-hidden="true" />
-                ) : <Icon size={28} aria-hidden="true" />}
+                <span className={`vehicle-choice-image is-${value}`} aria-hidden="true" />
                 <span className="vehicle-choice-label">{label}</span>
-                {description && <span className="vehicle-choice-description">{description}</span>}
                 {selectedVehicle === value && <span className="vehicle-choice-check" aria-hidden="true">✓</span>}
               </button>
             ))}

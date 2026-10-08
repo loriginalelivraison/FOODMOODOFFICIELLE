@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -94,6 +95,32 @@ Future<void> showPushNotification(
   final body = message.notification?.body ??
       message.data['body']?.toString() ??
       'افتح WinRak للاطلاع على تفاصيل الرحلة.';
+
+  if (isCourseOffer && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await const MethodChannel(
+        'winrak/course_notifications',
+      ).invokeMethod<void>('showOffer', {
+        'id':
+            int.tryParse(courseId ?? '') ??
+            DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        'price': message.data['price'] != null
+            ? '${message.data['price']} دج'
+            : body,
+        'pickup': message.data['pickup_address']?.toString() ?? 'موقع العميل',
+        'destination':
+            message.data['destination']?.toString() ?? 'تفاصيل الرحلة',
+        'payload': jsonEncode({'type': type, 'course_id': courseId}),
+      });
+      return;
+    } on PlatformException catch (error) {
+      debugPrint('Native offer notification fallback: ${error.code}');
+    } on MissingPluginException {
+      debugPrint(
+        'Native offer notifications unavailable; using standard notification',
+      );
+    }
+  }
 
   await notifications.show(
     id: int.tryParse(courseId ?? '') ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,

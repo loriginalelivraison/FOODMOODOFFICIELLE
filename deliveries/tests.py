@@ -172,7 +172,9 @@ class CourseRequestTests(TestCase):
 		self.assertEqual(notification_call.args[2], "575 دج")
 		self.assertEqual(notification_call.kwargs["course_id"], course.id)
 		self.assertEqual(notification_call.kwargs["notification_type"], "course_offer")
-		self.assertNotIn("extra_data", notification_call.kwargs)
+		self.assertEqual(notification_call.kwargs["extra_data"]["price"], "575")
+		self.assertEqual(notification_call.kwargs["extra_data"]["destination"], course.destination or "تفاصيل الرحلة")
+		self.assertEqual(notification_call.kwargs["extra_data"]["pickup_address"], course.pickup_address or course.pickup_name or "موقع العميل")
 
 	@patch("deliveries.views.resolve_destination_label", return_value="الجزائر الوسطى")
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))

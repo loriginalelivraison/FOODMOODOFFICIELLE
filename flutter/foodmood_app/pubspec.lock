@@ -861,6 +861,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.15.0"
+  winrak_notifications:
+    dependency: "direct main"
+    description:
+      path: "packages/winrak_notifications"
+      relative: true
+    source: path
+    version: "1.0.0"
   xdg_directories:
     dependency: transitive
     description:

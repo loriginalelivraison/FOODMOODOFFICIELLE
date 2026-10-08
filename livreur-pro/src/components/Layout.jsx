@@ -78,7 +78,6 @@ export default function Layout() {
 
           <span className="pro-brand-text">
             <strong>WinRak</strong>
-            <small>Delivery Platform</small>
           </span>
         </Link>
 

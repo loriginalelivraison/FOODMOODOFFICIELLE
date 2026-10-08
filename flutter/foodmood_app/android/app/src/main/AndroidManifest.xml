@@ -54,6 +54,7 @@
 
     <application
         android:label="WinRak"
+        android:supportsRtl="true"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
