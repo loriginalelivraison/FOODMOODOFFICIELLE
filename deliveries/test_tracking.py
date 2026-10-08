@@ -1,8 +1,12 @@
+from unittest.mock import patch
+
+import cloudinary
 from django.contrib.auth.models import User
+from django.core.files.storage import storages
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Client, Course, Livreur
+from .models import Client, Course, CourseOffer, Livreur
 
 
 class CourseTrackingTests(TestCase):
@@ -21,6 +25,8 @@ class CourseTrackingTests(TestCase):
         )
 
     def setUp(self):
+        # Resolve lazy storage before changing the SDK configuration in tests.
+        storages["default"]
         self.driver_api = APIClient()
         self.driver_api.force_authenticate(self.driver.user)
         self.client_api = APIClient()
@@ -42,6 +48,46 @@ class CourseTrackingTests(TestCase):
 
     def action(self, course, action):
         return self.driver_api.post(f"/api/courses/{course.id}/{action}/")
+
+    def test_tracking_after_acceptance_survives_missing_photo_configuration(self):
+        Livreur.objects.filter(pk=self.driver.pk).update(
+            est_en_ligne=True, photo="livreurs/profile",
+        )
+        course = self.make_course(status="searching", livreur=None, client_confirmed=False)
+        CourseOffer.objects.create(course=course, livreur=self.driver)
+        response = self.driver_api.post(
+            f"/api/courses/{course.id}/respond/", {"response": "accepted"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        with patch.object(cloudinary.config(), "cloud_name", ""):
+            response = self.client_api.get(f"/api/courses/{course.id}/")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/json")
+            self.assertEqual(response.data["status"], "driver_accepted")
+            self.assertEqual(response.data["accepted_drivers"][0]["id"], self.driver.id)
+            self.assertIsNone(response.data["accepted_drivers"][0]["photo"])
+            self.assertIsNone(response.data["accepted_drivers"][0]["telephone"])
+
+    def test_selected_driver_photo_failure_does_not_block_tracking_or_profile(self):
+        Livreur.objects.filter(pk=self.driver.pk).update(photo="livreurs/profile")
+        course = self.make_course()
+        with patch.object(cloudinary.config(), "cloud_name", ""):
+            response = self.client_api.get(f"/api/courses/{course.id}/")
+            self.assertEqual(response.status_code, 200)
+            self.assertIsNone(response.data["accepted_drivers"][0]["photo"])
+            self.assertEqual(response.data["navigation"]["stage"], "to_pickup")
+            profile = self.driver_api.get("/api/livreurs/me/")
+            self.assertEqual(profile.status_code, 200)
+            self.assertIsNone(profile.data["photo"])
+
+    def test_configured_photo_url_is_preserved(self):
+        Livreur.objects.filter(pk=self.driver.pk).update(photo="livreurs/profile")
+        course = self.make_course()
+        with patch.object(cloudinary.config(), "cloud_name", "test-cloud"):
+            response = self.client_api.get(f"/api/courses/{course.id}/")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("/test-cloud/image/upload/", response.data["accepted_drivers"][0]["photo"])
+            self.assertTrue(response.data["accepted_drivers"][0]["photo"].endswith("livreurs/profile"))
 
     def test_car_lifecycle_has_no_order_pickup(self):
         course = self.make_course()

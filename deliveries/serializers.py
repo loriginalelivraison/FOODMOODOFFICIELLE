@@ -1,5 +1,20 @@
+import logging
+
 from rest_framework import serializers
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
+
+logger = logging.getLogger(__name__)
+
+
+class OptionalPhotoField(serializers.ImageField):
+    """An unavailable profile photo must not interrupt course tracking."""
+
+    def to_representation(self, value):
+        try:
+            return super().to_representation(value)
+        except ValueError:
+            logger.warning("Driver photo URL unavailable; check media storage configuration.")
+            return None
 
 # Étapes de navigation d'un livreur de commandes : d'abord le retrait chez le
 # commerçant, puis la livraison chez le client.
@@ -23,6 +38,8 @@ def navigation_stage(course):
 
 
 class LivreurSerializer(serializers.ModelSerializer):
+    photo = OptionalPhotoField(required=False, allow_null=True)
+
     class Meta:
         model = Livreur
         exclude = ["fcm_token"]
@@ -124,7 +141,7 @@ class CourseSerializer(serializers.ModelSerializer):
                 "vehicule": driver.vehicule,
                 "telephone": driver.telephone if obj.active and obj.livreur_id == driver.id else None,
                 "est_en_ligne": driver.est_en_ligne,
-                "photo": driver.photo.url if driver.photo else None,
+                "photo": OptionalPhotoField(use_url=True).to_representation(driver.photo),
                 "note": driver.note,
                 "latitude": driver.latitude,
                 "longitude": driver.longitude,

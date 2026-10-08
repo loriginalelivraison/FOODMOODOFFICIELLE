@@ -120,10 +120,13 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": False,
 }
 
+# Read after load_dotenv, and preserve credentials supplied by CLOUDINARY_URL.
+# Empty explicit values must not erase the SDK's environment configuration.
+_cloudinary_environment = cloudinary.Config()
 CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME", ""),
-    "API_KEY": os.getenv("CLOUDINARY_API_KEY", ""),
-    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME") or _cloudinary_environment.cloud_name or "",
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY") or _cloudinary_environment.api_key or "",
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET") or _cloudinary_environment.api_secret or "",
 }
 
 cloudinary.config(
