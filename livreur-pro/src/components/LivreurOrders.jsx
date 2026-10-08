@@ -1,29 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "./LoadingSpinner.jsx";
+import { canFinishCourse, getCourseStatusLabel, getDriverCourseHint, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
 
 const OFFER_STATUSES = ["searching", "driver_accepted"];
 const CLOSED_STATUSES = ["completed", "cancelled"];
-
-const STATUS_LABELS = {
-  searching: "جارٍ البحث عن سائق",
-  driver_accepted: "في انتظار اختيار الزبون",
-  driver_selected: "تم تأكيد السائق",
-  driver_arriving: "في الطريق إلى الزبون",
-  driver_arrived: "وصلت إلى الزبون",
-  picked_up: "تم استلام الطلب",
-  in_progress: "الرحلة جارية",
-  completed: "مكتملة",
-  cancelled: "ملغاة",
-};
-
-const ONGOING_HINTS = {
-  driver_selected: "الزبون في انتظارك، انطلق نحو موقعه.",
-  driver_arriving: "الزبون في انتظارك، أكمل الطريق.",
-  driver_arrived: "أبلغ الزبون بوصولك ثم أكّد استلام الطلب.",
-  picked_up: "تم استلام الطلب، انطلق الآن نحو الزبون.",
-  in_progress: "الرحلة جارية، توجه إلى الوجهة.",
-};
 
 /**
  * Compte à rebours de l'offre (minuterie façon Uber) : propose au livreur
@@ -102,19 +83,20 @@ export function groupDriverCourses(courses, livreurId) {
 
 function OrderSummary({ course }) {
   const price = coursePrice(course);
+  const pickup = getPickupPosition(course);
+  const delivery = isDeliveryVehicle(course.vehicle_type);
 
   return (
     <div className="order-card-summary">
       {course.destination && (
         <span className="order-card-line">
-          <span aria-hidden="true">🎯</span> {course.destination}
+          <span aria-hidden="true">🎯</span> {delivery ? "نقطة التسليم" : "نقطة الوصول"}: {course.destination}
         </span>
       )}
       <span className="order-card-line">
         <span aria-hidden="true">📍</span>{" "}
-        {course.client_latitude != null && course.client_longitude != null
-          ? `${course.client_latitude}, ${course.client_longitude}`
-          : "موقع الزبون غير متوفر"}
+        {delivery ? "نقطة الاستلام" : "نقطة الانطلاق"}: {course.pickup_address || course.pickup_name
+          || (pickup ? `${pickup.latitude}, ${pickup.longitude}` : "الموقع غير متوفر")}
       </span>
       {course.estimated_distance_km != null && (
         <span className="order-card-line">
@@ -140,7 +122,7 @@ function OrderCard({ course, badge, hint, variant, busy = false, children }) {
   return (
     <article className={`order-card order-card-${variant}`}>
       <div className="order-card-head">
-        <strong>رحلة رقم {course.id}</strong>
+        <strong>{isDeliveryVehicle(course.vehicle_type) ? "طلب توصيل رقم" : "رحلة رقم"} {course.id}</strong>
         <span className={`order-status order-status-${variant}`}>{badge}</span>
       </div>
 
@@ -272,20 +254,20 @@ export default function LivreurOrders({
               key={course.id}
               course={course}
               variant="ongoing"
-              badge={STATUS_LABELS[course.status] || "الرحلة نشطة"}
-              hint={ONGOING_HINTS[course.status] || "تابع الرحلة من صفحة الرحلة."}
+              badge={getCourseStatusLabel(course)}
+              hint={getDriverCourseHint(course)}
               busy={finishingCourseId === course.id}
             >
-              <div className="driver-offer-actions">
+              {canFinishCourse(course) && <div className="driver-offer-actions">
                 <button
                   type="button"
                   className="order-btn-finish"
                   onClick={() => onFinish?.(course.id)}
                   disabled={finishingCourseId !== null}
                 >
-                  {finishingCourseId === course.id ? "جارٍ الإنهاء…" : "إنهاء الرحلة"}
+                  {finishingCourseId === course.id ? "جارٍ الإنهاء…" : isDeliveryVehicle(course.vehicle_type) ? "تم تسليم الطلب" : "إنهاء الرحلة"}
                 </button>
-              </div>
+              </div>}
             </OrderCard>
           ))}
         </OrdersGroup>

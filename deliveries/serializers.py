@@ -95,12 +95,15 @@ class CourseSerializer(serializers.ModelSerializer):
             return []
 
         accepted = obj.offers.filter(response="accepted").select_related("livreur")
+        accepted_drivers = {offer.livreur_id: offer.livreur for offer in accepted}
+        if obj.livreur:
+            accepted_drivers[obj.livreur_id] = obj.livreur
         drivers = []
-        for offer in accepted:
-            driver = offer.livreur
+        for driver in accepted_drivers.values():
             distance = None
-            if obj.client_latitude is not None and obj.client_longitude is not None and driver.latitude is not None and driver.longitude is not None:
-                distance = round(distance_km(obj.client_latitude, obj.client_longitude, driver.latitude, driver.longitude), 1)
+            pickup_lat, pickup_lon = obj.pickup_position
+            if pickup_lat is not None and pickup_lon is not None and driver.latitude is not None and driver.longitude is not None:
+                distance = round(distance_km(pickup_lat, pickup_lon, driver.latitude, driver.longitude), 1)
             drivers.append({
                 "id": driver.id,
                 "nom": driver.nom,
@@ -162,14 +165,26 @@ class CourseSerializer(serializers.ModelSerializer):
 
         if stage == "to_pickup":
             pickup_lat, pickup_lon = obj.pickup_position
+            # Le trajet d'approche part du chauffeur, pas du GPS du client.
+            # Sans routage routier en direct, cette liaison est une estimation.
+            from .course_services import distance_km, eta_minutes
+            driver = obj.livreur
+            route = None
+            distance = None
+            if driver and all(value is not None for value in (
+                driver.latitude, driver.longitude, pickup_lat, pickup_lon,
+            )):
+                route = [[driver.longitude, driver.latitude], [pickup_lon, pickup_lat]]
+                distance = round(distance_km(driver.latitude, driver.longitude, pickup_lat, pickup_lon), 2)
             return {
                 "stage": stage,
                 "target_latitude": pickup_lat,
                 "target_longitude": pickup_lon,
-                "target_label": obj.pickup_name or obj.pickup_address or "نقطة الاستلام",
-                "route_geometry": obj.pickup_route_geometry or obj.route_geometry,
-                "distance_km": obj.pickup_distance_km,
-                "eta_minutes": obj.pickup_eta_minutes,
+                "target_label": obj.pickup_address or obj.pickup_name or ("نقطة الاستلام" if obj.is_delivery else "نقطة الانطلاق"),
+                "route_geometry": route,
+                "route_is_estimate": True,
+                "distance_km": distance,
+                "eta_minutes": eta_minutes(distance) if distance is not None else None,
                 **tail,
             }
 

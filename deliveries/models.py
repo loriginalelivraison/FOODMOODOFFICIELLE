@@ -204,6 +204,10 @@ class Course(models.Model):
         return f"Course client {self.client_id} -> livreur {self.livreur_id}"
 
     @property
+    def is_delivery(self):
+        return self.vehicle_type in ("moto", "camion")
+
+    @property
     def has_pickup_point(self):
         """Vrai quand un commerçant a été désigné (sinon on retombe sur le client)."""
         return self.pickup_latitude is not None and self.pickup_longitude is not None

@@ -544,7 +544,42 @@ export async function createCourseRequest(request) {
   return data;
 }
 
-export async function getCourseQuote(request) {
+const mapRequestCache = new Map();
+function cachedMapRequest(key, ttl, request) {
+  const previous = mapRequestCache.get(key);
+  if (previous && previous.expires > Date.now()) return previous.promise;
+  if (mapRequestCache.size >= 100) mapRequestCache.delete(mapRequestCache.keys().next().value);
+  const entry = { expires: Infinity, promise: null };
+  entry.promise = request().then((result) => {
+    entry.expires = Date.now() + ttl;
+    return result;
+  }).catch((error) => {
+    if (mapRequestCache.get(key) === entry) mapRequestCache.delete(key);
+    throw error;
+  });
+  mapRequestCache.set(key, entry);
+  return entry.promise;
+}
+
+export function getCourseAddress(position) {
+  return cachedMapRequest(`address:${JSON.stringify(position)}`, 5 * 60 * 1000, () => fetchCourseAddress(position));
+}
+
+export function getCourseQuote(request) {
+  return cachedMapRequest(`quote:${JSON.stringify(request)}`, 30000, () => fetchCourseQuote(request));
+}
+
+async function fetchCourseAddress(position) {
+  const params = new URLSearchParams(position);
+  const response = await fetch(`${API_BASE_URL}/courses/address/?${params}`, {
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!response.ok) throw new Error("Adresse indisponible.");
+  const data = await response.json();
+  return data.address;
+}
+
+async function fetchCourseQuote(request) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   let response;

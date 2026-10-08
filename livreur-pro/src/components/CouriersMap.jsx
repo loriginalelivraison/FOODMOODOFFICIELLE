@@ -1,29 +1,16 @@
 import React, { useEffect, useRef } from "react";
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Polyline,
   Popup,
   useMap,
   useMapEvents,
-} from "react-leaflet";
+  createMarkerIcon,
+} from "./MapboxMap.jsx";
 
 import { useNavigate } from "react-router-dom";
-import L from "leaflet";
 import MapActionButton from "./MapActionButton.jsx";
-
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
 
 const ALGERIA_CENTER = [36.0339, 3.6596];
 const NORTHERN_ALGERIA_BOUNDS = [
@@ -31,7 +18,7 @@ const NORTHERN_ALGERIA_BOUNDS = [
   [37.3, 9.0],
 ];
 
-const clientIcon = new L.DivIcon({
+const clientIcon = createMarkerIcon({
   className: "client-marker",
   html: `
     <div style="
@@ -58,7 +45,7 @@ function getVehicleMarkerIcon(vehicle) {
 
   const config = map[vehicle] || map.moto;
 
-  return new L.DivIcon({
+  return createMarkerIcon({
     className: "vehicle-marker",
     html: `
       <div style="
@@ -123,6 +110,22 @@ function LocateButton({ clientPosition, onRequestClientPosition, isLocating = fa
     </div>
   );
 }
+
+const originIcon = createMarkerIcon({
+  className: "origin-marker",
+  html: `
+    <div style="
+      width:18px;
+      height:18px;
+      background:#16a34a;
+      border:3px solid white;
+      border-radius:50%;
+      box-shadow:0 0 0 6px rgba(22,163,74,0.18);
+    "></div>
+  `,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
 
 function RecenterOnClient({ clientPosition }) {
   const map = useMap();
@@ -193,7 +196,7 @@ function DestinationPicker({ active, clientPosition, onSelect }) {
   return null;
 }
 
-function DestinationPickOverlay({ phase }) {
+function DestinationPickOverlay({ phase, label = "الوجهة" }) {
   if (!phase) return null;
 
   const isChoosing = phase === "choosing";
@@ -211,17 +214,18 @@ function DestinationPickOverlay({ phase }) {
         <span className="map-pick-dot" aria-hidden="true" />
         <span>
           {isChoosing
-            ? "جاري اختيار الوجهة — انقر على الخريطة"
-            : "تم اختيار الوجهة — اضغط تأكيد الوجهة"}
+            ? `جاري اختيار ${label} — انقر على الخريطة`
+            : `تم اختيار ${label} — اضغط تأكيد ${label}`}
         </span>
       </div>
     </div>
   );
 }
 
-function RouteBounds({ positions }) {
+function RouteBounds({ positions, estimate }) {
   const map = useMap();
-  const routeKey = positions.map(([latitude, longitude]) => `${latitude},${longitude}`).join("|");
+  const boundsPositions = estimate ? positions.slice(-1) : positions;
+  const routeKey = boundsPositions.map(([latitude, longitude]) => `${latitude},${longitude}`).join("|");
 
   useEffect(() => {
     if (positions.length > 1) {
@@ -239,9 +243,14 @@ export default function CouriersMap({
   isLocating = false,
   selectingDestination = false,
   destinationPosition = null,
+  originPosition = null,
   onSelectDestination,
   routeGeometry = null,
+  allowRouteFallback = true,
+  routeIsEstimate = false,
   pickingPhase = null,
+  pickLabel = "الوجهة",
+  onPickConfirm = null,
 }) {
   const navigate = useNavigate();
 
@@ -260,15 +269,18 @@ export default function CouriersMap({
   });
 
   const hasClientPosition = hasPosition(clientPosition);
+  const hasOriginPosition = hasPosition(originPosition);
   const hasDestinationPosition = hasPosition(destinationPosition);
   const route = Array.isArray(routeGeometry)
     ? routeGeometry.map(([longitude, latitude]) => [latitude, longitude])
     : [];
+  // Trajet simple : uniquement départ → arrivée. Pas de chemin dessiné vers la
+  // position GPS brute — le départ choisi (ou pré-rempli) est l'origine.
   const routePositions = route.length > 1
     ? route
-    : hasClientPosition && hasDestinationPosition
+    : allowRouteFallback && hasOriginPosition && hasDestinationPosition
       ? [
-          [Number(clientPosition.latitude), Number(clientPosition.longitude)],
+          [Number(originPosition.latitude), Number(originPosition.longitude)],
           [Number(destinationPosition.latitude), Number(destinationPosition.longitude)],
         ]
       : [];
@@ -301,17 +313,6 @@ export default function CouriersMap({
           width: "100%",
         }}
       >
-        <TileLayer
-          attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-          maxNativeZoom={16}
-        />
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-          maxNativeZoom={16}
-        />
 
         <LocateButton
           clientPosition={clientPosition}
@@ -327,9 +328,21 @@ export default function CouriersMap({
           onSelect={onSelectDestination}
         />
 
-        <RouteBounds positions={routePositions} />
+        <RouteBounds positions={routePositions} estimate={routeIsEstimate} />
 
-        {hasClientPosition && (
+        {hasOriginPosition && (
+          <Marker
+            key="origin-position"
+            position={[Number(originPosition.latitude), Number(originPosition.longitude)]}
+            icon={originIcon}
+          >
+            <Popup>نقطة الانطلاق</Popup>
+          </Marker>
+        )}
+
+        {hasClientPosition && !(hasOriginPosition
+          && Number(clientPosition.latitude) === Number(originPosition.latitude)
+          && Number(clientPosition.longitude) === Number(originPosition.longitude)) && (
           <Marker
             key="client-position"
             position={[
@@ -359,7 +372,7 @@ export default function CouriersMap({
             pathOptions={{
               color: "#f97316",
               weight: 5,
-              ...(route.length < 2 && { dashArray: "8 8" }),
+              ...((routeIsEstimate || route.length < 2) && { dashArray: "8 8" }),
             }}
           />
         )}
@@ -404,7 +417,7 @@ export default function CouriersMap({
         ))}
       </MapContainer>
 
-      <DestinationPickOverlay phase={pickingPhase} />
+      <DestinationPickOverlay phase={pickingPhase} label={pickLabel} />
     </div>
   );
 }

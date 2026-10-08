@@ -9,24 +9,12 @@ import {
 } from "../livreursapi.js";
 import CouriersMap from "../components/CouriersMap.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import CourseCancelledState from "../components/CourseCancelledState.jsx";
 import defaultAvatar from "../assets/pasdephoto.png";
-
-const COURSE_STEPS = ["الطلب", "السائق", "في الطريق", "وصل", "انتهت"];
-// Commande de livraison (livreur) : deux jambes, retrait puis livraison.
-const DELIVERY_STEPS = ["الطلب", "السائق", "في الطريق", "تم الاستلام", "وصل"];
-// Un taxi va directement du client a la destination : vocabulaire inchange.
-const DELIVERY_VEHICLE_TYPES = ["moto", "camion"];
-
-function isDeliveryVehicle(vehicleType) {
-  return DELIVERY_VEHICLE_TYPES.includes(vehicleType);
-}
-
-function getSteps(vehicleType) {
-  return isDeliveryVehicle(vehicleType) ? DELIVERY_STEPS : COURSE_STEPS;
-}
+import { getCourseSteps, getCourseStepIndex, getCourseStatusLabel, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
 const VEHICLE_LABELS = {
-  moto: "دراجة نارية",
-  scooter: "دراجة نارية",
+  moto: "عامل توصيل",
+  scooter: "عامل توصيل",
   voiture: "سيارة",
   camion: "شاحنة",
 };
@@ -37,17 +25,6 @@ function positionIsValid(latitude, longitude) {
     && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
 }
 
-function getStepIndex(status) {
-  if (status === "searching") return 0;
-  if (status === "driver_accepted") return 1;
-  // Dès que le client confirme le chauffeur, l'étape passe à "في الطريق" (en route).
-  if (["driver_selected", "driver_arriving"].includes(status)) return 2;
-  // "picked_up" = commande récupérée : on part vers la livraison.
-  if (["driver_arrived", "picked_up", "in_progress"].includes(status)) return 3;
-  if (status === "completed") return 4;
-  return -1;
-}
-
 export default function ClientCourse() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -55,8 +32,6 @@ export default function ClientCourse() {
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [selectingDriverId, setSelectingDriverId] = useState(null);
-  const [calledCourseId, setCalledCourseId] = useState(null);
-  const [arrivalConfirmedCourseId, setArrivalConfirmedCourseId] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewMessage, setReviewMessage] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -106,7 +81,7 @@ export default function ClientCourse() {
       setCourse(updated);
       localStorage.removeItem("currentClientCourseId");
     } catch (err) {
-      setError(err.message || "تعذر إلغاء الرحلة.");
+      setError(err.message || (isDeliveryVehicle(course.vehicle_type) ? "تعذر إلغاء الطلب." : "تعذر إلغاء الرحلة."));
     } finally {
       setCancelling(false);
     }
@@ -119,8 +94,6 @@ export default function ClientCourse() {
     try {
       const updated = await selectCourseDriver(course.id, driverId);
       setCourse(updated);
-      setCalledCourseId(null);
-      setArrivalConfirmedCourseId(null);
     } catch (err) {
       setError(err.message || "تعذر تأكيد هذا السائق.");
       try {
@@ -167,22 +140,23 @@ export default function ClientCourse() {
   const selectedDriver = acceptedDrivers.find(
     (candidate) => String(candidate.id) === String(course.livreur)
   ) || acceptedDrivers[0];
-  const stepIndex = getStepIndex(course.status);
+  const stepIndex = getCourseStepIndex(course.status);
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
-  const steps = getSteps(course.vehicle_type);
-  const hasPickupPoint = positionIsValid(course.pickup_latitude, course.pickup_longitude);
+  if (course.status === "cancelled") {
+    return <CourseCancelledState isDelivery={isDelivery} onContinue={() => navigate("/livreurs", { replace: true })} />;
+  }
+  const steps = getCourseSteps(course.vehicle_type);
+  const pickupPosition = getPickupPosition(course);
   const hasStart = positionIsValid(course.client_latitude, course.client_longitude);
   const hasDestination = positionIsValid(
     course.destination_latitude,
     course.destination_longitude
   );
   const hasDriverPosition = positionIsValid(selectedDriver?.latitude, selectedDriver?.longitude);
-  const called = calledCourseId === String(course.id);
-  const arrivalConfirmed = arrivalConfirmedCourseId === String(course.id);
   const active = !["completed", "cancelled"].includes(course.status);
   const reviewAlreadySubmitted = reviewSubmitted
     || localStorage.getItem(`courseReviewSubmitted:${course.id}`) === "true";
-  const showMap = hasStart && [
+  const showMap = Boolean(pickupPosition) && [
     "driver_accepted",
     "driver_selected",
     "driver_arriving",
@@ -192,16 +166,11 @@ export default function ClientCourse() {
     "completed",
   ].includes(course.status);
   const hasSelectedDriver = Boolean(course.livreur);
-  // Avant que le client choisisse son chauffeur, on ne trace aucune ligne vers un
-  // chauffeur : seulement le client, la destination et les chauffeurs disponibles
-  // (comme la carte affichée une fois le chauffeur confirmé).
-  const driverRoute = hasSelectedDriver && hasStart && hasDriverPosition
+  const approachingPickup = hasSelectedDriver && ["driver_selected", "driver_arriving", "driver_arrived"].includes(course.status);
+  const driverRoute = approachingPickup && pickupPosition && hasDriverPosition
     ? [
         [Number(selectedDriver.longitude), Number(selectedDriver.latitude)],
-        // Livraison : le livreur rejoint d'abord le magasin.
-        isDelivery && hasPickupPoint
-          ? [Number(course.pickup_longitude), Number(course.pickup_latitude)]
-          : [Number(course.client_longitude), Number(course.client_latitude)],
+        [pickupPosition.longitude, pickupPosition.latitude],
       ]
     : null;
   const mapDrivers = course.livreur
@@ -219,21 +188,20 @@ export default function ClientCourse() {
       latitude: Number(driver.latitude),
       longitude: Number(driver.longitude),
     }));
-  const routeGeometry = (
-    isDelivery && course.trip_route_geometry?.length > 1
+  const routeGeometry = approachingPickup
+    ? driverRoute
+    : course.trip_route_geometry?.length > 1
       ? course.trip_route_geometry
       : course.route_geometry?.length > 1
         ? course.route_geometry
-        : driverRoute
-  );
-  const cancelIsInCallChoice = course.status === "driver_selected" && called && !arrivalConfirmed;
+        : null;
 
   return (
     <section className="page" dir="rtl">
       <header className="course-follow-header">
         <div>
           <span className="course-request-kicker">WinRak · الرحلة رقم {course.id}</span>
-          <h1>متابعة الرحلة</h1>
+          <h1>{isDelivery ? "متابعة التوصيل" : "متابعة الرحلة"}</h1>
         </div>
       </header>
 
@@ -269,12 +237,12 @@ export default function ClientCourse() {
         {course.status === "searching" && (
           <div className="course-searching-state">
             <span className="course-search-pulse" aria-hidden="true" />
-            <strong>جارٍ البحث عن سائق قريب</strong>
+            <strong>{isDelivery ? "جارٍ البحث عن عامل توصيل قريب" : "جارٍ البحث عن سائق قريب"}</strong>
           </div>
         )}
 
         {course.status === "driver_accepted" && (
-          <h2 className="course-tracking-title">اختر السائق المناسب</h2>
+          <h2 className="course-tracking-title">{isDelivery ? "اختر عامل التوصيل المناسب" : "اختر السائق المناسب"}</h2>
         )}
 
         {["searching", "driver_accepted"].includes(course.status) && acceptedDrivers.length > 0 && (
@@ -305,16 +273,16 @@ export default function ClientCourse() {
           </div>
         )}
 
-        {["driver_selected", "driver_arriving", "driver_arrived"].includes(course.status) && (
+        {["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"].includes(course.status) && (
           <>
             {course.status === "driver_selected" && (
-              <h2 className="course-tracking-title">تم تأكيد السائق</h2>
+              <h2 className="course-tracking-title">{getCourseStatusLabel(course)}</h2>
             )}
             {course.status === "driver_arriving" && (
-              <h2 className="course-tracking-title">سائقك في الطريق إليك</h2>
+              <h2 className="course-tracking-title">{getCourseStatusLabel(course)}</h2>
             )}
             {course.status === "driver_arrived" && (
-              <h2 className="course-arrived-title">وصل سائقك</h2>
+              <h2 className="course-arrived-title">{getCourseStatusLabel(course)}</h2>
             )}
             {selectedDriver && (
               <article className="confirmed-driver-card">
@@ -331,11 +299,10 @@ export default function ClientCourse() {
                     </span>
                   )}
                 </div>
-                {selectedDriver.telephone && !called && (
+                {selectedDriver.telephone && (
                   <a
                     className="tracking-call-button"
                     href={`tel:${selectedDriver.telephone}`}
-                    onClick={() => setCalledCourseId(String(course.id))}
                   >
                     اتصال
                   </a>
@@ -343,31 +310,20 @@ export default function ClientCourse() {
               </article>
             )}
 
-            {course.status === "driver_selected" && called && !arrivalConfirmed && (
-              <div className="driver-arrival-choice" role="group" aria-label="هل السائق في طريقه إليك؟">
-                <button type="button" onClick={() => setArrivalConfirmedCourseId(String(course.id))}>
-                  نعم، السائق قادم
-                </button>
-                <button type="button" onClick={handleCancel} disabled={cancelling}>
-                  {cancelling ? "جارٍ الإلغاء…" : "إلغاء الرحلة"}
-                </button>
-              </div>
-            )}
-
           </>
         )}
 
         {course.status === "picked_up" && (
           <>
-            <h2 className="course-tracking-title">طلبك في الطريق إليك</h2>
-            <p className="muted">تم استلام طلبك وهو الآن في الطريق إليك.</p>
+            <h2 className="course-tracking-title">{getCourseStatusLabel(course)}</h2>
+            <p className="muted">{isDelivery ? "تم استلام الطلب، وسيبدأ عامل التوصيل التوجه إلى نقطة التسليم." : "السائق جاهز لبدء الرحلة."}</p>
           </>
         )}
 
         {course.status === "in_progress" && (
           <>
             <h2 className="course-tracking-title">
-              {isDelivery ? "طلبك في الطريق إليك" : "الرحلة جارية"}
+              {getCourseStatusLabel(course)}
             </h2>
             {isDelivery && (course.pickup_name || course.pickup_address) && (
               <div className="course-destination">
@@ -388,6 +344,7 @@ export default function ClientCourse() {
           <div className="course-tracking-map">
             <CouriersMap
               couriers={mapCouriers}
+              originPosition={pickupPosition}
               clientPosition={hasStart ? {
                 latitude: Number(course.client_latitude),
                 longitude: Number(course.client_longitude),
@@ -397,6 +354,8 @@ export default function ClientCourse() {
                 longitude: Number(course.destination_longitude),
               } : null}
               routeGeometry={routeGeometry}
+              allowRouteFallback={!approachingPickup}
+              routeIsEstimate={approachingPickup}
             />
           </div>
         )}
@@ -407,7 +366,7 @@ export default function ClientCourse() {
               <strong className="course-review-success" role="status">شكراً لك على تقييمك</strong>
             ) : course.livreur ? (
               <form onSubmit={handleReviewSubmit}>
-                <h2>كيف كانت رحلتك؟</h2>
+                <h2>{isDelivery ? "كيف كانت خدمة التوصيل؟" : "كيف كانت رحلتك؟"}</h2>
                 <div className="course-review-stars" role="group" aria-label="تقييم من نجمة إلى خمس نجوم" dir="ltr">
                   {[1, 2, 3, 4, 5].map((rating) => (
                     <button
@@ -436,28 +395,19 @@ export default function ClientCourse() {
                 </button>
               </form>
             ) : (
-              <strong className="course-review-success">اكتملت الرحلة</strong>
+              <strong className="course-review-success">{getCourseStatusLabel(course)}</strong>
             )}
           </section>
         )}
 
-        {course.status === "cancelled" && (
-          <div className="course-cancelled-state">
-            <h2>أُلغيت الرحلة</h2>
-            <button className="course-request-submit" type="button" onClick={() => navigate("/", { replace: true })}>
-              العودة إلى الرئيسية
-            </button>
-          </div>
-        )}
-
-        {active && !cancelIsInCallChoice && (
+        {active && (
           <button
             className="course-cancel-button"
             type="button"
             onClick={handleCancel}
             disabled={cancelling}
           >
-            {cancelling ? "جارٍ الإلغاء…" : "إلغاء الرحلة"}
+            {cancelling ? "جارٍ الإلغاء…" : isDelivery ? "إلغاء الطلب" : "إلغاء الرحلة"}
           </button>
         )}
       </div>

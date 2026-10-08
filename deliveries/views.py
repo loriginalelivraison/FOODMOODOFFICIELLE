@@ -440,6 +440,21 @@ class CourseViewSet(ModelViewSet):
         pickup_phone = str(request.data.get("pickup_phone", "")).strip()[:30]
         pickup_lat = self._read_optional_float(request, "pickup_latitude")
         pickup_lon = self._read_optional_float(request, "pickup_longitude")
+        # Point de départ saisi en texte (ou « Ma position » pré-rempli) :
+        # on le géocode quand aucun point carte n'est transmis, pour obtenir
+        # un vrai trajet simple départ → arrivée (tous véhicules).
+        if pickup_lat is None and pickup_lon is None:
+            pickup_text = pickup_address or pickup_name
+            if pickup_text and pickup_text != "موقعي الحالي":
+                pickup_position = resolve_destination(pickup_text)
+                if not pickup_position:
+                    return Response(
+                        {"detail": "Point de départ introuvable. Vérifiez l’adresse puis réessayez."},
+                        status=422,
+                    )
+                pickup_lat, pickup_lon = pickup_position
+            else:
+                pickup_text = ""
         if (pickup_lat is None) != (pickup_lon is None):
             return Response(
                 {"detail": "Les coordonnées du commerçant sont incomplètes."}, status=400
@@ -570,6 +585,21 @@ class CourseViewSet(ModelViewSet):
 
         return Response(self.get_serializer(course).data, status=201)
 
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
+    def address(self, request):
+        """Adresse lisible des points GPS ou choisis sur la carte de réservation."""
+        try:
+            latitude = float(request.query_params["latitude"])
+            longitude = float(request.query_params["longitude"])
+        except (KeyError, TypeError, ValueError):
+            return Response({"detail": "Coordonnées invalides."}, status=400)
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            return Response({"detail": "Coordonnées invalides."}, status=400)
+        address = resolve_destination_label(latitude, longitude, full_address=True)
+        if not address:
+            return Response({"detail": "Adresse indisponible."}, status=422)
+        return Response({"address": address[:255]})
+
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def quote(self, request):
         destination = str(request.data.get("destination", "")).strip()
@@ -598,11 +628,26 @@ class CourseViewSet(ModelViewSet):
         elif not destination:
             destination = (resolve_destination_label(destination_lat, destination_lon) or "موقع محدد على الخريطة")[:255]
 
+        pickup_lat = self._read_optional_float(request, "pickup_latitude")
+        pickup_lon = self._read_optional_float(request, "pickup_longitude")
+        # Même logique que la création : un départ texte est géocodé pour
+        # chiffrer le trajet départ → arrivée (sinon on part du GPS).
+        if pickup_lat is None and pickup_lon is None:
+            pickup_text = (
+                str(request.data.get("pickup_address", "")).strip()
+                or str(request.data.get("pickup_name", "")).strip()
+            )
+            if pickup_text and pickup_text != "موقعي الحالي":
+                pickup_position = resolve_destination(pickup_text)
+                if not pickup_position:
+                    return Response({"detail": "Point de départ introuvable. Vérifiez l’adresse puis réessayez."}, status=422)
+                pickup_lat, pickup_lon = pickup_position
+
         routing = resolve_legs(
             start_lat,
             start_lon,
-            self._read_optional_float(request, "pickup_latitude"),
-            self._read_optional_float(request, "pickup_longitude"),
+            pickup_lat,
+            pickup_lon,
             destination_lat,
             destination_lon,
             router=resolve_route,
@@ -614,8 +659,8 @@ class CourseViewSet(ModelViewSet):
             "destination": destination,
             "destination_latitude": destination_lat,
             "destination_longitude": destination_lon,
-            "pickup_latitude": self._read_optional_float(request, "pickup_latitude"),
-            "pickup_longitude": self._read_optional_float(request, "pickup_longitude"),
+            "pickup_latitude": pickup_lat,
+            "pickup_longitude": pickup_lon,
             "pickup_distance_km": routing["pickup_distance_km"],
             "pickup_route_geometry": routing["pickup_route_geometry"],
             "trip_distance_km": routing["trip_distance_km"],
@@ -799,6 +844,10 @@ class CourseViewSet(ModelViewSet):
             course = Course.objects.select_for_update().filter(pk=pk, livreur=driver).first()
             if not course:
                 return Response({"detail": "Course introuvable."}, status=404)
+            if new_status == "picked_up" and not course.is_delivery:
+                return Response({"detail": "La récupération de commande est réservée aux livraisons."}, status=409)
+            if new_status == "in_progress" and course.is_delivery:
+                allowed_statuses = ["picked_up"]
             if course.status == new_status:
                 return Response(self.get_serializer(course).data)
             if course.status not in allowed_statuses:
@@ -862,8 +911,8 @@ class CourseViewSet(ModelViewSet):
                 if actor_type == "client" or affected_offer.livreur_id != course.livreur_id:
                     transaction.on_commit(lambda affected_offer=affected_offer: send_livreur_notification(
                         affected_offer.livreur,
-                        "تم إلغاء الرحلة",
-                        f"تم إلغاء طلب الرحلة رقم {course.id}. لم يعد متاحاً.",
+                        "تم إلغاء الطلب" if course.is_delivery else "تم إلغاء الرحلة",
+                        f"تم إلغاء الطلب رقم {course.id}. لم يعد متاحاً." if course.is_delivery else f"تم إلغاء طلب الرحلة رقم {course.id}. لم يعد متاحاً.",
                         course_id=course.id,
                         notification_type="course_cancelled",
                     ))
@@ -985,6 +1034,7 @@ class CourseViewSet(ModelViewSet):
             client.save(update_fields=["points"])
 
         return Response({
+            **self.get_serializer(course).data,
             "message": "Course terminée",
             "active": False,
             "nombre_livraisons": livreur.nombre_livraisons if livreur else None,

@@ -10,11 +10,10 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.0",
-    "leaflet": "^1.9.4",
     "lucide-react": "latest",
+    "mapbox-gl": "^3.32.0",
     "react": "latest",
     "react-dom": "latest",
-    "react-leaflet": "^5.0.0",
     "react-router-dom": "latest",
     "vite": "^5.4.0"
   }

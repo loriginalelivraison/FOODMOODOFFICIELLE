@@ -92,7 +92,7 @@ def resolve_destination(destination):
     return None
 
 
-def resolve_destination_label(latitude, longitude):
+def resolve_destination_label(latitude, longitude, *, full_address=False):
     try:
         response = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -102,6 +102,8 @@ def resolve_destination_label(latitude, longitude):
         )
         response.raise_for_status()
         result = response.json()
+        if full_address:
+            return result.get("display_name") or result.get("name")
         return result.get("name") or result.get("display_name")
     except (requests.RequestException, ValueError, AttributeError, TypeError):
         return None

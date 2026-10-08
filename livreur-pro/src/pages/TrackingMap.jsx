@@ -1,27 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Popup,
   useMap,
-} from "react-leaflet";
-import L from "leaflet";
+  createMarkerIcon,
+} from "../components/MapboxMap.jsx";
 import { getLivreurById } from "../livreursapi.js";
 
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
-
-const clientIcon = new L.DivIcon({
+const clientIcon = createMarkerIcon({
   className: "client-marker",
   html: `
     <div style="
@@ -48,7 +35,7 @@ function getVehicleMarkerIcon(vehicle) {
 
   const config = map[vehicle] || map.moto;
 
-  return new L.DivIcon({
+  return createMarkerIcon({
     className: "vehicle-marker",
     html: `
       <div style="
@@ -260,17 +247,6 @@ export default function TrackingMap({
           width: "100%",
         }}
       >
-        <TileLayer
-          attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-          maxNativeZoom={16}
-        />
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-          maxNativeZoom={16}
-        />
 
         <MapZoomButtons
           courier={currentCourier}
