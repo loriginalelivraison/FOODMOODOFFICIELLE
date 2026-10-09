@@ -80,6 +80,7 @@ try {
   await page.waitForFunction(() => document.querySelector('.mapboxgl-canvas'));
   await page.waitForTimeout(1000);
   await page.locator('.course-cancel-button').click();
+  await page.locator('.course-cancel-form button[type="submit"]').click();
   await page.locator('.course-cancelled-state').waitFor();
   assert.equal(await page.evaluate(() => localStorage.getItem('currentClientCourseId')), null);
   await page.locator('.course-cancelled-state button').click();

@@ -11,7 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foodmood_app/main.dart';
 
 void main() {
-  testWidgets('FoodMoodApp displays its configured root screen', (WidgetTester tester) async {
+  testWidgets('FoodMoodApp displays its configured root screen', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const FoodMoodApp(home: Text('WinRak test screen')),
     );
@@ -21,11 +23,15 @@ void main() {
     expect(find.text('WinRak test screen'), findsOneWidget);
   });
 
-  testWidgets('connection failure gives a visible retry action', (tester) async {
+  testWidgets('connection failure gives a visible retry action', (
+    tester,
+  ) async {
     var retries = 0;
-    await tester.pumpWidget(FoodMoodApp(
-      home: Scaffold(body: WebConnectionError(onRetry: () => retries++)),
-    ));
+    await tester.pumpWidget(
+      FoodMoodApp(
+        home: Scaffold(body: WebConnectionError(onRetry: () => retries++)),
+      ),
+    );
     expect(find.text('تعذر تحميل WinRak'), findsOneWidget);
     await tester.tap(find.text('إعادة المحاولة'));
     expect(retries, 1);

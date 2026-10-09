@@ -138,6 +138,11 @@ class CourseRequestTests(TestCase):
 				[matching_driver.id],
 			)
 			send_notification.reset_mock()
+			# Compare vehicle dispatch on separate bookings; one client cannot
+			# keep several active requests at the same time.
+			self.client_api.post(
+				f"/api/courses/{course.id}/cancel/", {"reason": "changed_mind"}, format="json",
+			)
 
 	@patch("deliveries.views.resolve_destination", return_value=(36.76, 3.07))
 	@patch("deliveries.views.resolve_route", return_value=(2.5, [[3.06, 36.75], [3.07, 36.76]]))

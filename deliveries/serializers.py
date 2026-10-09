@@ -1,9 +1,34 @@
 import logging
 
 from rest_framework import serializers
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
 
 logger = logging.getLogger(__name__)
+
+
+class AccountRegistrationSerializer(serializers.Serializer):
+    nom = serializers.CharField(max_length=100)
+    telephone = serializers.RegexField(r"^\+?\d{8,15}$", max_length=20)
+    password = serializers.CharField(max_length=128, trim_whitespace=False, write_only=True)
+
+    def validate(self, attrs):
+        if User.objects.filter(username=attrs["telephone"]).exists():
+            raise serializers.ValidationError({"telephone": "Un compte avec ce téléphone existe déjà."})
+        try:
+            validate_password(attrs["password"], User(username=attrs["telephone"]))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)})
+        return attrs
+
+
+class DriverRegistrationSerializer(AccountRegistrationSerializer):
+    ville = serializers.CharField(max_length=100)
+    vehicule = serializers.ChoiceField(choices=["moto", "voiture", "camion"])
+    modele_vehicule = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    photo = serializers.ImageField(required=False, allow_null=True)
 
 
 class OptionalPhotoField(serializers.ImageField):
@@ -43,7 +68,8 @@ class LivreurSerializer(serializers.ModelSerializer):
     class Meta:
         model = Livreur
         exclude = ["fcm_token"]
-        read_only_fields = ["user", "telephone", "note", "nombre_livraisons", "points", "created_at"]
+        read_only_fields = ["user", "telephone", "note", "nombre_livraisons", "points", "created_at",
+                            "disponible", "est_en_ligne", "latitude", "longitude"]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -65,11 +91,15 @@ class DemandeLivraisonSerializer(serializers.ModelSerializer):
     class Meta:
         model = DemandeLivraison
         fields = "__all__"
+        read_only_fields = ["client_nom", "client_telephone", "statut", "tracking_code", "created_at"]
 
 class CommentaireLivreurSerializer(serializers.ModelSerializer):
+    note = serializers.IntegerField(min_value=1, max_value=5)
+
     class Meta:
         model = CommentaireLivreur
         fields = "__all__"
+        read_only_fields = ["nom_client", "created_at"]
 
 class ClientSerializer(serializers.ModelSerializer):
     class Meta:
@@ -82,9 +112,11 @@ class ClientSerializer(serializers.ModelSerializer):
             "points",
             "created_at",
         ]
-        read_only_fields = ["user", "points", "created_at"]
+        read_only_fields = ["user", "telephone", "points", "created_at"]
 
 class CourseSerializer(serializers.ModelSerializer):
+    client_name = serializers.SerializerMethodField()
+    client_phone = serializers.SerializerMethodField()
     finished_by_name = serializers.SerializerMethodField()
     finished_by_type = serializers.SerializerMethodField()
     accepted_drivers = serializers.SerializerMethodField()
@@ -95,6 +127,21 @@ class CourseSerializer(serializers.ModelSerializer):
     my_offer_pickup_distance_km = serializers.SerializerMethodField()
     my_offer_dropoff_eta_minutes = serializers.SerializerMethodField()
     navigation = serializers.SerializerMethodField()
+
+    def _can_read_client_contact(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.client.user_id == request.user.id or bool(
+            obj.active and obj.livreur_id and obj.client_confirmed
+            and obj.livreur.user_id == request.user.id
+        )
+
+    def get_client_name(self, obj):
+        return obj.client.nom if self._can_read_client_contact(obj) else None
+
+    def get_client_phone(self, obj):
+        return obj.client.telephone if self._can_read_client_contact(obj) else None
 
     def get_my_offer_response(self, obj):
         request = self.context.get("request")
@@ -264,6 +311,8 @@ class CourseSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "client",
+            "client_name",
+            "client_phone",
             "livreur",
             "finished_by",
             "finished_by_client",

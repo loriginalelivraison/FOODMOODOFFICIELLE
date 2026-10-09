@@ -2,9 +2,9 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action, api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.exceptions import PermissionDenied, ValidationError, MethodNotAllowed
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError, MethodNotAllowed
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from PIL import Image, UnidentifiedImageError
@@ -13,12 +13,16 @@ import warnings
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.utils import timezone
-from django.db import transaction
-from django.db.models import Avg, Q
+from django.db import IntegrityError, transaction
+from django.db.models import Avg, F, Q
 from decimal import Decimal, InvalidOperation
+from math import isfinite
+from uuid import uuid4
 
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course, CourseOffer, DriverDocument
 from .serializers import (
+    AccountRegistrationSerializer,
+    DriverRegistrationSerializer,
     LivreurSerializer,
     DemandeLivraisonSerializer,
     CommentaireLivreurSerializer,
@@ -44,8 +48,30 @@ from .course_services import (
 )
 
 
+class CourseConflict(APIException):
+    status_code = 409
+
+
+def read_coordinates(data, latitude_key, longitude_key, *, required=False):
+    """Reject partial, nonnumeric and nonfinite GPS data before any write/routing."""
+    values = [data.get(latitude_key), data.get(longitude_key)]
+    if all(value is None or value == "" for value in values) and not required:
+        return None, None
+    try:
+        latitude, longitude = (float(value) for value in values)
+    except (TypeError, ValueError, OverflowError):
+        raise ValidationError({"detail": "Coordonnées GPS complètes et valides obligatoires."})
+    if not (isfinite(latitude) and isfinite(longitude)
+            and -90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise ValidationError({"detail": "Coordonnées GPS invalides."})
+    return latitude, longitude
+
+
 class LivreurViewSet(ModelViewSet):
     serializer_class = LivreurSerializer
+
+    def create(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method, "Utilisez l’inscription chauffeur.")
 
     @action(detail=False, methods=["get"])
     def me(self, request):
@@ -104,6 +130,8 @@ class LivreurViewSet(ModelViewSet):
         user = instance.user
 
         with transaction.atomic():
+            if Course.objects.filter(livreur=instance, active=True).exists():
+                raise CourseConflict("Terminez ou annulez votre course avant de supprimer le compte.")
             instance.delete()
             if user:
                 user.delete()
@@ -128,24 +156,11 @@ class LivreurViewSet(ModelViewSet):
         if livreur.user != request.user:
             return Response({"error": "Accès interdit"}, status=403)
 
-        latitude = request.data.get("latitude")
-        longitude = request.data.get("longitude")
-
-        if latitude is None or longitude is None:
-            return Response(
-                {"error": "latitude et longitude sont obligatoires"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        has_active_course = Course.objects.filter(
-            livreur=livreur,
-            active=True,
-        ).exists()
+        latitude, longitude = read_coordinates(request.data, "latitude", "longitude", required=True)
 
         livreur.latitude = latitude
         livreur.longitude = longitude
-        livreur.disponible = not has_active_course
-        livreur.save(update_fields=["latitude", "longitude", "disponible"])
+        livreur.save(update_fields=["latitude", "longitude"])
 
         return Response({
             "message": "Position mise à jour",
@@ -169,10 +184,13 @@ class LivreurViewSet(ModelViewSet):
         # Un livreur qui se déconnecte ne peut plus répondre à une offre.
         withdrawn = CourseOffer.objects.filter(
             livreur=livreur,
-            response="pending",
+            response__in=["pending", "accepted"],
             course__status__in=["searching", "driver_accepted"],
             course__livreur__isnull=True,
         ).update(response="withdrawn", responded_at=timezone.now())
+        Course.objects.filter(status="driver_accepted", livreur__isnull=True, active=True).exclude(
+            offers__response="accepted"
+        ).update(status="searching")
 
         return Response({
             "message": "Livreur passé hors ligne",
@@ -214,7 +232,7 @@ class LivreurViewSet(ModelViewSet):
             return Response({"error": "Accès interdit"}, status=403)
 
         livreur.disponible = False
-        livreur.save()
+        livreur.save(update_fields=["disponible"])
 
         return Response({
             "message": "Livreur passé en occupé",
@@ -257,14 +275,23 @@ class LivreurViewSet(ModelViewSet):
 
 
 class DemandeLivraisonViewSet(ModelViewSet):
-    parser_classes = [MultiPartParser, FormParser]
-    queryset = DemandeLivraison.objects.all().order_by("-created_at")
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     serializer_class = DemandeLivraisonSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.action == "create":
-            return [IsAuthenticated()]
+        if self.action in ["update", "partial_update", "destroy"]:
+            return [IsAdminUser()]
         return super().get_permissions()
+
+    def get_queryset(self):
+        queryset = DemandeLivraison.objects.all().order_by("-created_at")
+        if self.request.user.is_staff:
+            return queryset
+        client = Client.objects.filter(user=self.request.user).first()
+        if client:
+            return queryset.filter(client_telephone=client.telephone)
+        return queryset.filter(livreur__user=self.request.user)
 
     def create(self, request, *args, **kwargs):
         if not Client.objects.filter(user=request.user).exists():
@@ -272,64 +299,32 @@ class DemandeLivraisonViewSet(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        if not Client.objects.filter(user=self.request.user).exists():
+        client = Client.objects.filter(user=self.request.user).first()
+        if not client:
             raise PermissionDenied("يلزم حساب عميل لطلب توصيل.")
-        serializer.save()
+        serializer.save(client_nom=client.nom, client_telephone=client.telephone,
+                        statut="en_attente", tracking_code=uuid4().hex)
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@parser_classes([MultiPartParser, FormParser])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def register_livreur(request):
-    nom = request.data.get("nom")
-    telephone = request.data.get("telephone")
-    ville = request.data.get("ville")
-    vehicule = request.data.get("vehicule")
-    modele_vehicule = request.data.get("modele_vehicule", "")
-    password = request.data.get("password")
-
-    if not nom or not telephone or not password:
-        return Response(
-            {"error": "Nom, téléphone et mot de passe sont obligatoires"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    if User.objects.filter(username=telephone).exists():
-        return Response(
-            {"error": "Un compte avec ce téléphone existe déjà"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    if Livreur.objects.filter(telephone=telephone).exists():
-        return Response(
-            {"error": "Ce téléphone est déjà utilisé par un livreur"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    user = User.objects.create_user(
-        username=telephone,
-        password=password,
-    )
-
+    serializer = DriverRegistrationSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = dict(serializer.validated_data)
+    latitude, longitude = read_coordinates(request.data, "latitude", "longitude")
+    if Livreur.objects.filter(telephone=data["telephone"]).exists():
+        raise ValidationError({"telephone": "Ce téléphone est déjà utilisé par un chauffeur."})
     try:
-        livreur = Livreur.objects.create(
-            user=user,
-            nom=nom,
-            telephone=telephone,
-            ville=ville,
-            vehicule=vehicule,
-            modele_vehicule=modele_vehicule,
-            disponible=True,
-            photo=request.FILES.get("photo"),
-        )
-
-    except Exception as e:
-        user.delete()
-
-        return Response(
-            {"error": f"Erreur upload photo Cloudinary: {str(e)}"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        with transaction.atomic():
+            user = User.objects.create_user(username=data["telephone"], password=data.pop("password"))
+            livreur = Livreur.objects.create(
+                user=user, **data, latitude=latitude, longitude=longitude,
+                disponible=True, est_en_ligne=True,
+            )
+    except IntegrityError:
+        raise ValidationError({"telephone": "Un compte avec ce téléphone existe déjà."})
 
     return Response({
         "message": "Livreur créé avec succès",
@@ -343,9 +338,9 @@ class CommentaireLivreurViewSet(ModelViewSet):
     serializer_class = CommentaireLivreurSerializer
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve", "create"]:
+        if self.action in ["list", "retrieve"]:
             return [AllowAny()]
-        return [IsAuthenticated()]
+        return [IsAuthenticated()] if self.action == "create" else [IsAdminUser()]
 
     def get_queryset(self):
         livreur_id = self.request.query_params.get("livreur")
@@ -357,9 +352,29 @@ class CommentaireLivreurViewSet(ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        commentaire = serializer.save()
+        client = Client.objects.filter(user=self.request.user).first()
+        if not client or not Course.objects.filter(
+            client=client, livreur=serializer.validated_data["livreur"],
+            status="completed", active=False,
+        ).exists():
+            raise PermissionDenied("Un avis est possible après une course terminée avec ce chauffeur.")
+        commentaire = serializer.save(nom_client=client.nom)
 
-        livreur = commentaire.livreur
+        self._refresh_rating(commentaire.livreur)
+
+    def perform_update(self, serializer):
+        previous_driver = serializer.instance.livreur
+        commentaire = serializer.save()
+        self._refresh_rating(previous_driver)
+        self._refresh_rating(commentaire.livreur)
+
+    def perform_destroy(self, instance):
+        livreur = instance.livreur
+        instance.delete()
+        self._refresh_rating(livreur)
+
+    @staticmethod
+    def _refresh_rating(livreur):
         moyenne = CommentaireLivreur.objects.filter(
             livreur=livreur
         ).aggregate(avg_note=Avg("note"))["avg_note"]
@@ -371,6 +386,15 @@ class CommentaireLivreurViewSet(ModelViewSet):
 class ClientViewSet(ModelViewSet):
     serializer_class = ClientSerializer
     permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method, "Utilisez l’inscription client.")
+
+    def perform_destroy(self, instance):
+        with transaction.atomic():
+            if Course.objects.filter(client=instance, active=True).exists():
+                raise CourseConflict("Terminez ou annulez votre course avant de supprimer le compte.")
+            instance.user.delete()
 
     @action(detail=True, methods=["patch", "delete"])
     def update_fcm_token(self, request, pk=None):
@@ -388,32 +412,15 @@ class ClientViewSet(ModelViewSet):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_client(request):
-    nom = request.data.get("nom")
-    telephone = request.data.get("telephone")
-    password = request.data.get("password")
-
-    if not nom or not telephone or not password:
-        return Response(
-            {"error": "Nom, téléphone et mot de passe sont obligatoires"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    if User.objects.filter(username=telephone).exists():
-        return Response(
-            {"error": "Un utilisateur avec ce téléphone existe déjà"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    user = User.objects.create_user(
-        username=telephone,
-        password=password,
-    )
-
-    client = Client.objects.create(
-        user=user,
-        nom=nom,
-        telephone=telephone,
-    )
+    serializer = AccountRegistrationSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = dict(serializer.validated_data)
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(username=data["telephone"], password=data.pop("password"))
+            client = Client.objects.create(user=user, **data)
+    except IntegrityError:
+        raise ValidationError({"telephone": "Un compte avec ce téléphone existe déjà."})
 
     return Response({
         "message": "Client créé avec succès",
@@ -437,7 +444,18 @@ class CourseViewSet(ModelViewSet):
             raise PermissionDenied("يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل.")
         # Keep the existing direct-driver booking contract.
         with transaction.atomic():
+            client = Client.objects.select_for_update().get(user=request.user)
+            self._ensure_no_active_course(client)
             return super().create(request, *args, **kwargs)
+
+    @staticmethod
+    def _ensure_no_active_course(client):
+        existing = Course.objects.filter(client=client, active=True).first()
+        if existing:
+            raise CourseConflict({
+                "detail": "Vous avez déjà une course active. Reprenez-la avant une nouvelle demande.",
+                "course_id": existing.id,
+            })
 
     def get_queryset(self):
         user = self.request.user
@@ -472,7 +490,8 @@ class CourseViewSet(ModelViewSet):
             active=True,
         ).exists()
 
-        if existing_course or not livreur.disponible or not livreur.est_en_ligne:
+        if (existing_course or not livreur.disponible or not livreur.est_en_ligne
+                or not livreur.user_id or not livreur.user.is_active):
             raise ValidationError("هذا السائق غير متاح حالياً.")
 
         course = serializer.save(active=True, client_confirmed=True, status="driver_selected",
@@ -504,23 +523,21 @@ class CourseViewSet(ModelViewSet):
         client. La destination de livraison reste obligatoire.
         """
         destination = str(request.data.get("destination", "")).strip()
-        destination_lat = self._read_optional_float(request, "destination_latitude")
-        destination_lon = self._read_optional_float(request, "destination_longitude")
+        destination_lat, destination_lon = read_coordinates(
+            request.data, "destination_latitude", "destination_longitude"
+        )
         if not destination and destination_lat is None:
             return Response(
                 {"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400
             )
 
-        try:
-            start_lat = float(request.data["client_latitude"])
-            start_lon = float(request.data["client_longitude"])
-            proposed_price = Decimal(str(request.data["proposed_price"]))
-            if not proposed_price.is_finite():
-                raise InvalidOperation
-        except (KeyError, TypeError, ValueError, InvalidOperation):
-            return Response(
-                {"detail": "Position GPS et prix valide obligatoires."}, status=400
-            )
+        start_lat, start_lon = read_coordinates(
+            request.data, "client_latitude", "client_longitude", required=True
+        )
+        from rest_framework import serializers
+        proposed_price = serializers.DecimalField(max_digits=10, decimal_places=2).run_validation(
+            request.data.get("proposed_price")
+        )
 
         minimum = Decimal(settings.COURSE_MIN_PRICE_DZD)
         if proposed_price < minimum:
@@ -539,8 +556,7 @@ class CourseViewSet(ModelViewSet):
         pickup_name = str(request.data.get("pickup_name", "")).strip()[:120]
         pickup_address = str(request.data.get("pickup_address", "")).strip()[:255]
         pickup_phone = str(request.data.get("pickup_phone", "")).strip()[:30]
-        pickup_lat = self._read_optional_float(request, "pickup_latitude")
-        pickup_lon = self._read_optional_float(request, "pickup_longitude")
+        pickup_lat, pickup_lon = read_coordinates(request.data, "pickup_latitude", "pickup_longitude")
         # Point de départ saisi en texte (ou « Ma position » pré-rempli) :
         # on le géocode quand aucun point carte n'est transmis, pour obtenir
         # un vrai trajet simple départ → arrivée (tous véhicules).
@@ -605,6 +621,15 @@ class CourseViewSet(ModelViewSet):
         if not client:
             return Response({"detail": "يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل."}, status=403)
 
+        request_key = str(request.data.get("request_key", "")).strip()[:64] or None
+        if request_key:
+            existing = Course.objects.filter(client=client, request_key=request_key).first()
+            if existing:
+                return Response(self.get_serializer(existing).data, status=200)
+            if Course.objects.filter(request_key=request_key).exists():
+                raise ValidationError({"detail": "Identifiant de demande déjà utilisé."})
+        self._ensure_no_active_course(client)
+
         legs = self._parse_delivery_legs(request)
         if isinstance(legs, Response):
             return legs
@@ -638,9 +663,17 @@ class CourseViewSet(ModelViewSet):
         trip_distance = routing["trip_distance_km"]
         surcharge_percent = current_surcharge_percent()
         final_price = adjusted_price(legs["proposed_price"], surcharge_percent)
+        if final_price > Decimal("99999999.99"):
+            raise ValidationError({"detail": "Le prix proposé est trop élevé."})
 
         try:
             with transaction.atomic():
+                client = Client.objects.select_for_update().get(pk=client.pk)
+                if request_key:
+                    existing = Course.objects.filter(client=client, request_key=request_key).first()
+                    if existing:
+                        return Response(self.get_serializer(existing).data, status=200)
+                self._ensure_no_active_course(client)
                 course = Course.objects.create(
                     client=client,
                     client_latitude=start_lat,
@@ -704,16 +737,12 @@ class CourseViewSet(ModelViewSet):
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def quote(self, request):
         destination = str(request.data.get("destination", "")).strip()
-        try:
-            start_lat = float(request.data["client_latitude"])
-            start_lon = float(request.data["client_longitude"])
-        except (KeyError, TypeError, ValueError):
-            return Response({"detail": "Position GPS invalide."}, status=400)
-        try:
-            destination_lat = float(request.data["destination_latitude"])
-            destination_lon = float(request.data["destination_longitude"])
-        except (KeyError, TypeError, ValueError):
-            destination_lat = destination_lon = None
+        start_lat, start_lon = read_coordinates(
+            request.data, "client_latitude", "client_longitude", required=True
+        )
+        destination_lat, destination_lon = read_coordinates(
+            request.data, "destination_latitude", "destination_longitude"
+        )
 
         if not destination and destination_lat is None:
             return Response({"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400)
@@ -729,8 +758,7 @@ class CourseViewSet(ModelViewSet):
         elif not destination:
             destination = (resolve_destination_label(destination_lat, destination_lon) or "موقع محدد على الخريطة")[:255]
 
-        pickup_lat = self._read_optional_float(request, "pickup_latitude")
-        pickup_lon = self._read_optional_float(request, "pickup_longitude")
+        pickup_lat, pickup_lon = read_coordinates(request.data, "pickup_latitude", "pickup_longitude")
         # Même logique que la création : un départ texte est géocodé pour
         # chiffrer le trajet départ → arrivée (sinon on part du GPS).
         if pickup_lat is None and pickup_lon is None:
@@ -842,7 +870,9 @@ class CourseViewSet(ModelViewSet):
                     course.save(update_fields=["status"])
                 # Un refus ne doit pas laisser la commande en attente : on passe
                 # à la vague suivante dès qu'aucun livreur n'a d'offre en cours.
-                if not course.offers.filter(response="pending").exists():
+                if (course.status == "searching"
+                        and course.broadcast_round < settings.COURSE_OFFER_MAX_ROUNDS
+                        and not course.offers.filter(response__in=["pending", "accepted"]).exists()):
                     previous_round = course.broadcast_round
                     course.broadcast_round = previous_round + 1
                     course.status = "searching"
@@ -893,7 +923,7 @@ class CourseViewSet(ModelViewSet):
             if not offer:
                 return Response({"detail": "Ce chauffeur n’a pas accepté la course."}, status=409)
             offer.livreur = Livreur.objects.select_for_update().get(pk=offer.livreur_id)
-            if not offer.livreur.est_en_ligne or Course.objects.filter(
+            if not offer.livreur.est_en_ligne or not offer.livreur.user_id or not offer.livreur.user.is_active or Course.objects.filter(
                 livreur=offer.livreur, active=True
             ).exists():
                 return Response({"detail": "هذا السائق غير متاح حالياً. اختر سائقاً آخر."}, status=409)
@@ -909,6 +939,14 @@ class CourseViewSet(ModelViewSet):
             CourseOffer.objects.filter(course=course).exclude(pk=offer.pk).update(
                 response="withdrawn", responded_at=timezone.now()
             )
+            # A selected driver cannot remain selectable on another request.
+            CourseOffer.objects.filter(
+                livreur=offer.livreur, response__in=["pending", "accepted"],
+                course__active=True, course__livreur__isnull=True,
+            ).exclude(course=course).update(response="withdrawn", responded_at=timezone.now())
+            Course.objects.filter(status="driver_accepted", livreur__isnull=True, active=True).exclude(
+                offers__response="accepted"
+            ).update(status="searching")
             record_course_event(
                 course, "driver_selected", "client", client.id,
                 previous_status=previous_status,
@@ -956,7 +994,7 @@ class CourseViewSet(ModelViewSet):
                 allowed_statuses = ["picked_up"]
             if course.status == new_status:
                 return Response(self.get_serializer(course).data)
-            if course.status not in allowed_statuses:
+            if not course.active or course.status not in allowed_statuses:
                 return Response({"detail": "Cette transition n’est pas autorisée."}, status=409)
             previous_status = course.status
             course.status = new_status
@@ -1038,11 +1076,10 @@ class CourseViewSet(ModelViewSet):
                 has_other_active_course = Course.objects.filter(
                     livreur=course.livreur, active=True
                 ).exclude(pk=course.pk).exists()
-                course.livreur.disponible = False if has_other_active_course else (
+                course.livreur.disponible = False if has_other_active_course or not course.livreur.est_en_ligne else (
                     course.availability_before_course if course.availability_before_course is not None else True
                 )
-                course.livreur.est_en_ligne = course.livreur.disponible
-                course.livreur.save(update_fields=["disponible", "est_en_ligne"])
+                course.livreur.save(update_fields=["disponible"])
         return Response(self.get_serializer(course).data)
 
     @action(detail=False, methods=["get"])
@@ -1082,14 +1119,11 @@ class CourseViewSet(ModelViewSet):
         if course.client.user != request.user:
             return Response({"error": "Accès interdit"}, status=403)
 
-        latitude = request.data.get("client_latitude")
-        longitude = request.data.get("client_longitude")
-
-        if latitude is None or longitude is None:
-            return Response(
-                {"error": "client_latitude et client_longitude sont obligatoires"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not course.active:
+            raise CourseConflict("La course est terminée ; sa position ne peut plus être modifiée.")
+        latitude, longitude = read_coordinates(
+            request.data, "client_latitude", "client_longitude", required=True
+        )
 
         course.client_latitude = latitude
         course.client_longitude = longitude
@@ -1118,10 +1152,8 @@ class CourseViewSet(ModelViewSet):
                 return Response({"error": "Accès interdit"}, status=403)
             if not course.active or course.status in ["completed", "cancelled"]:
                 return Response(self.get_serializer(course).data)
-            if course.destination and course.status != "in_progress":
+            if course.status != "in_progress" or not course.livreur_id:
                 return Response({"detail": "Seule une course en cours peut être terminée."}, status=409)
-            if course.livreur_id and course.status not in ["in_progress", "driver_selected", "driver_arrived", "driver_arriving", "picked_up"]:
-                return Response({"detail": "La course ne peut pas être terminée dans cet état."}, status=409)
 
             previous_status = course.status
             course.active = False
@@ -1139,18 +1171,18 @@ class CourseViewSet(ModelViewSet):
             points_earned = settings.COURSE_COMPLETION_POINTS
 
             if livreur:
-                if course.client_confirmed:
-                    livreur.nombre_livraisons = (livreur.nombre_livraisons or 0) + 1
-                livreur.points = (livreur.points or 0) + points_earned
+                livreur = Livreur.objects.select_for_update().get(pk=livreur.pk)
+                livreur.nombre_livraisons = F("nombre_livraisons") + int(course.client_confirmed)
+                livreur.points = F("points") + points_earned
                 has_other_active_course = Course.objects.filter(livreur=livreur, active=True).exclude(pk=course.pk).exists()
-                livreur.disponible = False if has_other_active_course else (
+                livreur.disponible = False if has_other_active_course or not livreur.est_en_ligne else (
                     course.availability_before_course if course.availability_before_course is not None else True
                 )
-                livreur.est_en_ligne = livreur.disponible
-                livreur.save(update_fields=["nombre_livraisons", "disponible", "est_en_ligne", "points"])
+                livreur.save(update_fields=["nombre_livraisons", "disponible", "points"])
+                livreur.refresh_from_db()
 
-            client.points = (client.points or 0) + points_earned
-            client.save(update_fields=["points"])
+            Client.objects.filter(pk=client.pk).update(points=F("points") + points_earned)
+            client.refresh_from_db()
 
         return Response({
             **self.get_serializer(course).data,

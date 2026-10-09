@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, Trophy, User } from "lucide-react";
 import {
   deleteLivreur,
@@ -10,7 +10,7 @@ import {
   getActiveCoursesForLivreur,
   getCourseOffers,
   respondToCourseOffer,
-  clearCurrentDriverFcmToken,
+  logoutCurrentAccount,
   getLivreurById,
   getCommentairesLivreur,
   updateLivreurProfile,
@@ -20,6 +20,8 @@ import { readStoredAccount } from "../utils/navigation.js";
 import LivreurOrders from "../components/LivreurOrders.jsx";
 import DriverAccount from "../components/DriverAccount.jsx";
 import { formatDriverNumber, mergeDriverCourses } from "../utils/driverOrders.js";
+import { canFinishCourse } from "../utils/courseTracking.js";
+import { getLocationErrorMessage, isIOSDevice, requestUserPosition } from "../utils/geolocation.js";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
@@ -42,47 +44,43 @@ export default function LivreurDashboard() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [position, setPosition] = useState(null);
-  // Bascule "en ligne / hors ligne" façon Uber : c'est le serveur qui fait foi.
-  const [isOnline, setIsOnline] = useState(() => {
-    const saved = localStorage.getItem("livreurOnline");
-    return saved === null ? true : saved === "true";
-  });
+  const [locationError, setLocationError] = useState("");
+  const [statusError, setStatusError] = useState("");
+  const [isOnline, setIsOnline] = useState(false);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
+  const onlineMutation = useRef(false);
+  const profileRevision = useRef(0);
 
   useEffect(() => {
+    if (!statusLoaded || localStorage.getItem("role") !== "livreur") return;
     localStorage.setItem("livreurOnline", String(isOnline));
-  }, [isOnline]);
-
-  const trackingEnabled = isOnline;
+  }, [isOnline, statusLoaded]);
 
   const [activeCourse, setActiveCourse] = useState(null);
+  const trackingEnabled = isOnline || Boolean(activeCourse);
   const [courseOffers, setCourseOffers] = useState([]);
   const [respondingOfferId, setRespondingOfferId] = useState(null);
-  const [courseNotification, setCourseNotification] = useState("");
-  const [showHistory, setShowHistory] = useState(true);
   const [courses, setCourses] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [ordersError, setOrdersError] = useState("");
-  const [finishingCourse, setFinishingCourse] = useState(false);
+  const [finishingCourseId, setFinishingCourseId] = useState(null);
+  const [closingAccount, setClosingAccount] = useState(false);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (showHistory) {
-      loadHistory();
-    }
-  }, [showHistory]);
+    if (livreur?.id) loadHistory();
+  }, [livreur?.id]);
 
   async function loadHistory(silent = false) {
     if (!silent) {
       setLoadingHistory(true);
-      setError("");
     }
 
     try {
       const data = await getLivreurCourses();
-      setCourses(data);
+      setCourses(Array.isArray(data) ? data : data.results || []);
       setOrdersError("");
     } catch (err) {
       setOrdersError(err.message || "تعذر تحديث الطلبات.");
@@ -126,34 +124,28 @@ export default function LivreurDashboard() {
     if (!trackingEnabled) return;
 
     if (!navigator.geolocation) {
-      setError("الموقع الجغرافي غير مدعوم في هذا المتصفح.");
+      setLocationError("الموقع الجغرافي غير مدعوم في هذا المتصفح.");
       return;
     }
 
     let cancelled = false;
 
     const sendPosition = async (coords) => {
+      if (cancelled) return;
       try {
         const newPosition = {
           latitude: coords.latitude,
           longitude: coords.longitude,
         };
 
-        if (!cancelled) {
-          setPosition(newPosition);
-        }
-
-        const result = await updateLivreurPosition(livreur.id, {
+        await updateLivreurPosition(livreur.id, {
           latitude: newPosition.latitude,
           longitude: newPosition.longitude,
-          disponible: true,
         });
 
-        console.log("REPONSE API :", result);
-        setError("");
+        if (!cancelled) setLocationError("");
       } catch (err) {
-        console.error("ERREUR CREATE COURSE :", err);
-        setError(err.message || "حدث خطأ أثناء إنشاء الرحلة.");
+        if (!cancelled) setLocationError(err.message || "تعذر تحديث موقعك. تحقق من الاتصال.");
       }
     };
 
@@ -162,8 +154,7 @@ export default function LivreurDashboard() {
         sendPosition(pos.coords);
       },
       (geoError) => {
-        console.error(geoError);
-        setError("الرجاء تفعيل تعقب الموقع في هاتفك");
+        if (!cancelled) setLocationError(getLocationErrorMessage(geoError, isIOSDevice()));
       },
       {
         enableHighAccuracy: true,
@@ -177,8 +168,7 @@ export default function LivreurDashboard() {
         sendPosition(pos.coords);
       },
       (geoError) => {
-        console.error(geoError);
-        setError("الرجاء تفعيل تعقب الموقع في هاتفك");
+        if (!cancelled) setLocationError(getLocationErrorMessage(geoError, isIOSDevice()));
       },
       {
         enableHighAccuracy: true,
@@ -198,17 +188,15 @@ export default function LivreurDashboard() {
 
     try {
       const data = await getActiveCoursesForLivreur(livreur.id);
-
-      console.log("COURSE ACTIVE LIVREUR :", data);
+      if (localStorage.getItem("role") !== "livreur"
+        || String(readStoredAccount("livreur")?.id) !== String(livreur.id)) return;
 
       if (data.active && data.course) {
         setActiveCourse(data.course);
-        setCourseNotification(
-          "🚨 لديك طلب جديد: الزبون قبل الرحلة وشارك موقعه معك."
-        );
+        localStorage.setItem("activeDriverCourseId", String(data.course.id));
       } else {
         setActiveCourse(null);
-        setCourseNotification("");
+        localStorage.removeItem("activeDriverCourseId");
       }
     } catch (err) {
       console.error("Erreur chargement course active :", err);
@@ -273,14 +261,19 @@ export default function LivreurDashboard() {
     let cancelled = false;
 
     async function syncOnlineStatus() {
+      if (onlineMutation.current) return;
+      const revision = profileRevision.current;
       try {
         const data = await getLivreurById(livreur.id);
-        if (!cancelled) {
+        if (!cancelled && !onlineMutation.current && revision === profileRevision.current
+          && localStorage.getItem("role") === "livreur") {
           setProfile(data);
           setIsOnline(Boolean(data.est_en_ligne));
+          setStatusLoaded(true);
+          setStatusError("");
         }
       } catch (syncError) {
-        console.error("Erreur synchronisation du statut en ligne :", syncError);
+        if (!cancelled) setStatusError(syncError.message || "تعذر تحديث حالة الاتصال. أعد المحاولة.");
       }
     }
 
@@ -304,47 +297,39 @@ export default function LivreurDashboard() {
   const photoUrl = profile?.photo || livreur.photo || livreur.image || null;
   const displayName = profile?.nom || livreur.nom;
   // « En ligne » = disponible ET pas déjà en course (comme un chauffeur Uber).
-  const isAvailable = trackingEnabled && !activeCourse;
-  const vehicleLabels = {
-    moto: "دراجة نارية",
-    scooter: "دراجة نارية",
-    velo: "دراجة",
-    voiture: "سيارة",
-    camion: "شاحنة",
-  };
+  const isAvailable = isOnline && !activeCourse;
 
   async function handleDeleteAccount() {
+    if (closingAccount) return;
     const confirmDelete = window.confirm(
       "هل أنت متأكد أنك تريد حذف حسابك نهائيا؟"
     );
 
     if (!confirmDelete) return;
 
+    setClosingAccount(true);
     try {
       await deleteLivreur(livreur.id);
-
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-      localStorage.removeItem("role");
-      localStorage.removeItem("livreur");
-
-      window.dispatchEvent(new Event("authChanged"));
-
-      navigate("/livreurs");
+      await logoutCurrentAccount();
+      navigate("/", { replace: true });
     } catch (err) {
       console.error(err);
       setError(err.message || "حدث خطأ أثناء حذف الحساب.");
-   
+    } finally {
+      setClosingAccount(false);
     }
 
 
   }
 
   async function handleTrackingToggle() {
-    if (togglingOnline) return;
+    if (onlineMutation.current) return;
 
+    onlineMutation.current = true;
+    profileRevision.current += 1;
     setTogglingOnline(true);
     setError("");
+    setMessage("");
 
     try {
       if (isOnline) {
@@ -353,33 +338,45 @@ export default function LivreurDashboard() {
         localStorage.setItem("livreurOnline", "false");
         setMessage("أنت الآن غير متصل. لن تصلك أي طلب جديد.");
       } else {
+        // A fresh position is required before advertising the driver as available.
+        const position = await requestUserPosition({ enableHighAccuracy: true, timeout: 15000, retryWithLowAccuracy: true });
+        await updateLivreurPosition(livreur.id, {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
         const result = await setLivreurOnline(livreur.id);
         setIsOnline(Boolean(result.est_en_ligne));
         localStorage.setItem("livreurOnline", String(Boolean(result.est_en_ligne)));
         setMessage("أنت الآن متصل. ستصلك الطلبات القريبة.");
+        setLocationError("");
       }
+      setStatusLoaded(true);
+      setStatusError("");
     } catch (err) {
-      console.error("Erreur changement de statut en ligne :", err);
-      setError(err.message || "تعذر تغيير حالة الاتصال.");
+      setError(typeof err.code === "number" ? getLocationErrorMessage(err, isIOSDevice()) : err.message || "تعذر تغيير حالة الاتصال.");
     } finally {
+      onlineMutation.current = false;
       setTogglingOnline(false);
     }
   }
 
   async function handleFinishCourse(courseId) {
-    const targetCourse = activeCourse || courses.find((course) => course.id === courseId);
+    const targetCourse = String(activeCourse?.id) === String(courseId)
+      ? activeCourse : courses.find((course) => String(course.id) === String(courseId));
 
-    if (!targetCourse || finishingCourse) return;
+    if (!targetCourse || !canFinishCourse(targetCourse) || finishingCourseId !== null) return;
 
-    setFinishingCourse(true);
+    setFinishingCourseId(targetCourse.id);
     setError("");
 
     try {
       await finishCourse(targetCourse.id);
       setActiveCourse(null);
-      setCourseNotification("");
+      localStorage.removeItem("activeDriverCourseId");
+      setCourses((current) => current.map((course) => String(course.id) === String(targetCourse.id)
+        ? { ...course, active: false, status: "completed" } : course));
       setMessage("تم إنهاء الرحلة وتسجيلها في السجل.");
-      if (showHistory) loadHistory();
+      await loadHistory(true);
       try {
         setProfile(await getLivreurById(livreur.id));
       } catch (profileErr) {
@@ -388,7 +385,7 @@ export default function LivreurDashboard() {
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
     } finally {
-      setFinishingCourse(false);
+      setFinishingCourseId(null);
     }
   }
 
@@ -405,6 +402,7 @@ export default function LivreurDashboard() {
     }
 
     setSavingProfile(true);
+    profileRevision.current += 1;
     setError("");
 
     try {
@@ -422,9 +420,12 @@ export default function LivreurDashboard() {
         modele_vehicule: updated.modele_vehicule ?? (editVehicule === "voiture" ? editModeleVehicule.trim() : ""),
       };
       setLivreur(nextLivreur);
+      setProfile((current) => ({ ...current, ...updated }));
+      profileRevision.current += 1;
       localStorage.setItem("livreur", JSON.stringify(nextLivreur));
       window.dispatchEvent(new Event("authChanged"));
       setEditingProfile(false);
+      setMessage("تم حفظ معلوماتك.");
     } catch (err) {
       setError(err.message || "تعذر تحديث المعلومات.");
     } finally {
@@ -433,24 +434,15 @@ export default function LivreurDashboard() {
   }
 
   async function logout() {
-  try {
-    await clearCurrentDriverFcmToken();
-  } catch (err) {
-    setError(err.message || "تعذر إيقاف إشعارات السائق. أعد المحاولة.");
-    return;
+    if (closingAccount) return;
+    setClosingAccount(true);
+    try {
+      await logoutCurrentAccount();
+      navigate("/", { replace: true });
+    } finally {
+      setClosingAccount(false);
+    }
   }
-
-  localStorage.removeItem("access");
-  localStorage.removeItem("refresh");
-
-  localStorage.removeItem("livreur");
-  localStorage.removeItem("client");
-  localStorage.removeItem("role");
-
-  window.dispatchEvent(new Event("authChanged"));
-  navigate("/");
-
-}
   const isLoggedIn = localStorage.getItem("access");
 
   if (!isLoggedIn) return null;
@@ -469,6 +461,7 @@ export default function LivreurDashboard() {
     <section className={"page account-page driver-dashboard-page " + (accountView ? "is-account" : "is-home")} dir="rtl">
       {accountView ? <DriverAccount
         livreur={livreur} profile={profile} courses={courses} reviews={reviews} loadingHistory={loadingHistory}
+        historyError={ordersError} closingAccount={closingAccount}
         editingProfile={editingProfile} onEdit={openAccountEditor}
         form={{ name: editNom, setName: setEditNom, city: editVille, setCity: setEditVille,
           vehicle: editVehicule, setVehicle: setEditVehicule,
@@ -485,16 +478,16 @@ export default function LivreurDashboard() {
             </div>
           </button>
           <button type="button" className={"driver-availability " + (isAvailable ? "is-online" : "is-offline")}
-            onClick={handleTrackingToggle} disabled={togglingOnline || Boolean(activeCourse)}
+            onClick={handleTrackingToggle} disabled={togglingOnline}
             role="switch" aria-checked={isOnline}
             aria-label={isOnline ? "إيقاف استقبال الطلبات" : "بدء استقبال الطلبات"}>
             {togglingOnline ? <LoadingSpinner size={16} label="جارٍ التحديث…" /> : <><span className="driver-status-dot" aria-hidden="true" />
-              {activeCourse ? "في رحلة" : isOnline ? "متاح" : "غير متاح"}</>}
+              {!statusLoaded ? "تحديث الحالة" : activeCourse ? "في رحلة" : isOnline ? "متاح" : "غير متاح"}</>}
           </button>
         </header>
-        {!isOnline && <p className="driver-status-hint">فعّل استقبال الطلبات عندما تكون جاهزاً.</p>}
+        {statusLoaded && !isOnline && <p className="driver-status-hint">{activeCourse ? "لن تصلك طلبات جديدة. تستمر متابعة الرحلة الحالية حتى إتمامها." : "فعّل استقبال الطلبات عندما تكون جاهزاً."}</p>}
         <LivreurOrders livreurId={livreur.id} courses={visibleCourses} loading={loadingHistory} error={ordersError}
-          respondingOfferId={respondingOfferId} finishingCourseId={finishingCourse ? activeCourse?.id ?? true : null}
+          respondingOfferId={respondingOfferId} finishingCourseId={finishingCourseId} onRetry={() => loadHistory()}
           onAccept={(courseId) => handleOfferResponse(courseId, "accepted")}
           onReject={(courseId) => handleOfferResponse(courseId, "rejected")} onFinish={handleFinishCourse} />
         <button className="driver-rewards-card" type="button"
@@ -505,6 +498,8 @@ export default function LivreurDashboard() {
         </button>
       </>}
       {message && <p className="driver-feedback is-success" role="status">{message}</p>}
+      {statusError && <p className="driver-feedback is-error" role="alert">{statusError}</p>}
+      {trackingEnabled && locationError && <p className="driver-feedback is-error" role="alert">{locationError}</p>}
       {error && <p className="driver-feedback is-error" role="alert">{error}</p>}
     </section>
   );

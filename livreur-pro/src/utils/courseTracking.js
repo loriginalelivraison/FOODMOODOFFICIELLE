@@ -43,10 +43,7 @@ export function getCourseTarget(course) {
 }
 
 export function canFinishCourse(course) {
-  if (!course.active || !course.livreur) return false;
-  if (course.status === "in_progress") return true;
-  // Compatibilité des anciennes demandes sans destination.
-  return !course.destination && ["driver_selected", "driver_arriving", "driver_arrived", "picked_up"].includes(course.status);
+  return Boolean(course.active && course.livreur && course.status === "in_progress");
 }
 
 export function getCourseStatusLabel(course) {

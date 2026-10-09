@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getOfferPresentation, groupDriverCourses, mergeDriverCourses } from "./driverOrders.js";
+import { canRespondToDriverOffer, getOfferPresentation, groupDriverCourses, mergeDriverCourses } from "./driverOrders.js";
 
 const offer = { id: 42, livreur: null, status: "searching", my_offer_response: "pending",
   proposed_price: "380.50", final_price: "500", trip_distance_km: 6.2,
@@ -52,4 +52,23 @@ test("existing course state wins over a stale offer and active-course responses 
   const active = { ...accepted, livreur: 7, status: "driver_selected" };
   assert.deepEqual(mergeDriverCourses([accepted], [offer, newOffer], null), [accepted, newOffer]);
   assert.deepEqual(mergeDriverCourses([accepted], [offer, newOffer], active), [active, newOffer]);
+});
+
+test("only pending, unassigned, open offers with time remaining accept a response", () => {
+  assert.equal(canRespondToDriverOffer({ ...offer, active: true, my_offer_expires_in: 30 }), true);
+  assert.equal(canRespondToDriverOffer({ ...offer, my_offer_expires_in: null }), true);
+  for (const changes of [
+    { active: false }, { livreur: 7 }, { status: "cancelled" }, { status: "completed" },
+    { my_offer_response: "accepted" }, { my_offer_response: "rejected" },
+    { my_offer_response: "withdrawn" }, { my_offer_response: "expired" },
+    { my_offer_expires_in: 0 }, { my_offer_expires_in: -1 }, { my_offer_expires_in: "invalid" },
+  ]) {
+    assert.equal(canRespondToDriverOffer({ ...offer, ...changes }), false, JSON.stringify(changes));
+  }
+});
+
+test("closed or expired records never appear as actionable driver work", () => {
+  const expired = { ...offer, my_offer_expires_in: 0 };
+  const inactive = { ...offer, id: 43, active: false, livreur: 7, status: "in_progress" };
+  assert.deepEqual(groupDriverCourses([expired, inactive], 7), { ongoing: [], toAccept: [], waiting: [] });
 });

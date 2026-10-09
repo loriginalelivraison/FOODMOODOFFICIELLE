@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -7,7 +6,6 @@ import { scrollToPageTopWhenReady } from "../utils/scroll.js";
 import {
   getLocationErrorMessage,
   isIOSDevice,
-  openLocationSettings,
   requestUserPosition,
 } from "../utils/geolocation.js";
 
@@ -78,8 +76,6 @@ export default function CourierRegister({ onChooseClient }) {
   const [mode, setMode] = useState("register");
   const [error, setError] = useState("");
   const [gpsError, setGpsError] = useState(false);
-  const [locationSettingsMessage, setLocationSettingsMessage] = useState("");
-  const [showLocationSettingsButton, setShowLocationSettingsButton] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
@@ -93,9 +89,7 @@ export default function CourierRegister({ onChooseClient }) {
     ville: "",
     vehicule: "",
     modele_vehicule: "",
-    disponible: true,
     password: "",
-    services: "",
     photo: null,
   });
 
@@ -140,23 +134,31 @@ async function handleSubmit(e) {
     return;
   }
 
+  let position;
   try {
-    const position = await requestUserPosition({
+    position = await requestUserPosition({
       enableHighAccuracy: true,
       timeout: 20000,
       maximumAge: 0,
+      retryWithLowAccuracy: true,
     });
+  } catch (err) {
+    setGpsError(true);
+    setError(getLocationErrorMessage(err, isIOSDevice()));
+    setLoading(false);
+    return;
+  }
 
+  let accountCreated = false;
+  try {
     const data = new FormData();
 
-    data.append("nom", registerForm.nom);
+    data.append("nom", registerForm.nom.trim());
     data.append("telephone", registerForm.telephone);
     data.append("ville", registerForm.ville);
     data.append("vehicule", registerForm.vehicule);
     data.append("modele_vehicule", registerForm.vehicule === "voiture" ? registerForm.modele_vehicule.trim() : "");
-    data.append("disponible", registerForm.disponible);
     data.append("password", registerForm.password);
-    data.append("services", registerForm.services);
     data.append("latitude", position.coords.latitude);
     data.append("longitude", position.coords.longitude);
 
@@ -165,6 +167,7 @@ async function handleSubmit(e) {
     }
 
     await createLivreur(data);
+    accountCreated = true;
 
     await loginJWT({
       telephone: registerForm.telephone,
@@ -177,16 +180,15 @@ async function handleSubmit(e) {
       throw new Error("تعذر العثور على حساب السائق بعد التسجيل");
     }
 
-    navigate(`/livreur-dashboard/${livreur.id}`);
+    navigate(`/livreur-dashboard/${livreur.id}`, { replace: true });
   } catch (err) {
-    const isIOS = isIOSDevice();
-    const message = getLocationErrorMessage(err, isIOS);
-
-    setGpsError(true);
-    setLocationSettingsMessage(message);
-    setShowLocationSettingsButton(err.code === 1 && isIOS);
-    setError(message);
-
+    if (accountCreated) {
+      setLoginForm({ telephone: registerForm.telephone, password: "" });
+      setMode("login");
+      setError("تم إنشاء حسابك. تعذر تسجيل الدخول تلقائياً، سجّل الدخول للمتابعة.");
+    } else {
+      setError(err.message || "تعذر إنشاء الحساب. حاول مجدداً.");
+    }
   } finally {
     setLoading(false);
   }
@@ -209,7 +211,7 @@ async function handleSubmit(e) {
         throw new Error("تعذر العثور على حساب السائق");
       }
 
-      navigate(`/livreur-dashboard/${livreur.id}`);
+      navigate(`/livreur-dashboard/${livreur.id}`, { replace: true });
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء تسجيل الدخول");
     } finally {
@@ -219,11 +221,15 @@ async function handleSubmit(e) {
 
   function handlePhotoChange(e) {
     const file = e.target.files[0] || null;
-
-    setRegisterForm({
-      ...registerForm,
-      photo: file,
-    });
+    if (file && (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      e.target.value = "";
+      setRegisterForm((current) => ({ ...current, photo: null }));
+      setGpsError(false);
+      setError("اختر صورة JPEG أو PNG لا تتجاوز 5 ميغابايت.");
+      return;
+    }
+    setError("");
+    setRegisterForm((current) => ({ ...current, photo: file }));
   }
 
   return (
@@ -235,6 +241,7 @@ async function handleSubmit(e) {
               type="button"
               aria-pressed="false"
               className="secondary-btn small"
+              disabled={loading}
               onClick={onChooseClient}
             >
               زبون
@@ -249,24 +256,25 @@ async function handleSubmit(e) {
           </div>
         )}
 
-        <center>
+        <header className="driver-register-heading">
           <h2>
             {mode === "register"
               ? "تسجيل سائق جديد"
               : "تسجيل دخول السائق"}
           </h2>
 
-          <h5>
+          <p>
             {mode === "register"
               ? "انضم إلى المنصة كسائق وابدأ في استقبال طلبات التوصيل."
               : "قم بتسجيل الدخول إذا كنت مسجلاً من قبل."}
-          </h5>
-        </center>
+          </p>
+        </header>
 
         <div className="auth-switch">
           <button
             type="button"
             disabled={loading}
+            aria-pressed={mode === "register"}
             className={
               mode === "register" ? "primary-btn small" : "secondary-btn small"
             }
@@ -278,6 +286,7 @@ async function handleSubmit(e) {
           <button
             type="button"
             disabled={loading}
+            aria-pressed={mode === "login"}
             className={
               mode === "login" ? "primary-btn small" : "secondary-btn small"
             }
@@ -305,7 +314,9 @@ async function handleSubmit(e) {
               رقم الهاتف
                               <input
                   id="courier-login-phone"
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="username"
                   required
                   value={loginForm.telephone}
                   onChange={(e) =>
@@ -314,10 +325,10 @@ async function handleSubmit(e) {
                       telephone: e.target.value.replace(/\D/g, ""),
                     })
                   }
-                  minLength={10}
-                  maxLength={14}
-                  pattern="[0-9]{10,14}"
-                  title="يجب إدخال رقم هاتف صحيح مكون من 10 إلى 14 رقماً"
+                  minLength={8}
+                  maxLength={15}
+                  pattern="[0-9]{8,15}"
+                  title="أدخل رقم هاتف من 8 إلى 15 رقماً"
                   style={{ direction: "ltr", textAlign: "right" }}
                 />
             </label>
@@ -327,6 +338,7 @@ async function handleSubmit(e) {
               <input
                 id="courier-login-password"
                 type="password"
+                autoComplete="current-password"
                 required
                 placeholder="أدخل كلمة المرور"
                 value={loginForm.password}
@@ -363,7 +375,8 @@ async function handleSubmit(e) {
               <input
                 id="courier-register-name"
                 required
-                maxLength={20}
+                maxLength={100}
+                autoComplete="name"
                 placeholder="مثال: أمين"
                 value={registerForm.nom}
                 onChange={(e) =>
@@ -379,7 +392,9 @@ async function handleSubmit(e) {
               رقم الهاتف
             <input
   id="courier-register-phone"
-  type="text"
+  type="tel"
+  inputMode="tel"
+  autoComplete="tel"
   required
   value={registerForm.telephone}
   onChange={(e) =>
@@ -388,10 +403,10 @@ async function handleSubmit(e) {
       telephone: e.target.value.replace(/\D/g, ""),
     })
   }
-  minLength={10}
-  maxLength={14}
-  pattern="[0-9]{10,14}"
-  title="يجب إدخال رقم هاتف صحيح مكون من 10 إلى 14 رقماً"
+  minLength={8}
+  maxLength={15}
+  pattern="[0-9]{8,15}"
+  title="أدخل رقم هاتف من 8 إلى 15 رقماً"
   style={{ direction: "ltr", textAlign: "right" }}
 />
             </label>
@@ -460,46 +475,14 @@ async function handleSubmit(e) {
             )}
 
             <label>
-              الحالة
-              <select
-                id="courier-register-availability"
-                required
-                value={registerForm.disponible ? "true" : "false"}
-                onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    disponible: e.target.value === "true",
-                  })
-                }
-              >
-                <option value="true">متاح الآن</option>
-                <option value="false">غير متاح</option>
-              </select>
-            </label>
-
-            <label>
-              الخدمات المقترحة
-              <textarea
-                id="courier-register-services"
-                rows="4"
-                placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، ..."
-                value={registerForm.services}
-                onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    services: e.target.value,
-                  })
-                }
-              />
-            </label>
-
-            <label>
               كلمة المرور
               <input
                 id="courier-register-password"
                 type="password"
+                autoComplete="new-password"
+                minLength={8}
                 required
-                placeholder="أدخل كلمة المرور"
+                placeholder="8 أحرف على الأقل"
                 value={registerForm.password}
                 onChange={(e) =>
                   setRegisterForm({
@@ -511,13 +494,15 @@ async function handleSubmit(e) {
             </label>
 
                       <label>
-            صورة السائق
+            صورة السائق (اختيارية)
             <input
                 id="courier-register-photo"
                 type="file"
                 accept="image/jpeg,image/png,image/jpg"
                 onChange={handlePhotoChange}
+                disabled={loading}
               />
+              <small>JPEG أو PNG · حتى 5 ميغابايت</small>
           </label>
 
           {registerForm.photo && (
@@ -595,6 +580,7 @@ async function handleSubmit(e) {
     id="courier-location-consent"
     type="button"
     role="switch"
+    disabled={loading}
     aria-checked={locationConsent}
     aria-label="أوافق على استخدام بيانات الموقع الجغرافي"
     aria-invalid={(gpsError && !locationConsent) || undefined}

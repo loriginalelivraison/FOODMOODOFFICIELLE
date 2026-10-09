@@ -1,14 +1,21 @@
 import { getPickupPosition } from "./courseTracking.js";
 
+export function canRespondToDriverOffer(course) {
+  return Boolean(course && course.active !== false && !course.livreur
+    && ["searching", "driver_accepted"].includes(course.status)
+    && course.my_offer_response === "pending"
+    && (course.my_offer_expires_in == null || Number(course.my_offer_expires_in) > 0));
+}
+
 export function groupDriverCourses(courses, livreurId) {
   const ongoing = [], toAccept = [], waiting = [];
   (Array.isArray(courses) ? courses : []).forEach((course) => {
-    if (!course) return;
+    if (!course || course.active === false) return;
     if (course.livreur != null && Number(course.livreur) === Number(livreurId)
       && !["completed", "cancelled"].includes(course.status)) {
       ongoing.push(course);
     } else if (!course.livreur && ["searching", "driver_accepted"].includes(course.status)) {
-      if (course.my_offer_response === "pending") toAccept.push(course);
+      if (canRespondToDriverOffer(course)) toAccept.push(course);
       else if (course.my_offer_response === "accepted") waiting.push(course);
     }
   });

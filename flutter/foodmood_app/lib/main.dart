@@ -233,14 +233,22 @@ Future<void> main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     notificationsEnabled = true;
   } catch (_) {
-    debugPrint('Push notifications unavailable; the web app remains accessible.');
+    debugPrint(
+      'Push notifications unavailable; the web app remains accessible.',
+    );
   }
   try {
     await initializeBackgroundService();
   } catch (_) {
-    debugPrint('Background location unavailable; foreground tracking remains available.');
+    debugPrint(
+      'Background location unavailable; foreground tracking remains available.',
+    );
   }
-  runApp(FoodMoodApp(home: FoodMoodWebView(notificationsEnabled: notificationsEnabled)));
+  runApp(
+    FoodMoodApp(
+      home: FoodMoodWebView(notificationsEnabled: notificationsEnabled),
+    ),
+  );
 }
 
 Future<void> initializeBackgroundService() async {
@@ -329,7 +337,9 @@ void onStart(ServiceInstance service) async {
       if (!await Geolocator.isLocationServiceEnabled()) return;
       final permission = await Geolocator.checkPermission();
       if (permission != LocationPermission.whileInUse &&
-          permission != LocationPermission.always) return;
+          permission != LocationPermission.always) {
+        return;
+      }
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -337,18 +347,22 @@ void onStart(ServiceInstance service) async {
         ),
       );
       // A logout/account switch may arrive while obtaining the position.
-      if (stopped || currentToken != token || currentDriver != livreurId) return;
-      final response = await http.patch(
-        Uri.parse("$backendUrl/livreurs/$currentDriver/update_position/"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $currentToken",
-        },
-        body: jsonEncode({
-          "latitude": position.latitude,
-          "longitude": position.longitude,
-        }),
-      ).timeout(const Duration(seconds: 12));
+      if (stopped || currentToken != token || currentDriver != livreurId) {
+        return;
+      }
+      final response = await http
+          .patch(
+            Uri.parse("$backendUrl/livreurs/$currentDriver/update_position/"),
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer $currentToken",
+            },
+            body: jsonEncode({
+              "latitude": position.latitude,
+              "longitude": position.longitude,
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode == 401 || response.statusCode == 403) {
         token = null;
         livreurId = null;
@@ -490,7 +504,11 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
       """);
       final session = WebSession.fromJavaScript(auth);
       _session = session;
-      await syncLocationService();
+      try {
+        await syncLocationService();
+      } catch (_) {
+        debugPrint('Background location synchronization will retry.');
+      }
       if (session == null) {
         _syncedAccount = null;
         return;
@@ -500,14 +518,18 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
       if (token == null) return;
       final identity = '${session.identity}:$token';
       if (_syncedAccount == identity) return;
-      final response = await http.patch(
-        Uri.parse('$backendUrl/${session.collection}/${session.accountId}/update_fcm_token/'),
-        headers: {
-          'Authorization': 'Bearer ${session.accessToken}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'fcm_token': token}),
-      ).timeout(const Duration(seconds: 12));
+      final response = await http
+          .patch(
+            Uri.parse(
+              '$backendUrl/${session.collection}/${session.accountId}/update_fcm_token/',
+            ),
+            headers: {
+              'Authorization': 'Bearer ${session.accessToken}',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'fcm_token': token}),
+          )
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _syncedAccount = identity;
       }
@@ -553,7 +575,16 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
     try {
       final uri = Uri.tryParse(url);
       if (uri == null ||
-          !{'https', 'http', 'tel', 'mailto', 'sms', 'whatsapp', 'geo', 'comgooglemaps'}.contains(uri.scheme)) {
+          !{
+            'https',
+            'http',
+            'tel',
+            'mailto',
+            'sms',
+            'whatsapp',
+            'geo',
+            'comgooglemaps',
+          }.contains(uri.scheme)) {
         return;
       }
       if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
@@ -562,7 +593,9 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر فتح الرابط. تحقق من التطبيقات المثبتة.')),
+        const SnackBar(
+          content: Text('تعذر فتح الرابط. تحقق من التطبيقات المثبتة.'),
+        ),
       );
     }
   }
@@ -574,11 +607,16 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
       badge: false,
       sound: false,
     );
-    FirebaseMessaging.instance.getToken().then((token) {
-      fcmToken = token;
-      _syncedAccount = null;
-      syncAuthFromWebView();
-    }).catchError((Object _) { debugPrint('Push token will be retried.'); });
+    FirebaseMessaging.instance
+        .getToken()
+        .then((token) {
+          fcmToken = token;
+          _syncedAccount = null;
+          syncAuthFromWebView();
+        })
+        .catchError((Object _) {
+          debugPrint('Push token will be retried.');
+        });
 
     tokenSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((
       token,
@@ -593,7 +631,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
     ) async {
       try {
         await showForegroundNotification(message);
-        if (mounted && isTrustedWebUrl(Uri.tryParse(await controller.currentUrl() ?? ''))) {
+        if (mounted &&
+            isTrustedWebUrl(
+              Uri.tryParse(await controller.currentUrl() ?? ''),
+            )) {
           await controller.runJavaScript(
             'window.dispatchEvent(new CustomEvent("winrakPush", {detail: ${jsonEncode(notificationPayload(message.data))}}));',
           );
@@ -610,11 +651,16 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
       openCourseFromNotification(jsonEncode(message.data));
     });
 
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) {
-        openCourseFromNotification(jsonEncode(message.data));
-      }
-    }).catchError((Object _) { debugPrint('Initial push unavailable.'); });
+    FirebaseMessaging.instance
+        .getInitialMessage()
+        .then((message) {
+          if (message != null) {
+            openCourseFromNotification(jsonEncode(message.data));
+          }
+        })
+        .catchError((Object _) {
+          debugPrint('Initial push unavailable.');
+        });
   }
 
   @override
@@ -625,9 +671,12 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFFFFFFFF))
-      ..addJavaScriptChannel('WinRakSession', onMessageReceived: (_) {
-        syncAuthFromWebView();
-      })
+      ..addJavaScriptChannel(
+        'WinRakSession',
+        onMessageReceived: (_) {
+          syncAuthFromWebView();
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -661,12 +710,13 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
             await syncAuthFromWebView();
           },
           onWebResourceError: (error) {
-            if (error.isForMainFrame == true || error.url == lastPage.toString()) {
+            if (error.isForMainFrame == true ||
+                error.url == lastPage.toString()) {
               showPageFailure();
             }
           },
           onHttpError: (error) {
-            if (error.request?.isForMainFrame == true) showPageFailure();
+            if (error.request?.uri == lastPage) showPageFailure();
           },
           onNavigationRequest: (NavigationRequest request) async {
             final uri = Uri.tryParse(request.url);
@@ -682,20 +732,33 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
 
       androidController.setOnShowFileSelector((params) async {
         try {
-          if (!isTrustedWebUrl(Uri.tryParse(await controller.currentUrl() ?? ''))) return [];
+          if (!isTrustedWebUrl(
+            Uri.tryParse(await controller.currentUrl() ?? ''),
+          )) {
+            return [];
+          }
           final picker = ImagePicker();
-          if (params.mode == FileSelectorMode.openMultiple && !params.isCaptureEnabled) {
+          if (params.mode == FileSelectorMode.openMultiple &&
+              !params.isCaptureEnabled) {
             final images = await picker.pickMultiImage();
-            return images.map((image) => Uri.file(image.path).toString()).toList();
+            return images
+                .map((image) => Uri.file(image.path).toString())
+                .toList();
           }
           final image = await picker.pickImage(
-            source: params.isCaptureEnabled ? ImageSource.camera : ImageSource.gallery,
+            source: params.isCaptureEnabled
+                ? ImageSource.camera
+                : ImageSource.gallery,
           );
           return image == null ? [] : [Uri.file(image.path).toString()];
         } catch (_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تعذر اختيار الصورة. تحقق من الأذونات وحاول مجددًا.')),
+              const SnackBar(
+                content: Text(
+                  'تعذر اختيار الصورة. تحقق من الأذونات وحاول مجددًا.',
+                ),
+              ),
             );
           }
           return [];
@@ -705,7 +768,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
       androidController.setGeolocationPermissionsPromptCallbacks(
         onShowPrompt: (request) async {
           if (!isTrustedWebUrl(Uri.tryParse(request.origin))) {
-            return const GeolocationPermissionsResponse(allow: false, retain: false);
+            return const GeolocationPermissionsResponse(
+              allow: false,
+              retain: false,
+            );
           }
           final status = await Permission.location.request();
           syncAuthFromWebView();
@@ -722,9 +788,13 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
     });
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      serviceReadySubscription = FlutterBackgroundService().on('ready').listen((_) {
+      serviceReadySubscription = FlutterBackgroundService().on('ready').listen((
+        _,
+      ) {
         _locationAuth = null;
-        syncLocationService();
+        syncLocationService().catchError((Object _) {
+          debugPrint('Background location synchronization will retry.');
+        });
       });
     }
     if (widget.notificationsEnabled) initializeNotifications();
@@ -786,17 +856,21 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView>
             children: [
               WebViewWidget(controller: controller),
               if (pageFailed)
-                WebConnectionError(onRetry: () {
-                  setState(() {
-                    pageFailed = false;
-                    isLoading = true;
-                  });
-                  controller.loadRequest(lastPage);
-                }),
+                WebConnectionError(
+                  onRetry: () {
+                    setState(() {
+                      pageFailed = false;
+                      isLoading = true;
+                    });
+                    controller.loadRequest(lastPage);
+                  },
+                ),
               if (isLoading)
                 const Align(
                   alignment: Alignment.topCenter,
-                  child: LinearProgressIndicator(semanticsLabel: 'جارٍ التحميل'),
+                  child: LinearProgressIndicator(
+                    semanticsLabel: 'جارٍ التحميل',
+                  ),
                 ),
             ],
           ),
@@ -823,13 +897,27 @@ class WebConnectionError extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.wifi_off_rounded, size: 48, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.wifi_off_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(height: 20),
-                Text('تعذر تحميل WinRak', style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  'تعذر تحميل WinRak',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 const SizedBox(height: 12),
-                const Text('تحقق من اتصال الإنترنت ثم حاول مجددًا.', textAlign: TextAlign.center),
+                const Text(
+                  'تحقق من اتصال الإنترنت ثم حاول مجددًا.',
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 24),
-                FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة المحاولة'),
+                ),
               ],
             ),
           ),

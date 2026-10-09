@@ -31,26 +31,29 @@ export default function ClientAuth() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (loading) return;
 
     setError("");
     setErrorField("");
     setMessage("");
 
-    if (password.trim().length < 6) {
+    if (mode === "register" && password.length < 8) {
       setErrorField("client-auth-password");
-      setError("كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل");
+      setError("كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل وألا تكون أرقاماً فقط.");
       return;
     }
 
     setLoading(true);
 
+    let registered = false;
     try {
       if (mode === "register") {
         await createClient({
-          nom,
+          nom: nom.trim(),
           telephone,
           password,
         });
+        registered = true;
       }
 
       await loginClient({
@@ -65,7 +68,10 @@ export default function ClientAuth() {
       localStorage.removeItem("redirectAfterLogin");
       navigate(redirect, { replace: true });
     } catch (err) {
-      console.error(err);
+      if (registered) {
+        setMode("login");
+        setMessage("تم إنشاء حسابك. سجّل الدخول للمتابعة.");
+      }
       setError(err?.message || "حدث خطأ أثناء تسجيل الدخول أو إنشاء الحساب");
     } finally {
       setLoading(false);
@@ -103,6 +109,7 @@ export default function ClientAuth() {
           <button
             type="button"
             aria-pressed="false"
+            disabled={loading}
             className="secondary-btn small"
             onClick={() => setAccountType("courier")}
           >
@@ -112,7 +119,7 @@ export default function ClientAuth() {
 
         <center>
           <h2>
-            {mode === "register" ? "هل تريد؟" : "تسجيل الدخول"}
+            {mode === "register" ? "إنشاء حساب عميل" : "تسجيل الدخول"}
           </h2>
 
           {mode === "login" && (
@@ -187,7 +194,8 @@ export default function ClientAuth() {
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
                 placeholder="عبد القادر"
-                maxLength={20}
+                maxLength={100}
+                autoComplete="name"
                 required
               />
             </label>
@@ -197,14 +205,17 @@ export default function ClientAuth() {
   رقم الهاتف
   <input
     id="client-auth-phone"
-    type="text"
+    type="tel"
+    inputMode="tel"
+    autoComplete="tel"
+    dir="ltr"
     value={telephone}
     onChange={(e) =>
       setTelephone(e.target.value.replace(/\D/g, ""))
     }
-    maxLength={14}
-    pattern="([0-9]{10}|[0-9]{14})"
-    title="يجب إدخال رقم هاتف صحيح مكون من 10 أو 14 رقماً فقط"
+    maxLength={15}
+    pattern="[0-9]{8,15}"
+    title="أدخل رقم هاتف من 8 إلى 15 رقماً"
     required
   />
 </label>
@@ -225,8 +236,9 @@ export default function ClientAuth() {
                 }
               }}
               placeholder="******"
-              minLength={6}
-              title="كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل"
+              minLength={mode === "register" ? 8 : undefined}
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+              title={mode === "register" ? "8 أحرف على الأقل، وليست أرقاماً فقط" : undefined}
               required
             />
             {errorField === "client-auth-password" && error && (

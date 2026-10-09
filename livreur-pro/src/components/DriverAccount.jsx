@@ -4,6 +4,7 @@ import DriverDocuments from "./DriverDocuments.jsx";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import AddressLabel from "./AddressLabel.jsx";
 import { formatDriverNumber } from "../utils/driverOrders.js";
+import { getCourseStatusLabel } from "../utils/courseTracking.js";
 
 const VEHICLES = { voiture: "سيارة", moto: "دراجة نارية", scooter: "دراجة نارية", camion: "شاحنة", velo: "دراجة" };
 function formatDate(value) {
@@ -12,10 +13,11 @@ function formatDate(value) {
 }
 
 export default function DriverAccount({ livreur, profile, courses, reviews, loadingHistory,
-  editingProfile, onEdit, form, onLogout, onDelete, onPrivacy }) {
+  historyError, closingAccount, editingProfile, onEdit, form, onLogout, onDelete, onPrivacy }) {
   const name = profile?.nom || livreur.nom;
   const vehicle = profile?.vehicule || livreur.vehicule;
   const photo = profile?.photo || livreur.photo || livreur.image;
+  const assignedCourses = courses.filter((course) => String(course.livreur) === String(livreur.id));
   return <>
     <header className="driver-account-title"><h1>حسابي</h1><span>كل معلوماتك في مكان واحد</span></header>
     <section className="account-card driver-profile-card" id="personal-info">
@@ -25,7 +27,7 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
           <span className="account-role">{vehicle === "voiture" ? "حساب سائق" : "حساب عامل توصيل"}</span>
           <span className="driver-profile-phone"><Phone size={15} aria-hidden="true" /><bdi>{profile?.telephone || livreur.telephone}</bdi></span>
         </div>
-        <button className="driver-edit-button" type="button" onClick={onEdit} aria-expanded={editingProfile}>
+        <button className="driver-edit-button" type="button" onClick={onEdit} aria-expanded={editingProfile} disabled={form.saving}>
           <Pencil size={16} aria-hidden="true" />تعديل
         </button>
       </div>
@@ -48,7 +50,7 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
         /></label>}
         <div className="account-form-actions">
           <button type="submit" className="save" disabled={form.saving}>{form.saving ? "جارٍ الحفظ…" : "حفظ"}</button>
-          <button type="button" className="cancel" onClick={form.onCancel}>إلغاء</button>
+          <button type="button" className="cancel" onClick={form.onCancel} disabled={form.saving}>إلغاء</button>
         </div>
       </form>}
     </section>
@@ -73,10 +75,11 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
         <div className="driver-account-history">
           <h3>سجل الرحلات</h3>
           {loadingHistory && <LoadingSpinner label="جارٍ تحميل السجل…" />}
-          {!loadingHistory && courses.length === 0 && <p className="account-empty">لا توجد رحلات مسجلة حالياً.</p>}
-          {!loadingHistory && courses.map((course) => <article className="account-item" key={course.id}>
+          {historyError && <p role="alert">{historyError}</p>}
+          {!loadingHistory && !historyError && assignedCourses.length === 0 && <p className="account-empty">لا توجد رحلات مسجلة حالياً.</p>}
+          {!loadingHistory && assignedCourses.map((course) => <article className="account-item" key={course.id}>
             <div className="account-item-head"><strong>رحلة رقم <bdi>{course.id}</bdi></strong>
-              <span className="account-status-pill">{course.status === "cancelled" ? "ملغاة" : course.status === "completed" ? "مكتملة" : course.active ? "نشطة" : "منتهية"}</span></div>
+              <span className="account-status-pill">{getCourseStatusLabel(course)}</span></div>
             <div className="account-item-meta"><span>{formatDate(course.created_at)}</span>
               {course.destination && <AddressLabel text={course.destination} />}
               {(course.final_price ?? course.proposed_price) != null && <span className="account-item-price"><bdi>{formatDriverNumber(course.final_price ?? course.proposed_price)}</bdi> دج</span>}
@@ -93,8 +96,8 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
       <h2><ShieldCheck size={20} aria-hidden="true" />الإعدادات</h2>
       <button className="account-link" type="button" onClick={onPrivacy}>سياسة الخصوصية</button>
       <a className="account-link" href="https://www.winrak.fr" target="_blank" rel="noreferrer">موقع WinRak</a>
-      <button className="account-logout" type="button" onClick={onLogout}><LogOut size={18} aria-hidden="true" />تسجيل الخروج</button>
+      <button className="account-logout" type="button" onClick={onLogout} disabled={closingAccount}><LogOut size={18} aria-hidden="true" />تسجيل الخروج</button>
     </section>
-    <button className="account-delete" type="button" onClick={onDelete}>حذف الحساب نهائياً</button>
+    <button className="account-delete" type="button" onClick={onDelete} disabled={closingAccount}>حذف الحساب نهائياً</button>
   </>;
 }

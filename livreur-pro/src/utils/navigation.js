@@ -36,3 +36,13 @@ export function getClientReturnPath(path) {
   return typeof path === "string" && /^\/(livreurs|client-dashboard|course\/[1-9]\d*|tracking\/[1-9]\d*)$/.test(path)
     ? path : "/livreurs";
 }
+
+export function clearStoredSession(storage = globalThis.localStorage) {
+  const keys = ["access", "refresh", "role", "client", "livreur", "redirectAfterLogin",
+    "currentClientCourseId", "activeDriverCourseId", "livreurOnline"];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key?.startsWith("activeTrackingCourse_") || key?.startsWith("courseReviewSubmitted:")) keys.push(key);
+  }
+  keys.forEach((key) => storage.removeItem(key));
+}

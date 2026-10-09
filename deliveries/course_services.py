@@ -50,6 +50,7 @@ def distance_km(latitude_a, longitude_a, latitude_b, longitude_b):
         * cos(radians(latitude_b))
         * sin(longitude_delta / 2) ** 2
     )
+    value = min(1.0, max(0.0, value))
     return earth_radius_km * 2 * atan2(sqrt(value), sqrt(1 - value))
 
 
@@ -257,6 +258,7 @@ def _build_offers(course, drivers, expires_at):
     ]
 
 
+@transaction.atomic
 def broadcast_course_offers(course, now=None, notifier=None):
     """Diffuse la course à une nouvelle vague de livreurs et notifie via FCM.
 
@@ -268,6 +270,14 @@ def broadcast_course_offers(course, now=None, notifier=None):
         from .firebase import send_livreur_notification as notifier
 
     now = now or timezone.now()
+    course = Course.objects.select_for_update().get(pk=course.pk)
+    if (not course.active or course.livreur_id or course.status != "searching"
+            or course.offers.filter(response__in=["pending", "accepted"]).exists()):
+        return []
+    # Timestamp empty rounds as well, otherwise a request without nearby drivers
+    # can never be retried when someone subsequently comes online.
+    course.last_offer_at = now
+    course.save(update_fields=["last_offer_at"])
     drivers = eligible_drivers_for_course(course)
     if not drivers:
         record_course_event(
@@ -334,15 +344,22 @@ def dispatch_expired_courses(now=None):
 
     dispatched = []
     for course in candidates:
-        previous_round = course.broadcast_round
-        course.broadcast_round = previous_round + 1
-        course.save(update_fields=["broadcast_round"])
-        record_course_event(
-            course,
-            "offers_rebroadcast",
-            details={"previous_round": previous_round, "round": course.broadcast_round},
-        )
-        if broadcast_course_offers(course, now=now):
-            dispatched.append(course.id)
+        with transaction.atomic():
+            course = Course.objects.select_for_update().get(pk=course.pk)
+            if (not course.active or course.status != "searching" or course.livreur_id
+                    or course.broadcast_round >= settings.COURSE_OFFER_MAX_ROUNDS
+                    or course.last_offer_at is None or course.last_offer_at > threshold
+                    or course.offers.filter(response__in=["pending", "accepted"]).exists()):
+                continue
+            previous_round = course.broadcast_round
+            course.broadcast_round = previous_round + 1
+            course.save(update_fields=["broadcast_round"])
+            record_course_event(
+                course,
+                "offers_rebroadcast",
+                details={"previous_round": previous_round, "round": course.broadcast_round},
+            )
+            if broadcast_course_offers(course, now=now):
+                dispatched.append(course.id)
 
     return dispatched

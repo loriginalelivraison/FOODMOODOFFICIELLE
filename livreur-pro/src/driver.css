@@ -20,6 +20,14 @@
 .driver-availability:disabled { cursor: default; }
 .driver-status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .driver-status-hint { margin: -6px 0 0; color: #697386; font-size: 13px; text-align: center; }
+.driver-register-heading { text-align: center; }
+.driver-register-heading p { color: #697386; line-height: 1.7; font-size: 14px; }
+.driver-course-contacts { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 14px; }
+.driver-course-contacts a { flex: 1; min-height: 44px; text-align: center; }
+.driver-dashboard-page :is(button, a, summary):focus-visible,
+.driver-course-page :is(button, a, select, textarea):focus-visible { outline: 3px solid #176b53; outline-offset: 3px; }
+.driver-dashboard-page button:disabled { cursor: wait; opacity: .65; }
+.driver-dashboard-page .driver-orders-error { flex-wrap: wrap; }
 .driver-dashboard-page .orders-board { display: grid; gap: 12px; }
 .driver-dashboard-page .orders-board-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .driver-dashboard-page .orders-tile { padding: 10px 6px; min-height: 90px; border: 1px solid transparent; border-radius: 19px; gap: 4px; }
@@ -143,7 +151,7 @@
 .driver-feedback.is-error { color: #b54747; background: #fff0ef; }
 .mapbox-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #f0f3f6e8; color: #7c8899; z-index: 1; font-size: 12px; }
 @media (max-width: 860px) {
-  .driver-shell .bottom-nav { grid-template-columns: repeat(3, 1fr); border-color: #edf0f3; border-radius: 22px; box-shadow: 0 7px 30px #2430430c; }
+  .driver-shell .bottom-nav { grid-template-columns: repeat(2, 1fr); border-color: #edf0f3; border-radius: 22px; box-shadow: 0 7px 30px #2430430c; }
   .driver-shell .bottom-nav > button { display: none !important; }
   .driver-shell .bottom-link { min-height: 48px; }
 }

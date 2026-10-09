@@ -1,466 +1,223 @@
 import React, { useEffect, useState } from "react";
-import {
-  deleteClient,
-  getClientCourses,
-  getCommentairesLivreur,
-  clearCurrentDriverFcmToken,
-  updateClientProfile,
-  getClientProfile,
-  finishCourse,
-} from "../livreursapi.js";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { deleteClient, getClientCourses, getClientProfile, updateClientProfile,
+  finishCourse, logoutCurrentAccount } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import AddressLabel from "../components/AddressLabel.jsx";
-import { readStoredAccount } from "../utils/navigation.js";
-
-const STATUS_LABELS = {
-  searching: "جارٍ البحث عن سائق",
-  driver_accepted: "بانتظار اختيار السائق",
-  driver_selected: "تم تأكيد السائق",
-  driver_arriving: "السائق في الطريق",
-  driver_arrived: "وصل السائق",
-  in_progress: "الرحلة جارية",
-  completed: "مكتملة",
-  cancelled: "ملغاة",
-};
-
-const STATUS_CLASSES = {
-  completed: "is-done",
-  cancelled: "is-cancel",
-};
+import { clearStoredSession, readStoredAccount } from "../utils/navigation.js";
+import { canFinishCourse, getCourseStatusLabel, isDeliveryVehicle } from "../utils/courseTracking.js";
 
 function formatDate(value) {
-  if (!value) return "غير متوفر";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "غير متوفر" : date.toLocaleDateString("ar-DZ");
+  return !value || Number.isNaN(date.getTime()) ? "غير متوفر" : date.toLocaleDateString("ar-DZ");
 }
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
-
-  const [client, setClient] = useState(() => {
-    return readStoredAccount("client");
-  });
-
+  const [client, setClient] = useState(() => readStoredAccount("client"));
   const [editingProfile, setEditingProfile] = useState(false);
   const [editNom, setEditNom] = useState(client?.nom || "");
   const [savingProfile, setSavingProfile] = useState(false);
-
   const [deleting, setDeleting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [showHistory, setShowHistory] = useState(true);
   const [courses, setCourses] = useState([]);
-  const [comments, setComments] = useState({});
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [activeCourse, setActiveCourse] = useState(null);
-  const [loadingActiveCourse, setLoadingActiveCourse] = useState(true);
-  const [activeCourseError, setActiveCourseError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+  const [retry, setRetry] = useState(0);
   const [clientPoints, setClientPoints] = useState(null);
-  const [finishingActiveCourse, setFinishingActiveCourse] = useState(false);
 
   useEffect(() => {
-    if (showHistory) {
-      loadHistory();
-    }
-  }, [showHistory]);
-
-  useEffect(() => {
-    if (!localStorage.getItem("access") || localStorage.getItem("role") !== "client") return;
-    loadClientProfile();
-  }, []);
-
-  useEffect(() => {
-    if (!localStorage.getItem("access") || localStorage.getItem("role") !== "client") {
-      setLoadingActiveCourse(false);
-      return undefined;
-    }
-
     let cancelled = false;
-
-    async function refreshActiveCourse() {
+    let pending = false;
+    async function refresh() {
+      if (pending) return;
+      pending = true;
       try {
-        const clientCourses = await getClientCourses();
-        const currentCourse = clientCourses.find(
-          (course) => course.active && !["completed", "cancelled"].includes(course.status)
-        ) || null;
+        const data = await getClientCourses();
         if (cancelled) return;
-
-        setActiveCourse(currentCourse);
-        setActiveCourseError("");
-        if (currentCourse) {
-          localStorage.setItem("currentClientCourseId", String(currentCourse.id));
-        } else {
-          localStorage.removeItem("currentClientCourseId");
-        }
+        setCourses(data);
+        setHistoryError("");
+        const current = data.find((course) => course.active && !["completed", "cancelled"].includes(course.status));
+        if (current) localStorage.setItem("currentClientCourseId", String(current.id));
+        else localStorage.removeItem("currentClientCourseId");
       } catch (err) {
-        if (!cancelled) setActiveCourseError(err.message || "تعذر تحميل الرحلة الحالية.");
+        if (!cancelled) setHistoryError(err.message || "تعذر تحميل الرحلات. حاول مجدداً.");
       } finally {
-        if (!cancelled) setLoadingActiveCourse(false);
+        pending = false;
+        if (!cancelled) setLoading(false);
       }
     }
-
-    refreshActiveCourse();
-    const interval = setInterval(refreshActiveCourse, 15000);
+    refresh();
+    const timer = setInterval(refresh, 15000);
+    window.addEventListener("winrakPush", refresh);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      clearInterval(timer);
+      window.removeEventListener("winrakPush", refresh);
     };
-  }, []);
+  }, [retry]);
 
-  async function loadClientProfile() {
-    try {
-      const data = await getClientProfile();
-      if (data) setClientPoints(data.points ?? 0);
-    } catch (err) {
-      console.error("Erreur chargement profil client :", err);
-    }
-  }
-
-  async function loadHistory() {
-    setLoadingHistory(true);
-    setError("");
-
-    try {
-      const data = await getClientCourses();
-      setCourses(data);
-
-      const commentsByLivreur = {};
-
-      for (const course of data) {
-        const livreurId = course.livreur;
-
-        if (livreurId && !commentsByLivreur[livreurId]) {
-          const commentaires = await getCommentairesLivreur(livreurId);
-          const list = Array.isArray(commentaires)
-            ? commentaires
-            : commentaires.results || [];
-
-         commentsByLivreur[livreurId] = list;
-        }
-      }
-
-      setComments(commentsByLivreur);
-    } catch (err) {
-      setError(err.message || "حدث خطأ أثناء تحميل السجل");
-    } finally {
-      setLoadingHistory(false);
-    }
-  }
-
-  async function handleDeleteClientAccount() {
-    const confirmDelete = window.confirm(
-      "هل أنت متأكد من حذف حسابك نهائياً؟ لا يمكن التراجع عن هذه العملية."
-    );
-
-    if (!confirmDelete) return;
-
-    setError("");
-    setMessage("");
-    setDeleting(true);
-
-    try {
-      await deleteClient(client.id);
-
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-      localStorage.removeItem("role");
-      localStorage.removeItem("livreur");
-      localStorage.removeItem("client");
-      localStorage.removeItem("redirectAfterLogin");
-
+  useEffect(() => {
+    let cancelled = false;
+    getClientProfile().then((profile) => {
+      if (cancelled || !profile) return;
+      setClient(profile);
+      setClientPoints(profile.points ?? 0);
+      localStorage.setItem("client", JSON.stringify(profile));
       window.dispatchEvent(new Event("authChanged"));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [retry]);
 
-      navigate("/livreurs", { replace: true });
-    } catch (err) {
-      setError(err.message || "حدث خطأ أثناء حذف الحساب");
-    } finally {
-      setDeleting(false);
-    }
-  }
+  const activeCourse = courses.find((course) => course.active && !["completed", "cancelled"].includes(course.status));
+  const history = courses.filter((course) => !course.active || ["completed", "cancelled"].includes(course.status));
+  const completedCount = courses.filter((course) => course.status === "completed").length;
 
   async function handleProfileSave(event) {
     event.preventDefault();
     if (!client || savingProfile) return;
-
     const nom = editNom.trim();
-
-    if (!nom) {
-      setError("الاسم مطلوب.");
-      return;
-    }
-
+    if (!nom) { setError("الاسم مطلوب."); return; }
     setSavingProfile(true);
     setError("");
-
+    setMessage("");
     try {
       const updated = await updateClientProfile(client.id, { nom });
-      const nextClient = { ...client, nom: updated.nom || nom };
-      setClient(nextClient);
-      localStorage.setItem("client", JSON.stringify(nextClient));
+      const next = { ...client, ...updated };
+      setClient(next);
+      localStorage.setItem("client", JSON.stringify(next));
       window.dispatchEvent(new Event("authChanged"));
       setEditingProfile(false);
-    } catch (err) {
-      setError(err.message || "تعذر تحديث المعلومات.");
-    } finally {
-      setSavingProfile(false);
-    }
+      setMessage("تم تحديث معلوماتك.");
+    } catch (err) { setError(err.message || "تعذر تحديث المعلومات."); }
+    finally { setSavingProfile(false); }
   }
 
-  async function handleFinishActiveCourse() {
-    if (!activeCourse || finishingActiveCourse) return;
-
-    setFinishingActiveCourse(true);
+  async function handleFinish() {
+    if (!activeCourse || !canFinishCourse(activeCourse) || finishing) return;
+    if (!window.confirm(isDeliveryVehicle(activeCourse.vehicle_type) ? "هل تم تسليم الطلب بالفعل؟" : "هل وصلت إلى وجهتك وانتهت الرحلة؟")) return;
+    setFinishing(true);
     setError("");
-
     try {
       await finishCourse(activeCourse.id);
-      setActiveCourse(null);
       localStorage.removeItem("currentClientCourseId");
-      await loadClientProfile();
-      await loadHistory();
-    } catch (err) {
-      setError(err.message || "تعذر إنهاء الرحلة.");
-    } finally {
-      setFinishingActiveCourse(false);
-    }
+      navigate(`/course/${activeCourse.id}`);
+    } catch (err) { setError(err.message || "تعذر إنهاء الرحلة."); }
+    finally { setFinishing(false); }
   }
 
-
-  if (!client) {
-    return (
-      <section className="page" dir="rtl">
-        <div className="tracking-card">
-          <h2>يجب تسجيل الدخول كزبون</h2>
-          <button
-            className="primary-btn full"
-            onClick={() => navigate("/connexion-client")}
-          >
-            تسجيل الدخول
-          </button>
-        </div>
-      </section>
-    );
+  async function handleDelete() {
+    if (!client || deleting || activeCourse || loading || historyError) return;
+    if (!window.confirm("هل أنت متأكد من حذف حسابك نهائياً؟ لا يمكن التراجع عن هذه العملية.")) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteClient(client.id);
+      clearStoredSession();
+      window.dispatchEvent(new Event("authChanged"));
+      navigate("/livreurs", { replace: true });
+    } catch (err) { setError(err.message || "تعذر حذف الحساب."); }
+    finally { setDeleting(false); }
   }
 
+  async function logout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    await logoutCurrentAccount();
+    navigate("/connexion-client", { replace: true });
+  }
 
- async function logout() {
-  await clearCurrentDriverFcmToken();
-  localStorage.removeItem("access");
-  localStorage.removeItem("refresh");
-
-  localStorage.removeItem("livreur");
-  localStorage.removeItem("client");
-  localStorage.removeItem("role");
-
-  window.dispatchEvent(new Event("authChanged"));
-  navigate("/");
-
-}
-  const isLoggedIn = localStorage.getItem("access");
-
-  if (!isLoggedIn) return null;
-
-  const initial = (client.nom || "؟").trim().charAt(0) || "؟";
-  const reviews = Object.values(comments).flat();
-  const completedCourses = courses.filter((course) => course.status === "completed").length;
-
+  if (!client) return null;
   return (
     <section className="page account-page" dir="rtl">
       <header className="account-header">
-        <div className="account-avatar">{initial}</div>
+        <div className="account-avatar" aria-hidden="true">{client.nom?.trim().charAt(0) || "؟"}</div>
         <div className="account-identity">
           <h1>{client.nom}</h1>
           <span className="account-role">حساب عميل</span>
-          <span className="account-meta">
-            <span>📞 {client.telephone}</span>
-          </span>
+          <span className="account-meta"><bdi>{client.telephone}</bdi></span>
         </div>
-        <button
-          type="button"
-          className="account-edit-btn"
-          onClick={() => {
-            setEditNom(client.nom || "");
-            setEditingProfile((value) => !value);
-          }}
-        >
-          تعديل
-        </button>
+        <button type="button" className="account-edit-btn" aria-expanded={editingProfile}
+          onClick={() => { setEditNom(client.nom || ""); setEditingProfile(!editingProfile); }}>تعديل</button>
       </header>
-
       <nav className="account-sections" aria-label="أقسام الحساب">
-        <a href="#personal-info">المعلومات</a><a href="#trip-history">رحلاتي</a><a href="#account-settings">الإعدادات</a>
+        <a href="#personal-info">المعلومات</a><a href="#trip-history">رحلاتي وطلباتي</a><a href="#account-settings">الإعدادات</a>
       </nav>
-
+      {error && <p className="course-request-error" role="alert">{error}</p>}
+      {message && <p className="account-feedback" role="status">{message}</p>}
+      {historyError && <div className="course-request-error" role="alert">
+        <p>{historyError}</p><button className="secondary-btn small" type="button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button>
+      </div>}
       <section className="account-card">
-        <h2>رحلتي الحالية</h2>
-        {loadingActiveCourse && <LoadingSpinner label="جارٍ البحث عن رحلة نشطة…" />}
-        {!loadingActiveCourse && activeCourse && (
-          <>
-            <div className="account-row">
-              <span className="account-row-label">الوجهة</span>
-              <AddressLabel className="account-row-value" text={activeCourse.destination || "قيد التنفيذ"} />
-            </div>
-            <div className="account-row">
-              <span className="account-row-label">الحالة</span>
-              <span className="account-row-value">{STATUS_LABELS[activeCourse.status] || "نشطة"}</span>
-            </div>
-            <button
-              className="primary-btn full"
-              type="button"
-              onClick={() => navigate(`/course/${activeCourse.id}`)}
-            >
-              متابعة الرحلة
-            </button>
-            <button
-              className="primary-btn full"
-              type="button"
-              onClick={handleFinishActiveCourse}
-              disabled={finishingActiveCourse}
-              style={{ background: "#dc2626" }}
-            >
-              {finishingActiveCourse ? "جارٍ إنهاء الرحلة…" : "إنهاء الرحلة"}
-            </button>
-          </>
-        )}
-        {!loadingActiveCourse && !activeCourse && !activeCourseError && (
-          <p className="account-empty">ليست لديك رحلة نشطة حالياً.</p>
-        )}
-        {activeCourseError && <p className="course-request-error" role="alert">{activeCourseError}</p>}
+        <h2>رحلتي أو طلبي الحالي</h2>
+        {loading ? <LoadingSpinner label="جارٍ تحميل الطلب الحالي…" /> : activeCourse ? <>
+          <div className="account-row"><span className="account-row-label">الوجهة</span>
+            <AddressLabel className="account-row-value" text={activeCourse.destination || "غير محددة"} /></div>
+          <div className="account-row"><span className="account-row-label">الحالة</span>
+            <span className="account-row-value">{getCourseStatusLabel(activeCourse)}</span></div>
+          <Link className="primary-btn full" to={`/course/${activeCourse.id}`}>متابعة {isDeliveryVehicle(activeCourse.vehicle_type) ? "التوصيل" : "الرحلة"}</Link>
+          {canFinishCourse(activeCourse) && <button className="secondary-btn full" type="button" onClick={handleFinish} disabled={finishing}>
+            {finishing ? "جارٍ التأكيد…" : isDeliveryVehicle(activeCourse.vehicle_type) ? "تأكيد استلام الطلب" : "تأكيد الوصول"}
+          </button>}
+        </> : !historyError && <>
+          <p className="account-empty">ليست لديك رحلة أو طلب نشط حالياً.</p>
+          <Link className="primary-btn full" to="/livreurs">طلب رحلة أو توصيل</Link>
+        </>}
       </section>
-
       <section className="account-card">
-        <h2>حالة حسابك</h2>
-        <div className="account-points">
-          <span className="account-points-icon" aria-hidden="true">🏅</span>
-          <strong>{clientPoints ?? 0}</strong>
-          <span className="account-points-label">نقطة</span>
-        </div>
-        <p className="account-points-hint">تُضاف نقاط مكافأة مع كل رحلة مكتملة.</p>
+        <h2>نشاط حسابك</h2>
+        <div className="account-points"><strong>{clientPoints ?? "—"}</strong><span className="account-points-label">نقطة</span></div>
+        <p className="account-points-hint">تُضاف نقاط مكافأة مع كل رحلة أو توصيل مكتمل.</p>
         <div className="account-stat-grid">
-          <div className="account-stat">
-            <span>رحلات مكتملة</span>
-            <strong>{completedCourses}</strong>
-          </div>
-          <div className="account-stat">
-            <span>إجمالي الرحلات</span>
-            <strong>{courses.length}</strong>
-          </div>
+          <div className="account-stat"><span>رحلات وطلبات مكتملة</span><strong>{loading || historyError ? "—" : completedCount}</strong></div>
+          <div className="account-stat"><span>إجمالي الرحلات والطلبات</span><strong>{loading || historyError ? "—" : courses.length}</strong></div>
         </div>
       </section>
-
-      {editingProfile && (
-        <section className="account-card" data-scroll-step="edit-profile">
-          <h2>تعديل المعلومات</h2>
-          <form className="account-form" onSubmit={handleProfileSave}>
-            <label>
-              الاسم
-              <input
-                value={editNom}
-                onChange={(event) => setEditNom(event.target.value)}
-                maxLength={100}
-              />
-            </label>
-            <label>
-              رقم الهاتف
-              <input value={client.telephone} disabled readOnly />
-            </label>
-            <div className="account-form-actions">
-              <button type="submit" className="save" disabled={savingProfile}>
-                {savingProfile ? "جارٍ الحفظ…" : "حفظ"}
-              </button>
-              <button type="button" className="cancel" onClick={() => setEditingProfile(false)}>
-                إلغاء
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
-
+      {editingProfile && <section className="account-card" data-scroll-step="edit-profile">
+        <h2>تعديل المعلومات</h2>
+        <form className="account-form" onSubmit={handleProfileSave}>
+          <label>الاسم<input value={editNom} onChange={(event) => setEditNom(event.target.value)} maxLength={100} autoComplete="name" required /></label>
+          <label>رقم الهاتف<input value={client.telephone} dir="ltr" disabled readOnly /></label>
+          <div className="account-form-actions">
+            <button type="submit" className="save" disabled={savingProfile}>{savingProfile ? "جارٍ الحفظ…" : "حفظ"}</button>
+            <button type="button" className="cancel" disabled={savingProfile} onClick={() => setEditingProfile(false)}>إلغاء</button>
+          </div>
+        </form>
+      </section>}
       <section className="account-card" id="personal-info">
         <h2>المعلومات الشخصية</h2>
-        <div className="account-row">
-          <span className="account-row-label">الاسم</span>
-          <span className="account-row-value">{client.nom}</span>
-        </div>
-        <div className="account-row">
-          <span className="account-row-label">رقم الهاتف</span>
-          <span className="account-row-value">{client.telephone}</span>
-        </div>
+        <div className="account-row"><span className="account-row-label">الاسم</span><span className="account-row-value">{client.nom}</span></div>
+        <div className="account-row"><span className="account-row-label">رقم الهاتف</span><bdi className="account-row-value">{client.telephone}</bdi></div>
       </section>
-
       <section className="account-card" id="trip-history">
-        <h2>رحلاتي</h2>
-        {loadingHistory && <LoadingSpinner label="جاري تحميل السجل..." />}
-        {!loadingHistory && courses.length === 0 && (
-          <p className="account-empty">لا توجد رحلات مسجلة حالياً.</p>
-        )}
-        {!loadingHistory && courses.map((course) => (
-          <article className="account-item" key={course.id}>
-            <div className="account-item-head">
-              <strong>رحلة رقم {course.id}</strong>
-              <span className={`account-status-pill ${STATUS_CLASSES[course.status] || (course.active ? "is-active" : "")}`}>
-                {STATUS_LABELS[course.status] || (course.active ? "نشطة" : "منتهية")}
-              </span>
-            </div>
-            <div className="account-item-meta">
-              <span>{formatDate(course.created_at)}</span>
-              {course.livreur && <span>السائق: {course.livreur}</span>}
-              {course.destination && <AddressLabel text={course.destination} />}
-              {(course.final_price ?? course.proposed_price) != null && (
-                <span className="account-item-price">{course.final_price ?? course.proposed_price} دج</span>
-              )}
-            </div>
-          </article>
-        ))}
+        <h2>سجل الرحلات والطلبات</h2>
+        {loading && <LoadingSpinner label="جارٍ تحميل السجل…" />}
+        {!loading && !historyError && history.length === 0 && <p className="account-empty">ستظهر هنا رحلاتك وطلباتك السابقة.</p>}
+        {history.map((course) => <Link className="account-item account-history-link" to={`/course/${course.id}`} key={course.id}>
+          <div className="account-item-head">
+            <strong>{isDeliveryVehicle(course.vehicle_type) ? "طلب" : "رحلة"} رقم {course.id}</strong>
+            <span className={`account-status-pill ${course.status === "completed" ? "is-done" : "is-cancel"}`}>{getCourseStatusLabel(course)}</span>
+          </div>
+          <div className="account-item-meta">
+            <span>{formatDate(course.created_at)}</span>
+            {course.destination && <AddressLabel text={course.destination} />}
+            {(course.final_price ?? course.proposed_price) != null && <span className="account-item-price">{course.final_price ?? course.proposed_price} دج</span>}
+          </div>
+          <span className="account-history-action">عرض التفاصيل</span>
+        </Link>)}
       </section>
-
-      {reviews.length > 0 && (
-        <section className="account-card">
-          <h2>تقييماتي</h2>
-          {reviews.map((comment) => (
-            <article className="account-item" key={comment.id}>
-              <div className="account-item-head">
-                <strong>⭐ {comment.note || 5} / 5</strong>
-                <span className="account-item-meta">{formatDate(comment.created_at)}</span>
-              </div>
-              {comment.message && <p style={{ margin: 0 }}>{comment.message}</p>}
-            </article>
-          ))}
-        </section>
-      )}
-
-      <section className="account-card">
-        <h2>المساعدة والدعم</h2>
-        <a className="account-link" href="/livreurs">
-          عرض السائقين المتاحين
-        </a>
-        <a className="account-link" href="https://www.winrak.fr" target="_blank" rel="noreferrer">
-          موقع WinRak
-        </a>
-      </section>
-
       <section className="account-card" id="account-settings">
         <h2>الإعدادات والخصوصية</h2>
-        <button className="account-link" type="button" onClick={() => navigate("/privacy")}>
-          سياسة الخصوصية
+        <Link className="account-link" to="/privacy">سياسة الخصوصية</Link>
+        <button className="account-logout" type="button" onClick={logout} disabled={loggingOut}>{loggingOut ? "جارٍ تسجيل الخروج…" : "تسجيل الخروج"}</button>
+        {activeCourse && <p className="account-empty">أكمل الطلب الحالي أو ألغِه قبل حذف حسابك.</p>}
+        <button className="account-delete" type="button" onClick={handleDelete} disabled={deleting || loading || Boolean(activeCourse) || Boolean(historyError)}>
+          {deleting ? "جارٍ حذف الحساب…" : "حذف الحساب نهائياً"}
         </button>
       </section>
-
-      {error && <p className="course-request-error" role="alert">{error}</p>}
-
-      <button className="account-logout" type="button" onClick={logout}>
-        تسجيل الخروج
-      </button>
-
-      <button
-        className="account-delete"
-        type="button"
-        onClick={handleDeleteClientAccount}
-        disabled={deleting}
-      >
-        {deleting ? "جارٍ حذف الحساب…" : "حذف الحساب نهائياً"}
-      </button>
     </section>
   );
 }

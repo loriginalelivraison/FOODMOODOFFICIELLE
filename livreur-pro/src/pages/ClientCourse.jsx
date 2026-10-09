@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Star } from "lucide-react";
 import {
   cancelCourse,
   createCommentaireLivreur,
   getCourse,
+  finishCourse,
   selectCourseDriver,
 } from "../livreursapi.js";
 import CouriersMap from "../components/CouriersMap.jsx";
@@ -13,7 +14,7 @@ import AddressLabel from "../components/AddressLabel.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
 import { clearCurrentClientCourse } from "../utils/navigation.js";
 import defaultAvatar from "../assets/pasdephoto.png";
-import { getCourseSteps, getCourseStepIndex, getCourseStatusLabel, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
+import { canFinishCourse, getCourseSteps, getCourseStepIndex, getCourseStatusLabel, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
 const VEHICLE_LABELS = {
   moto: "عامل توصيل",
   scooter: "عامل توصيل",
@@ -39,23 +40,43 @@ export default function ClientCourse() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [showCancellation, setShowCancellation] = useState(false);
+  const [cancelReason, setCancelReason] = useState("changed_mind");
+  const [cancelComment, setCancelComment] = useState("");
+  const mutationVersion = useRef(0);
+  const mutationPending = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    let pending = false;
+    let terminal = false;
+    setCourse(null);
+    setError("");
+    setReviewSubmitted(false);
+    setReviewMessage("");
+    setReviewRating(5);
+    setReviewError("");
+    setShowCancellation(false);
 
     async function refreshCourse() {
+      if (pending || terminal || mutationPending.current) return;
+      pending = true;
+      const version = mutationVersion.current;
       try {
         const data = await getCourse(id);
-        if (!cancelled) {
+        if (!cancelled && version === mutationVersion.current) {
           setCourse(data);
           setError("");
           if (["completed", "cancelled"].includes(data.status)) {
+            terminal = true;
             clearCurrentClientCourse(data.id);
           } else {
             localStorage.setItem("currentClientCourseId", String(data.id));
           }
         }
       } catch (err) {
+        if (cancelled || version !== mutationVersion.current) return;
         if (!cancelled && err.status === 401) {
           navigate("/connexion-client", { replace: true });
           return;
@@ -66,6 +87,8 @@ export default function ClientCourse() {
           return;
         }
         if (!cancelled) setError(err.message || "تعذر تحميل الرحلة.");
+      } finally {
+        pending = false;
       }
     }
 
@@ -82,29 +105,29 @@ export default function ClientCourse() {
     };
   }, [id, navigate]);
 
-  useEffect(() => {
-    if (course?.status !== "completed") return undefined;
-    const timeout = setTimeout(() => navigate("/", { replace: true }), 12000);
-    return () => clearTimeout(timeout);
-  }, [course?.status, navigate]);
-
-  async function handleCancel() {
-    if (!course || cancelling || ["completed", "cancelled"].includes(course.status)) return;
+  async function handleCancel(event) {
+    event.preventDefault();
+    if (!course || mutationPending.current || ["completed", "cancelled"].includes(course.status)) return;
+    mutationPending.current = true;
+    mutationVersion.current += 1;
     setCancelling(true);
     setError("");
     try {
-      const updated = await cancelCourse(course.id, "changed_mind");
+      const updated = await cancelCourse(course.id, cancelReason, cancelComment.trim());
       setCourse(updated);
       clearCurrentClientCourse(course.id);
     } catch (err) {
       setError(err.message || (isDeliveryVehicle(course.vehicle_type) ? "تعذر إلغاء الطلب." : "تعذر إلغاء الرحلة."));
     } finally {
+      mutationPending.current = false;
       setCancelling(false);
     }
   }
 
   async function handleSelectDriver(driverId) {
-    if (!course || selectingDriverId !== null) return;
+    if (!course || mutationPending.current) return;
+    mutationPending.current = true;
+    mutationVersion.current += 1;
     setSelectingDriverId(driverId);
     setError("");
     try {
@@ -118,7 +141,26 @@ export default function ClientCourse() {
         setError(refreshError.message || "تعذر تحديث حالة الرحلة.");
       }
     } finally {
+      mutationPending.current = false;
       setSelectingDriverId(null);
+    }
+  }
+
+  async function handleFinish() {
+    if (!course || !canFinishCourse(course) || mutationPending.current) return;
+    if (!window.confirm(isDeliveryVehicle(course.vehicle_type) ? "هل تم تسليم الطلب بالفعل؟" : "هل وصلت إلى وجهتك وانتهت الرحلة؟")) return;
+    mutationPending.current = true;
+    mutationVersion.current += 1;
+    setFinishing(true);
+    setError("");
+    try {
+      setCourse(await finishCourse(course.id));
+      clearCurrentClientCourse(course.id);
+    } catch (err) {
+      setError(err.message || "تعذر تأكيد الوصول.");
+    } finally {
+      mutationPending.current = false;
+      setFinishing(false);
     }
   }
 
@@ -135,7 +177,6 @@ export default function ClientCourse() {
       });
       localStorage.setItem(`courseReviewSubmitted:${course.id}`, "true");
       setReviewSubmitted(true);
-      navigate("/", { replace: true });
     } catch (err) {
       setReviewError(err.message || "تعذر إرسال تقييمك. يرجى المحاولة مجدداً.");
     } finally {
@@ -155,7 +196,7 @@ export default function ClientCourse() {
   const acceptedDrivers = course.accepted_drivers || [];
   const selectedDriver = acceptedDrivers.find(
     (candidate) => String(candidate.id) === String(course.livreur)
-  ) || acceptedDrivers[0];
+  );
   const stepIndex = getCourseStepIndex(course.status);
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
   if (course.status === "cancelled") {
@@ -217,10 +258,16 @@ export default function ClientCourse() {
     <section className="page" dir="rtl">
       <header className="course-follow-header">
         <div>
-          <span className="course-request-kicker">WinRak · الرحلة رقم {course.id}</span>
+          <span className="course-request-kicker">WinRak · {isDelivery ? "الطلب" : "الرحلة"} رقم {course.id}</span>
           <h1>{isDelivery ? "متابعة التوصيل" : "متابعة الرحلة"}</h1>
         </div>
       </header>
+
+      <div className="course-summary" aria-label="ملخص الطلب">
+        {(course.pickup_address || course.pickup_name) && <p><span>{isDelivery ? "الاستلام" : "الانطلاق"}</span><AddressLabel text={course.pickup_address || course.pickup_name} /></p>}
+        {course.destination && <p><span>{isDelivery ? "التسليم" : "الوجهة"}</span><AddressLabel text={course.destination} /></p>}
+        {(course.final_price ?? course.proposed_price) != null && <p><span>السعر</span><strong>{course.final_price ?? course.proposed_price} دج</strong></p>}
+      </div>
 
       {stepIndex >= 0 && (
         <nav
@@ -281,7 +328,7 @@ export default function ClientCourse() {
                 <button
                   type="button"
                   onClick={() => handleSelectDriver(driver.id)}
-                  disabled={selectingDriverId !== null}
+                  disabled={selectingDriverId !== null || cancelling}
                 >
                   {selectingDriverId === driver.id ? "جارٍ التأكيد…" : "اختيار"}
                 </button>
@@ -417,16 +464,46 @@ export default function ClientCourse() {
           </section>
         )}
 
-        {active && (
+        {course.status === "completed" && <button className="secondary-btn full" type="button"
+          disabled={submittingReview} onClick={() => navigate("/livreurs", { replace: true })}>
+          {reviewAlreadySubmitted ? "طلب رحلة أو توصيل جديد" : "العودة للرئيسية"}
+        </button>}
+
+        {canFinishCourse(course) && <button className="primary-btn full" type="button" onClick={handleFinish} disabled={finishing || cancelling}>
+          {finishing ? "جارٍ التأكيد…" : isDelivery ? "تأكيد استلام الطلب" : "تأكيد الوصول"}
+        </button>}
+
+        {active && !showCancellation && (
           <button
             className="course-cancel-button"
             type="button"
-            onClick={handleCancel}
-            disabled={cancelling}
+            onClick={() => setShowCancellation(true)}
+            disabled={finishing || selectingDriverId !== null}
           >
             {cancelling ? "جارٍ الإلغاء…" : isDelivery ? "إلغاء الطلب" : "إلغاء الرحلة"}
           </button>
         )}
+
+        {active && showCancellation && <form className="course-cancel-form account-form" onSubmit={handleCancel}>
+          <h2>{isDelivery ? "تأكيد إلغاء الطلب" : "تأكيد إلغاء الرحلة"}</h2>
+          <label>سبب الإلغاء
+            <select value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} disabled={cancelling}>
+              <option value="changed_mind">لم أعد بحاجة إلى الخدمة</option>
+              <option value="driver_delay">تأخر السائق</option>
+              <option value="request_error">خطأ في الطلب</option>
+              <option value="other">سبب آخر</option>
+            </select>
+          </label>
+          {cancelReason === "other" && <label>توضيح السبب
+            <textarea value={cancelComment} onChange={(event) => setCancelComment(event.target.value)} maxLength={500} required />
+          </label>}
+          <div className="account-form-actions">
+            <button className="cancel" type="button" onClick={() => setShowCancellation(false)} disabled={cancelling}>الاحتفاظ بالطلب</button>
+            <button className="course-cancel-button" type="submit" disabled={cancelling || finishing || selectingDriverId !== null || (cancelReason === "other" && !cancelComment.trim())}>
+              {cancelling ? "جارٍ الإلغاء…" : "تأكيد الإلغاء"}
+            </button>
+          </div>
+        </form>}
       </div>
 
       {error && <p className="course-request-error" role="alert">{error}</p>}

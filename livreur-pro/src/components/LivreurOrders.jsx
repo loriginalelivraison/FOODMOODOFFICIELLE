@@ -30,6 +30,7 @@ export default function LivreurOrders({
   onAccept,
   onReject,
   onFinish,
+  onRetry,
 }) {
   const { ongoing, toAccept, waiting } = useMemo(
     () => groupDriverCourses(courses, livreurId),
@@ -59,7 +60,10 @@ export default function LivreurOrders({
       </div>
 
       {loading && <LoadingSpinner label="جاري تحميل الطلبات..." />}
-      {error && <p className="driver-orders-error" role="alert"><WifiOff size={20} aria-hidden="true" />تعذر تحديث الطلبات. تحقق من اتصال الإنترنت.{toAccept.length + ongoing.length + waiting.length > 0 && " نعرض آخر تحديث متاح."}</p>}
+      {error && <div className="driver-orders-error" role="alert"><WifiOff size={20} aria-hidden="true" />
+        <span>{error}{toAccept.length + ongoing.length + waiting.length > 0 && " نعرض آخر تحديث متاح."}</span>
+        {onRetry && <button className="secondary-btn small" type="button" onClick={onRetry} disabled={loading}>إعادة المحاولة</button>}
+      </div>}
 
       {!loading && !error && toAccept.length === 0 && ongoing.length === 0 && waiting.length === 0 && (
         <div className="orders-empty">

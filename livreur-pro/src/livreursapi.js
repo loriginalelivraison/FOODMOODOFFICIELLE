@@ -1,7 +1,8 @@
 import { toArabicMessage } from "./utils/messagesAr.js";
+import { clearStoredSession, readStoredAccount } from "./utils/navigation.js";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+  import.meta.env?.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 function getCleanToken() {
   return localStorage.getItem("access")?.replaceAll('"', "").trim();
@@ -20,7 +21,8 @@ function handleInvalidToken(data) {
     if (redirectingToLogin) return;
     redirectingToLogin = true;
     const loginPath = localStorage.getItem("role") === "livreur" ? "/inscription-livreur" : "/connexion-client";
-    localStorage.clear();
+    clearStoredSession();
+    window.dispatchEvent(new Event("authChanged"));
     window.location.replace(loginPath);
   }
 }
@@ -30,7 +32,7 @@ function authHeaders(extra = {}) {
 
   return {
     ...extra,
-    Authorization: `Bearer ${token}`,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
@@ -38,6 +40,14 @@ function requireClientRole() {
   if (localStorage.getItem("role") !== "client" || !getCleanToken()) {
     throw new Error("يلزم حساب عميل لطلب رحلة. سجّل الدخول بحساب عميل.");
   }
+}
+
+function registrationMessage(data, fallback) {
+  if (data.password) return toArabicMessage(data.password, "اختر كلمة مرور من 8 أحرف على الأقل، غير شائعة ولا تتكوّن من أرقام فقط.");
+  if (data.nom) return toArabicMessage(data.nom, "أدخل اسماً صحيحاً من 100 حرف كحد أقصى.");
+  if (data.ville) return toArabicMessage(data.ville, "أدخل المدينة.");
+  if (data.photo) return toArabicMessage(data.photo, "اختر صورة صالحة للحساب.");
+  return toArabicMessage(data.error || data.detail || data.telephone || data, fallback);
 }
 
 export async function getDriverDocuments(id) {
@@ -116,15 +126,14 @@ export async function loginJWT(credentials) {
   const livreur = profileResponse.ok ? await profileResponse.json() : null;
 
   if (!livreur) {
-    localStorage.clear();
     throw new Error("هذا الحساب ليس حساب سائق. يرجى تسجيل الدخول من فضاء العميل.");
   }
 
   const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
 
-  await clearCurrentDriverFcmToken();
+  await clearCurrentDriverFcmToken().catch(() => {});
 
-  localStorage.clear();
+  clearStoredSession();
 
   if (redirectAfterLogin) {
     localStorage.setItem("redirectAfterLogin", redirectAfterLogin);
@@ -170,8 +179,8 @@ export async function createLivreur(livreur) {
 
   if (!response.ok) {
     throw new Error(
-      toArabicMessage(
-        data.error || data.telephone,
+      registrationMessage(
+        data,
         "حدث خطأ أثناء إنشاء حساب السائق."
       )
     );
@@ -206,6 +215,7 @@ export async function clearLivreurFcmToken(id) {
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/clear_fcm_token/`, {
     method: "DELETE",
     headers: authHeaders(),
+    signal: AbortSignal.timeout(5000),
   });
   const data = await response.json().catch(() => ({}));
 
@@ -219,10 +229,11 @@ export async function clearLivreurFcmToken(id) {
 
 export async function clearCurrentDriverFcmToken() {
   if (localStorage.getItem("role") === "client") {
-    const client = JSON.parse(localStorage.getItem("client") || "null");
+    const client = readStoredAccount("client");
     if (client?.id) {
       await fetch(`${API_BASE_URL}/clients/${client.id}/update_fcm_token/`, {
         method: "DELETE", headers: authHeaders(),
+        signal: AbortSignal.timeout(5000),
       });
     }
     return;
@@ -236,7 +247,26 @@ export async function clearCurrentDriverFcmToken() {
     return;
   }
 
-  if (livreur?.id) return clearLivreurFcmToken(livreur.id);
+  if (livreur?.id) {
+    // Leaving this account must also stop advertising it for new requests.
+    return Promise.allSettled([
+      clearLivreurFcmToken(livreur.id),
+      fetch(`${API_BASE_URL}/livreurs/${livreur.id}/set_offline/`, {
+        method: "PATCH", headers: authHeaders(), signal: AbortSignal.timeout(5000),
+      }),
+    ]);
+  }
+}
+
+export async function logoutCurrentAccount() {
+  try {
+    await clearCurrentDriverFcmToken();
+  } catch {
+    // Local logout must remain available when the server cannot be reached.
+  } finally {
+    clearStoredSession();
+    window.dispatchEvent(new Event("authChanged"));
+  }
 }
 
 export async function getLivreurBytelephone(telephone) {
@@ -331,9 +361,9 @@ export async function getCommentairesLivreur(livreurId) {
 export async function createCommentaireLivreur(commentaire) {
   const response = await fetch(`${API_BASE_URL}/commentaires-livreurs/`, {
     method: "POST",
-    headers: {
+    headers: authHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(commentaire),
   });
 
@@ -364,7 +394,7 @@ export async function createClient(client) {
 
   if (!response.ok) {
     throw new Error(
-      toArabicMessage(data.error, "حدث خطأ أثناء إنشاء حساب العميل.")
+      registrationMessage(data, "حدث خطأ أثناء إنشاء حساب العميل.")
     );
   }
 
@@ -389,11 +419,23 @@ export async function loginClient(credentials) {
     throw new Error(toArabicMessage(data.detail, "تعذر تسجيل دخول العميل."));
   }
 
+  const profileResponse = await fetch(`${API_BASE_URL}/clients/`, {
+    headers: { Authorization: `Bearer ${data.access}` },
+  });
+  if (!profileResponse.ok) throw new Error("تعذر تحميل حساب العميل. حاول مجدداً.");
+  const profiles = await profileResponse.json();
+  const clean = (value) => String(value || "").replace(/\s/g, "");
+  const client = (Array.isArray(profiles) ? profiles : profiles.results || [])
+    .find((profile) => clean(profile.telephone) === clean(credentials.telephone));
+  if (!client) {
+    throw new Error("هذا الحساب ليس حساب عميل. يرجى تسجيل الدخول من فضاء السائق.");
+  }
+
   const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
 
-  await clearCurrentDriverFcmToken();
+  await clearCurrentDriverFcmToken().catch(() => {});
 
-  localStorage.clear();
+  clearStoredSession();
 
   if (redirectAfterLogin) {
     localStorage.setItem("redirectAfterLogin", redirectAfterLogin);
@@ -402,13 +444,6 @@ export async function loginClient(credentials) {
   localStorage.setItem("access", data.access);
   localStorage.setItem("refresh", data.refresh);
   localStorage.setItem("role", "client");
-
-  const client = await getClientByTelephone(credentials.telephone);
-
-  if (!client) {
-    localStorage.clear();
-    throw new Error("هذا الحساب ليس حساب عميل. يرجى تسجيل الدخول من فضاء السائق.");
-  }
 
   localStorage.setItem(
     "client",
@@ -594,7 +629,10 @@ export async function createCourseRequest(request) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(toArabicMessage(data.detail || data.error, "تعذر إنشاء طلب الرحلة."));
+    const error = new Error(toArabicMessage(data.detail || data.error, "تعذر إنشاء طلب الرحلة."));
+    error.status = response.status;
+    error.courseId = data.course_id;
+    throw error;
   }
   return data;
 }

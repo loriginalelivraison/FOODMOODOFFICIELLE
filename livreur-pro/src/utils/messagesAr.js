@@ -1,6 +1,8 @@
 const arabicPattern = /[\u0600-\u06FF]/;
 
 const translations = [
+  ["Un compte avec ce téléphone existe déjà", "رقم الهاتف مسجّل بالفعل. سجّل الدخول إلى حسابك."],
+  ["Ce téléphone est déjà utilisé", "رقم الهاتف مسجّل بالفعل. سجّل الدخول إلى حسابك."],
   ["Given token not valid", "رمز الدخول غير صالح. يرجى تسجيل الدخول من جديد."],
   ["token_not_valid", "رمز الدخول غير صالح. يرجى تسجيل الدخول من جديد."],
   ["Token is invalid", "رمز الدخول غير صالح. يرجى تسجيل الدخول من جديد."],

@@ -13,7 +13,8 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import AddressLabel from "../components/AddressLabel.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
-import { getDriverDashboardPath } from "../utils/navigation.js";
+import { getDriverDashboardPath, readStoredAccount } from "../utils/navigation.js";
+import { canRespondToDriverOffer, formatDriverNumber } from "../utils/driverOrders.js";
 import { OfferCountdown } from "../components/LivreurOrders.jsx";
 import useDriverCourseLocation from "../hooks/useDriverCourseLocation.js";
 import { canFinishCourse, getCourseTarget, getCourseStatusLabel, getDriverCourseHint, isDeliveryVehicle, isDropoffStage } from "../utils/courseTracking.js";
@@ -36,15 +37,43 @@ export default function LivreurCourse() {
   const [reason, setReason] = useState("cannot_complete");
   const [comment, setComment] = useState("");
   const [responding, setResponding] = useState(false);
+  const [offerExpired, setOfferExpired] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const actionInFlight = useRef(false);
+  const revision = useRef(0);
   const locationError = useDriverCourseLocation(course);
+  const busy = responding || updatingStatus || finishing;
+
+  useEffect(() => {
+    setOfferExpired(course?.my_offer_expires_in != null && Number(course.my_offer_expires_in) <= 0);
+  }, [course?.id, course?.my_offer_expires_in]);
+
+  useEffect(() => {
+    if (!course) return;
+    const driver = readStoredAccount("livreur");
+    if (driver?.id && String(course.livreur) === String(driver.id) && course.active
+      && !["completed", "cancelled"].includes(course.status)) {
+      localStorage.setItem("activeDriverCourseId", String(course.id));
+    } else if (localStorage.getItem("activeDriverCourseId") === String(course.id)) {
+      localStorage.removeItem("activeDriverCourseId");
+    }
+  }, [course?.id, course?.livreur, course?.active, course?.status]);
 
   useEffect(() => {
     let cancelled = false;
+    setCourse(null);
+    setError("");
+    setRefreshError("");
 
     async function refreshCourse() {
+      if (actionInFlight.current) return;
+      const currentRevision = revision.current;
       try {
         const data = await getCourse(id);
-        if (!cancelled) setCourse(data);
+        if (!cancelled && !actionInFlight.current && currentRevision === revision.current) {
+          setCourse(data);
+          setRefreshError("");
+        }
       } catch (err) {
         if (!cancelled && err.status === 401) {
           navigate("/inscription-livreur", { replace: true });
@@ -54,7 +83,7 @@ export default function LivreurCourse() {
           navigate(getDriverDashboardPath(), { replace: true });
           return;
         }
-        if (!cancelled) setError(err.message || "تعذر تحميل الرحلة.");
+        if (!cancelled && !actionInFlight.current && currentRevision === revision.current) setRefreshError(err.message || "تعذر تحميل الرحلة.");
       }
     }
     refreshCourse();
@@ -72,11 +101,13 @@ export default function LivreurCourse() {
   }, [id, navigate]);
 
   async function startRoute(event) {
-    if (!course || !getCourseTarget(course) || updatingStatus) {
+    if (!course || !getCourseTarget(course) || actionInFlight.current) {
       event.preventDefault();
       return;
     }
     if (course.status === "driver_selected") {
+      actionInFlight.current = true;
+      revision.current += 1;
       setUpdatingStatus(true);
       setError("");
       try {
@@ -85,13 +116,16 @@ export default function LivreurCourse() {
       } catch (err) {
         setError(err.message || "تعذر تحديث حالة الرحلة.");
       } finally {
+        actionInFlight.current = false;
         setUpdatingStatus(false);
       }
     }
   }
 
   async function handleStatusAction(action) {
-    if (!course || updatingStatus) return;
+    if (!course || actionInFlight.current) return;
+    actionInFlight.current = true;
+    revision.current += 1;
     setUpdatingStatus(true);
     setError("");
     try {
@@ -107,27 +141,37 @@ export default function LivreurCourse() {
     } catch (err) {
       setError(err.message || "تعذر تحديث حالة الرحلة.");
     } finally {
+      actionInFlight.current = false;
       setUpdatingStatus(false);
     }
   }
 
   async function handleCancel(event) {
     event.preventDefault();
-    if (!course || updatingStatus) return;
+    if (!course || actionInFlight.current) return;
+    if (reason === "other" && !comment.trim()) {
+      setError("يرجى توضيح سبب الإلغاء.");
+      return;
+    }
+    actionInFlight.current = true;
+    revision.current += 1;
     setUpdatingStatus(true);
     setError("");
     try {
-      const updated = await cancelCourse(course.id, reason, comment);
+      const updated = await cancelCourse(course.id, reason, reason === "other" ? comment.trim() : "");
       setCourse(updated);
     } catch (err) {
       setError(err.message || (isDeliveryVehicle(course.vehicle_type) ? "تعذر إلغاء الطلب." : "تعذر إلغاء الرحلة."));
     } finally {
+      actionInFlight.current = false;
       setUpdatingStatus(false);
     }
   }
 
   async function handleOfferResponse(response) {
-    if (!course || responding) return;
+    if (!canRespondToDriverOffer(course) || offerExpired || actionInFlight.current) return;
+    actionInFlight.current = true;
+    revision.current += 1;
     setResponding(true);
     setError("");
     try {
@@ -141,6 +185,7 @@ export default function LivreurCourse() {
       setError(err.message || "هذه الرحلة لم تعد متاحة.");
       setCourse(await getCourse(course.id).catch(() => course));
     } finally {
+      actionInFlight.current = false;
       setResponding(false);
     }
   }
@@ -155,8 +200,10 @@ export default function LivreurCourse() {
   }, [course, navigate, notificationAction]);
 
   async function handleFinishCourse() {
-    if (!course || !canFinishCourse(course) || finishing) return;
+    if (!course || !canFinishCourse(course) || actionInFlight.current) return;
 
+    actionInFlight.current = true;
+    revision.current += 1;
     setFinishing(true);
     setError("");
 
@@ -165,14 +212,16 @@ export default function LivreurCourse() {
       setCourse(updated);
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
+    } finally {
+      actionInFlight.current = false;
       setFinishing(false);
     }
   }
 
-  if (error && !course) {
+  if ((error || refreshError) && !course) {
     return (
       <section className="page" dir="rtl">
-        <p role="alert" style={{ color: "#b91c1c", textAlign: "center" }}>{error}</p>
+        <p role="alert" style={{ color: "#b91c1c", textAlign: "center" }}>{error || refreshError}</p>
         <button className="primary-btn full" onClick={() => navigate(getDriverDashboardPath(), { replace: true })}>
           رجوع
         </button>
@@ -189,7 +238,9 @@ export default function LivreurCourse() {
   }
 
   const hasClientLocation =
-    course.client_latitude !== null && course.client_longitude !== null;
+    course.client_latitude != null && course.client_longitude != null
+    && course.client_latitude !== "" && course.client_longitude !== ""
+    && Number.isFinite(Number(course.client_latitude)) && Number.isFinite(Number(course.client_longitude));
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
   if (course.status === "cancelled") {
     return <CourseCancelledState isDelivery={isDelivery} isDriver cancelledBy={course.cancelled_by_type} onContinue={() => navigate(getDriverDashboardPath(course.livreur), { replace: true })} />;
@@ -197,6 +248,9 @@ export default function LivreurCourse() {
   const routeIsDestination = isDropoffStage(course.status);
   const routeTarget = getCourseTarget(course);
   const isOffer = !course.livreur && ["searching", "driver_accepted"].includes(course.status);
+  const canRespond = canRespondToDriverOffer(course) && !offerExpired;
+  const unavailableOffer = isOffer && course.my_offer_response !== "accepted" && !canRespond;
+  const offerLabel = unavailableOffer ? "الطلب غير متاح" : course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد";
   const hasRouteTarget = Boolean(routeTarget);
   const courseStatusClass = isOffer && course.my_offer_response === "accepted"
     ? "driver_accepted"
@@ -204,20 +258,20 @@ export default function LivreurCourse() {
   const vehicleLabels = { moto: "دراجة نارية", scooter: "دراجة نارية", voiture: "سيارة", camion: "شاحنة" };
 
   return (
-    <section className="page" dir="rtl">
+    <section className="page driver-course-page" dir="rtl">
       <header className="course-follow-header">
         <div>
           <span className="course-request-kicker">WinRak · الرحلة رقم {course.id}</span>
           <h1>{isDelivery ? "تفاصيل التوصيل" : "تفاصيل الرحلة"}</h1>
         </div>
         <strong className={`course-status-badge status-${courseStatusClass}`}>
-          {isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد" : getCourseStatusLabel(course)}
+          {isOffer ? offerLabel : getCourseStatusLabel(course)}
         </strong>
       </header>
 
-      {isOffer && course.my_offer_response === "pending" && (
+      {isOffer && course.my_offer_response === "pending" && !offerExpired && (
         <div className="offer-countdown-banner">
-          <OfferCountdown seconds={course.my_offer_expires_in} />
+          <OfferCountdown seconds={course.my_offer_expires_in} onExpire={() => setOfferExpired(true)} />
           <span>اقبل الطلب قبل انتهاء المهلة.</span>
         </div>
       )}
@@ -226,11 +280,12 @@ export default function LivreurCourse() {
         <div className="course-stage-card" aria-live="polite" data-scroll-step={`${course.status}:${course.my_offer_response || ""}`}>
           <span className="course-stage-indicator" aria-hidden="true" />
           <div>
-            <strong>{isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد" : getCourseStatusLabel(course)}</strong>
-            <p>{isOffer ? course.my_offer_response === "accepted" ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : getDriverCourseHint(course)}</p>
+            <strong>{isOffer ? offerLabel : getCourseStatusLabel(course)}</strong>
+            <p>{isOffer ? unavailableOffer ? "انتهت مهلة الطلب أو لم يعد متاحاً. ارجع إلى الطلبات للاطلاع على الفرص الجديدة." : course.my_offer_response === "accepted" ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : getDriverCourseHint(course)}</p>
           </div>
         </div>
       )}
+      {unavailableOffer && <button className="secondary-btn full" type="button" onClick={() => navigate(getDriverDashboardPath(), { replace: true })}>العودة إلى الطلبات</button>}
       {course.status === "completed" && (
         <div className="course-terminal-message course-terminal-completed" role="status" data-scroll-step="completed">
           <strong>{isDelivery ? "تم تسليم الطلب بنجاح" : "اكتملت الرحلة بنجاح"}</strong>
@@ -246,13 +301,20 @@ export default function LivreurCourse() {
         <span><b>موقع العميل</b>{hasClientLocation ? "متوفر" : "غير متوفر"}</span>
         <span><b>المسافة</b>{course.estimated_distance_km == null ? "غير متوفرة" : `${course.estimated_distance_km} كم`}</span>
         <span><b>المركبة</b>{vehicleLabels[course.vehicle_type] || course.vehicle_type || "غير محددة"}</span>
-        <span><b>السعر</b>{course.final_price ?? course.proposed_price} دج</span>
+        <span><b>السعر</b><bdi>{formatDriverNumber(course.final_price ?? course.proposed_price)}</bdi> دج</span>
       </div>
 
-      {isOffer && course.my_offer_response !== "accepted" && (
+      {course.active && course.livreur && (course.client_phone || course.pickup_phone) && (
+        <div className="driver-course-contacts" aria-label="جهات الاتصال">
+          {course.client_phone && <a className="secondary-btn" href={`tel:${course.client_phone}`}>الاتصال بالعميل{course.client_name ? ` · ${course.client_name}` : ""}</a>}
+          {isDelivery && course.pickup_phone && <a className="secondary-btn" href={`tel:${course.pickup_phone}`}>الاتصال بنقطة الاستلام</a>}
+        </div>
+      )}
+
+      {canRespond && (
         <div className="driver-offer-actions" dir="rtl">
-          <button type="button" onClick={() => handleOfferResponse("accepted")} disabled={responding}>قبول</button>
-          <button type="button" onClick={() => handleOfferResponse("rejected")} disabled={responding}>رفض</button>
+          <button type="button" onClick={() => handleOfferResponse("accepted")} disabled={busy}>{responding ? "جارٍ الإرسال…" : "قبول"}</button>
+          <button type="button" onClick={() => handleOfferResponse("rejected")} disabled={busy}>رفض</button>
         </div>
       )}
 
@@ -262,7 +324,7 @@ export default function LivreurCourse() {
         target="_blank"
         rel="noopener noreferrer"
         onClick={startRoute}
-        aria-disabled={updatingStatus}
+        aria-disabled={busy}
         style={{
           background: "#16a34a",
           display: "block",
@@ -276,21 +338,22 @@ export default function LivreurCourse() {
 
       {locationError && <p className="course-request-error" role="alert">{locationError}</p>}
       {error && <p className="course-request-error" role="alert">{error}</p>}
+      {refreshError && <p className="course-request-error" role="alert">{refreshError} نعرض آخر تحديث متاح.</p>}
 
       {["driver_selected", "driver_arriving"].includes(course.status) && (
-        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("arrive")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
+        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("arrive")} disabled={busy} style={{ marginTop: "12px", background: "#176b53" }}>
           {updatingStatus ? "جارٍ تحديث الحالة…" : isDelivery ? "وصلت إلى نقطة الاستلام" : "وصلت إلى نقطة الانطلاق"}
         </button>
       )}
 
       {course.status === "driver_arrived" && (
-        <button className="primary-btn full" type="button" onClick={() => handleStatusAction(isDelivery ? "pickup" : "start")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
+        <button className="primary-btn full" type="button" onClick={() => handleStatusAction(isDelivery ? "pickup" : "start")} disabled={busy} style={{ marginTop: "12px", background: "#176b53" }}>
           {updatingStatus ? "جارٍ تحديث الحالة…" : isDelivery ? "تم استلام الطلب" : "بدء الرحلة"}
         </button>
       )}
 
       {course.status === "picked_up" && (
-        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("start")} disabled={updatingStatus} style={{ marginTop: "12px", background: "#176b53" }}>
+        <button className="primary-btn full" type="button" onClick={() => handleStatusAction("start")} disabled={busy} style={{ marginTop: "12px", background: "#176b53" }}>
           {updatingStatus ? "جارٍ تحديث الحالة…" : isDelivery ? "بدء التوصيل" : "بدء الرحلة"}
         </button>
       )}
@@ -300,8 +363,8 @@ export default function LivreurCourse() {
           className="primary-btn full"
           type="button"
           onClick={handleFinishCourse}
-          disabled={finishing}
-          style={{ marginTop: "14px", background: "#dc2626" }}
+          disabled={busy}
+          style={{ marginTop: "14px", background: "#176b53" }}
         >
           {finishing ? <LoadingSpinner label="جارٍ التأكيد..." size={20} /> : isDelivery ? "تم تسليم الطلب" : "إنهاء الرحلة"}
         </button>
@@ -320,7 +383,7 @@ export default function LivreurCourse() {
             </select>
           </label>
           {reason === "other" && <label data-scroll-step="cancel-reason">توضيح<textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={500} required /></label>}
-          <button type="submit" disabled={updatingStatus}>{updatingStatus ? "جارٍ الإلغاء…" : "تأكيد الإلغاء"}</button>
+          <button type="submit" disabled={busy}>{updatingStatus ? "جارٍ الإلغاء…" : "تأكيد الإلغاء"}</button>
         </form>
       )}
     </section>
