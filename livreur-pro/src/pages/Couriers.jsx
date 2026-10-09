@@ -237,7 +237,7 @@ function CourseTrackingPanel({
 
                   return (
                     <article className="accepted-driver-card" key={driver.id}>
-                      <img src={profile?.photo || defaultAvatar} alt="" />
+                      <img src={driver.photo || profile?.photo || defaultAvatar} alt="" />
                       <div className="accepted-driver-details">
                         <strong>{driver.nom}</strong>
                         <span>
@@ -290,7 +290,7 @@ function CourseTrackingPanel({
             {selectedDriver && (
               <article className="confirmed-driver-card">
                 <img
-                  src={selectedDriverProfile?.photo || defaultAvatar}
+                  src={selectedDriver.photo || selectedDriverProfile?.photo || defaultAvatar}
                   alt=""
                   className="confirmed-driver-photo"
                 />

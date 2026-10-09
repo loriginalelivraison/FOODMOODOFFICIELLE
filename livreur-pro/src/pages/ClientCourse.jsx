@@ -254,7 +254,7 @@ export default function ClientCourse() {
           <div className="accepted-driver-list">
             {acceptedDrivers.map((driver) => (
               <article className="accepted-driver-card" key={driver.id}>
-                <img src={defaultAvatar} alt="" />
+                <img src={driver.photo || defaultAvatar} alt="" />
                 <div className="accepted-driver-details">
                   <strong>{driver.nom}</strong>
                   <span>
@@ -291,7 +291,7 @@ export default function ClientCourse() {
             )}
             {selectedDriver && (
               <article className="confirmed-driver-card">
-                <img src={defaultAvatar} alt="" className="confirmed-driver-photo" />
+                <img src={selectedDriver.photo || defaultAvatar} alt="" className="confirmed-driver-photo" />
                 <div className="confirmed-driver-details">
                   <strong>{selectedDriver.nom}</strong>
                   <span>{VEHICLE_LABELS[selectedDriver.vehicule] || selectedDriver.vehicule}</span>
