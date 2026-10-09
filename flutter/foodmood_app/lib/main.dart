@@ -18,6 +18,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'web_session.dart';
+
 const String backendUrl =
     "https://foodmood-backend-bfc29fe902a0.herokuapp.com/api";
 const String courseOfferCategory = "COURSE_OFFER";
@@ -225,17 +227,24 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await Firebase.initializeApp();
-
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  await initializeBackgroundService();
-
-  runApp(const FoodMoodApp());
+  var notificationsEnabled = false;
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    notificationsEnabled = true;
+  } catch (_) {
+    debugPrint('Push notifications unavailable; the web app remains accessible.');
+  }
+  try {
+    await initializeBackgroundService();
+  } catch (_) {
+    debugPrint('Background location unavailable; foreground tracking remains available.');
+  }
+  runApp(FoodMoodApp(home: FoodMoodWebView(notificationsEnabled: notificationsEnabled)));
 }
 
 Future<void> initializeBackgroundService() async {
+  if (defaultTargetPlatform != TargetPlatform.android) return;
   const AndroidNotificationChannel locationChannel = AndroidNotificationChannel(
     'foodmood_location',
     'موقع WinRak',
@@ -272,6 +281,7 @@ Future<void> initializeBackgroundService() async {
     androidConfiguration: AndroidConfiguration(
       onStart: onStart,
       autoStart: false,
+      autoStartOnBoot: false,
       isForegroundMode: true,
       notificationChannelId: 'foodmood_location',
       initialNotificationTitle: 'WinRak نشط',
@@ -289,11 +299,17 @@ void onStart(ServiceInstance service) async {
 
   String? token;
   String? livreurId;
+  var sending = false;
+  var stopped = false;
+  Timer? timer;
 
-  service.on("setAuth").listen((event) {
-    token = event?["token"]?.toString();
-    livreurId = event?["livreurId"]?.toString();
-  });
+  Future<void> stopTracking() async {
+    stopped = true;
+    token = null;
+    livreurId = null;
+    timer?.cancel();
+    await service.stopSelf();
+  }
 
   if (service is AndroidServiceInstance) {
     await service.setAsForegroundService();
@@ -304,37 +320,59 @@ void onStart(ServiceInstance service) async {
     );
   }
 
-  Timer.periodic(const Duration(seconds: 15), (timer) async {
-    if (token == null || livreurId == null) return;
-
-    final enabled = await Geolocator.isLocationServiceEnabled();
-    if (!enabled) return;
-
-    final permission = await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
-
+  Future<void> sendPosition() async {
+    if (stopped || sending || token == null || livreurId == null) return;
+    sending = true;
+    final currentToken = token;
+    final currentDriver = livreurId;
     try {
-      await http.patch(
-        Uri.parse("$backendUrl/livreurs/$livreurId/update_position/"),
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) return;
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
+      );
+      // A logout/account switch may arrive while obtaining the position.
+      if (stopped || currentToken != token || currentDriver != livreurId) return;
+      final response = await http.patch(
+        Uri.parse("$backendUrl/livreurs/$currentDriver/update_position/"),
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
+          "Authorization": "Bearer $currentToken",
         },
         body: jsonEncode({
           "latitude": position.latitude,
           "longitude": position.longitude,
         }),
-      );
-    } catch (_) {}
+      ).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        token = null;
+        livreurId = null;
+      }
+    } catch (_) {
+      // GPS/network interruptions are retried without overlapping requests.
+    } finally {
+      sending = false;
+    }
+  }
+
+  service.on('stopService').listen((_) => stopTracking());
+  service.on('setAuth').listen((event) {
+    if (stopped) return;
+    token = event?['token']?.toString();
+    livreurId = event?['livreurId']?.toString();
+    if (token == null || token!.isEmpty || !isValidAccountId(livreurId)) {
+      stopTracking();
+      return;
+    }
+    sendPosition();
   });
+  timer = Timer.periodic(const Duration(seconds: 15), (_) => sendPosition());
+  service.invoke('ready');
 }
 
 class FoodMoodApp extends StatelessWidget {
@@ -347,21 +385,30 @@ class FoodMoodApp extends StatelessWidget {
     return MaterialApp(
       title: 'WinRak',
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF97316)),
+        useMaterial3: true,
+      ),
       home: home,
     );
   }
 }
 
 class FoodMoodWebView extends StatefulWidget {
-  const FoodMoodWebView({super.key});
+  const FoodMoodWebView({super.key, this.notificationsEnabled = true});
+
+  final bool notificationsEnabled;
 
   @override
   State<FoodMoodWebView> createState() => _FoodMoodWebViewState();
 }
 
-class _FoodMoodWebViewState extends State<FoodMoodWebView> {
+class _FoodMoodWebViewState extends State<FoodMoodWebView>
+    with WidgetsBindingObserver {
   late final WebViewController controller;
   bool isLoading = true;
+  bool pageFailed = false;
+  Uri lastPage = Uri.parse(webAppUrl);
 
   final FlutterLocalNotificationsPlugin localNotifications =
       FlutterLocalNotificationsPlugin();
@@ -370,6 +417,10 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   StreamSubscription<String>? tokenSubscription;
   StreamSubscription<RemoteMessage>? messageSubscription;
   StreamSubscription<RemoteMessage>? openedSubscription;
+  StreamSubscription<Map<String, dynamic>?>? serviceReadySubscription;
+  WebSession? _session;
+  String? _locationAuth;
+  bool _appIsForeground = true;
 
   Future<void> initializeLocalNotifications() async {
     await localNotifications.initialize(
@@ -414,66 +465,49 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
   }
 
   Future<void> requestPermissions() async {
-    await Permission.location.request();
-    await Permission.notification.request();
-
-    final settings = await FirebaseMessaging.instance.requestPermission(
+    await FirebaseMessaging.instance.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
-
-    debugPrint("PERMISSION NOTIFICATION = ${settings.authorizationStatus}");
-
-    final service = FlutterBackgroundService();
-    final isRunning = await service.isRunning();
-
-    if (!isRunning) {
-      await service.startService();
-    }
   }
 
   String? _syncedAccount;
   bool _syncingAuth = false;
 
   Future<void> syncAuthFromWebView() async {
-    if (_syncingAuth) return;
+    if (_syncingAuth || !mounted) return;
     _syncingAuth = true;
     try {
       final currentUrl = Uri.tryParse(await controller.currentUrl() ?? '');
-      if (currentUrl?.scheme != 'https' ||
-          !{'www.winrak.fr', 'winrak.fr'}.contains(currentUrl?.host)) {
-        return;
-      }
-      dynamic auth = await controller.runJavaScriptReturningResult("""
+      if (!isTrustedWebUrl(currentUrl)) return;
+      final auth = await controller.runJavaScriptReturningResult("""
         JSON.stringify({token: localStorage.getItem('access'),
           role: localStorage.getItem('role'),
+          online: localStorage.getItem('livreurOnline'),
+          activeCourseId: localStorage.getItem('activeDriverCourseId'),
           account: localStorage.getItem(localStorage.getItem('role') === 'client' ? 'client' : 'livreur')})
       """);
-      for (var i = 0; i < 2 && auth is String; i++) {
-        auth = jsonDecode(auth);
-      }
-      if (auth is! Map ||
-          auth['token'] == null ||
-          auth['account'] == null ||
-          !['client', 'livreur'].contains(auth['role'])) {
+      final session = WebSession.fromJavaScript(auth);
+      _session = session;
+      await syncLocationService();
+      if (session == null) {
         _syncedAccount = null;
         return;
       }
-      final account = jsonDecode(auth['account'] as String) as Map;
+      if (!widget.notificationsEnabled) return;
       final token = fcmToken ?? await FirebaseMessaging.instance.getToken();
-      if (token == null || account['id'] == null) return;
-      final identity = '${auth['role']}:${account['id']}:$token';
+      if (token == null) return;
+      final identity = '${session.identity}:$token';
       if (_syncedAccount == identity) return;
-      final collection = auth['role'] == 'client' ? 'clients' : 'livreurs';
       final response = await http.patch(
-        Uri.parse('$backendUrl/$collection/${account['id']}/update_fcm_token/'),
+        Uri.parse('$backendUrl/${session.collection}/${session.accountId}/update_fcm_token/'),
         headers: {
-          'Authorization': 'Bearer ${auth['token']}',
+          'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'fcm_token': token}),
-      );
+      ).timeout(const Duration(seconds: 12));
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _syncedAccount = identity;
       }
@@ -484,13 +518,52 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     }
   }
 
-  Future<void> openExternal(String url) async {
-    final uri = Uri.parse(url);
+  Future<void> syncLocationService() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    final service = FlutterBackgroundService();
+    final session = _session;
+    final running = await service.isRunning();
+    if (session == null || !session.locationEnabled) {
+      _locationAuth = null;
+      if (running) service.invoke('stopService');
+      return;
+    }
+    // Android requires a visible activity and granted location permission to
+    // start this foreground service. The website requests GPS when needed.
+    if (!await Permission.location.isGranted) {
+      _locationAuth = null;
+      if (running) service.invoke('stopService');
+      return;
+    }
+    if (!running) {
+      if (!_appIsForeground) return;
+      _locationAuth = null;
+      await service.startService();
+    }
+    final identity = '${session.identity}:${session.accessToken}';
+    if (_locationAuth == identity && running) return;
+    _locationAuth = identity;
+    service.invoke('setAuth', {
+      'token': session.accessToken,
+      'livreurId': session.accountId,
+    });
+  }
 
+  Future<void> openExternal(String url) async {
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint("Impossible d'ouvrir : $url");
+      final uri = Uri.tryParse(url);
+      if (uri == null ||
+          !{'https', 'http', 'tel', 'mailto', 'sms', 'whatsapp', 'geo', 'comgooglemaps'}.contains(uri.scheme)) {
+        return;
+      }
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      debugPrint('External application unavailable.');
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح الرابط. تحقق من التطبيقات المثبتة.')),
+      );
     }
   }
 
@@ -504,25 +577,30 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     FirebaseMessaging.instance.getToken().then((token) {
       fcmToken = token;
       _syncedAccount = null;
-    });
+      syncAuthFromWebView();
+    }).catchError((Object _) { debugPrint('Push token will be retried.'); });
 
     tokenSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((
       token,
     ) {
       fcmToken = token;
       _syncedAccount = null;
+      syncAuthFromWebView();
     });
 
     messageSubscription = FirebaseMessaging.onMessage.listen((
       RemoteMessage message,
-    ) {
-      debugPrint(
-        "NOTIFICATION REÇUE FOREGROUND : ${message.notification?.title}",
-      );
-      showForegroundNotification(message);
-      controller.runJavaScript(
-        'window.dispatchEvent(new CustomEvent("winrakPush", {detail: ${jsonEncode(notificationPayload(message.data))}}));',
-      );
+    ) async {
+      try {
+        await showForegroundNotification(message);
+        if (mounted && isTrustedWebUrl(Uri.tryParse(await controller.currentUrl() ?? ''))) {
+          await controller.runJavaScript(
+            'window.dispatchEvent(new CustomEvent("winrakPush", {detail: ${jsonEncode(notificationPayload(message.data))}}));',
+          );
+        }
+      } catch (_) {
+        debugPrint('Foreground notification could not be displayed.');
+      }
     });
 
     openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
@@ -536,24 +614,29 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
       if (message != null) {
         openCourseFromNotification(jsonEncode(message.data));
       }
-    });
+    }).catchError((Object _) { debugPrint('Initial push unavailable.'); });
   }
 
   @override
   void initState() {
     super.initState();
-
-    requestPermissions();
+    WidgetsBinding.instance.addObserver(this);
 
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFFFFFFFF))
+      ..addJavaScriptChannel('WinRakSession', onMessageReceived: (_) {
+        syncAuthFromWebView();
+      })
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
             if (!mounted) return;
             setState(() {
               isLoading = true;
+              pageFailed = false;
+              final uri = Uri.tryParse(url);
+              if (isTrustedWebUrl(uri)) lastPage = uri!;
             });
           },
           onPageFinished: (String url) async {
@@ -561,57 +644,74 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
             setState(() {
               isLoading = false;
             });
-
+            if (!isTrustedWebUrl(Uri.tryParse(url)) || pageFailed) return;
+            try {
+              await controller.runJavaScript('''
+                if (!window.__winrakSessionBridge) {
+                  window.__winrakSessionBridge = true;
+                  const sync = () => WinRakSession.postMessage('sync');
+                  window.addEventListener('authChanged', sync);
+                  window.addEventListener('storage', sync);
+                  document.addEventListener('visibilitychange', sync);
+                }
+              ''');
+            } catch (_) {
+              // A navigation can replace the document before this executes.
+            }
             await syncAuthFromWebView();
           },
+          onWebResourceError: (error) {
+            if (error.isForMainFrame == true || error.url == lastPage.toString()) {
+              showPageFailure();
+            }
+          },
+          onHttpError: (error) {
+            if (error.request?.isForMainFrame == true) showPageFailure();
+          },
           onNavigationRequest: (NavigationRequest request) async {
-            final url = request.url;
-
-            if (url.startsWith('tel:')) {
-              await openExternal(url);
-              return NavigationDecision.prevent;
-            }
-
-            if (url.startsWith('https://wa.me/') ||
-                url.startsWith('http://wa.me/') ||
-                url.startsWith('whatsapp://')) {
-              await openExternal(url);
-              return NavigationDecision.prevent;
-            }
-
-            if (url.startsWith('https://www.google.com/maps/') ||
-                url.startsWith('https://maps.google.com/')) {
-              await openExternal(url);
-              return NavigationDecision.prevent;
-            }
-
-            return NavigationDecision.navigate;
+            final uri = Uri.tryParse(request.url);
+            if (isTrustedWebUrl(uri)) return NavigationDecision.navigate;
+            if (request.isMainFrame) await openExternal(request.url);
+            return NavigationDecision.prevent;
           },
         ),
       )
-      ..loadRequest(Uri.parse("https://www.winrak.fr"));
+      ..loadRequest(lastPage);
     if (controller.platform is AndroidWebViewController) {
       final androidController = controller.platform as AndroidWebViewController;
 
       androidController.setOnShowFileSelector((params) async {
-        final image = await ImagePicker().pickImage(
-          source: ImageSource.gallery,
-        );
-
-        if (image == null) {
+        try {
+          if (!isTrustedWebUrl(Uri.tryParse(await controller.currentUrl() ?? ''))) return [];
+          final picker = ImagePicker();
+          if (params.mode == FileSelectorMode.openMultiple && !params.isCaptureEnabled) {
+            final images = await picker.pickMultiImage();
+            return images.map((image) => Uri.file(image.path).toString()).toList();
+          }
+          final image = await picker.pickImage(
+            source: params.isCaptureEnabled ? ImageSource.camera : ImageSource.gallery,
+          );
+          return image == null ? [] : [Uri.file(image.path).toString()];
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تعذر اختيار الصورة. تحقق من الأذونات وحاول مجددًا.')),
+            );
+          }
           return [];
         }
-
-        return [Uri.file(image.path).toString()];
       });
 
       androidController.setGeolocationPermissionsPromptCallbacks(
         onShowPrompt: (request) async {
+          if (!isTrustedWebUrl(Uri.tryParse(request.origin))) {
+            return const GeolocationPermissionsResponse(allow: false, retain: false);
+          }
           final status = await Permission.location.request();
-
+          syncAuthFromWebView();
           return GeolocationPermissionsResponse(
             allow: status.isGranted,
-            retain: true,
+            retain: status.isGranted,
           );
         },
       );
@@ -621,9 +721,45 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
       await syncAuthFromWebView();
     });
 
-    initializeLocalNotifications().then((_) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      serviceReadySubscription = FlutterBackgroundService().on('ready').listen((_) {
+        _locationAuth = null;
+        syncLocationService();
+      });
+    }
+    if (widget.notificationsEnabled) initializeNotifications();
+  }
+
+  Future<void> initializeNotifications() async {
+    try {
+      await initializeLocalNotifications();
+      await requestPermissions();
       if (mounted) listenFirebaseMessages();
+    } catch (_) {
+      debugPrint('Push notifications unavailable for this session.');
+    }
+  }
+
+  void showPageFailure() {
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+      pageFailed = true;
     });
+  }
+
+  Future<void> handleBack() async {
+    if (await controller.canGoBack()) {
+      await controller.goBack();
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      await SystemNavigator.pop();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appIsForeground = state == AppLifecycleState.resumed;
+    if (_appIsForeground) syncAuthFromWebView();
   }
 
   @override
@@ -632,18 +768,71 @@ class _FoodMoodWebViewState extends State<FoodMoodWebView> {
     tokenSubscription?.cancel();
     messageSubscription?.cancel();
     openedSubscription?.cancel();
+    serviceReadySubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            WebViewWidget(controller: controller),
-            if (isLoading) const Center(child: CircularProgressIndicator()),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) handleBack();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              WebViewWidget(controller: controller),
+              if (pageFailed)
+                WebConnectionError(onRetry: () {
+                  setState(() {
+                    pageFailed = false;
+                    isLoading = true;
+                  });
+                  controller.loadRequest(lastPage);
+                }),
+              if (isLoading)
+                const Align(
+                  alignment: Alignment.topCenter,
+                  child: LinearProgressIndicator(semanticsLabel: 'جارٍ التحميل'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class WebConnectionError extends StatelessWidget {
+  const WebConnectionError({super.key, required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.wifi_off_rounded, size: 48, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 20),
+                Text('تعذر تحميل WinRak', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                const Text('تحقق من اتصال الإنترنت ثم حاول مجددًا.', textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
+              ],
+            ),
+          ),
         ),
       ),
     );

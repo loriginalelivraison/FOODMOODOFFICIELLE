@@ -20,4 +20,14 @@ void main() {
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.text('WinRak test screen'), findsOneWidget);
   });
+
+  testWidgets('connection failure gives a visible retry action', (tester) async {
+    var retries = 0;
+    await tester.pumpWidget(FoodMoodApp(
+      home: Scaffold(body: WebConnectionError(onRetry: () => retries++)),
+    ));
+    expect(find.text('تعذر تحميل WinRak'), findsOneWidget);
+    await tester.tap(find.text('إعادة المحاولة'));
+    expect(retries, 1);
+  });
 }
