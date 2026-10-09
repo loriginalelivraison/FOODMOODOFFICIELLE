@@ -10,6 +10,8 @@ import {
 } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import AddressLabel from "../components/AddressLabel.jsx";
+import { readStoredAccount } from "../utils/navigation.js";
 
 const STATUS_LABELS = {
   searching: "جارٍ البحث عن سائق",
@@ -37,8 +39,7 @@ export default function ClientDashboard() {
   const navigate = useNavigate();
 
   const [client, setClient] = useState(() => {
-    const stored = localStorage.getItem("client");
-    return stored ? JSON.parse(stored) : null;
+    return readStoredAccount("client");
   });
 
   const [editingProfile, setEditingProfile] = useState(false);
@@ -298,7 +299,7 @@ export default function ClientDashboard() {
           <>
             <div className="account-row">
               <span className="account-row-label">الوجهة</span>
-              <span className="account-row-value">{activeCourse.destination || "قيد التنفيذ"}</span>
+              <AddressLabel className="account-row-value" text={activeCourse.destination || "قيد التنفيذ"} />
             </div>
             <div className="account-row">
               <span className="account-row-label">الحالة</span>
@@ -349,7 +350,7 @@ export default function ClientDashboard() {
       </section>
 
       {editingProfile && (
-        <section className="account-card">
+        <section className="account-card" data-scroll-step="edit-profile">
           <h2>تعديل المعلومات</h2>
           <form className="account-form" onSubmit={handleProfileSave}>
             <label>
@@ -405,7 +406,7 @@ export default function ClientDashboard() {
             <div className="account-item-meta">
               <span>{formatDate(course.created_at)}</span>
               {course.livreur && <span>السائق: {course.livreur}</span>}
-              {course.destination && <span>{course.destination}</span>}
+              {course.destination && <AddressLabel text={course.destination} />}
               {(course.final_price ?? course.proposed_price) != null && (
                 <span className="account-item-price">{course.final_price ?? course.proposed_price} دج</span>
               )}

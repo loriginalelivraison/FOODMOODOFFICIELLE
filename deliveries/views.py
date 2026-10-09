@@ -285,6 +285,7 @@ def register_livreur(request):
     telephone = request.data.get("telephone")
     ville = request.data.get("ville")
     vehicule = request.data.get("vehicule")
+    modele_vehicule = request.data.get("modele_vehicule", "")
     password = request.data.get("password")
 
     if not nom or not telephone or not password:
@@ -317,6 +318,7 @@ def register_livreur(request):
             telephone=telephone,
             ville=ville,
             vehicule=vehicule,
+            modele_vehicule=modele_vehicule,
             disponible=True,
             photo=request.FILES.get("photo"),
         )

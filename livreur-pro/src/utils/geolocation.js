@@ -64,14 +64,27 @@ export function requestUserPosition(options = {}) {
     return Promise.reject(new Error("الموقع الجغرافي غير مدعوم في هذا المتصفح."));
   }
 
+  const { retryWithLowAccuracy = false, ...positionOptions } = options;
   const settings = {
     enableHighAccuracy: true,
     timeout: 15000,
     maximumAge: 0,
-    ...options,
+    ...positionOptions,
   };
 
   return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, settings);
+    navigator.geolocation.getCurrentPosition(resolve, (error) => {
+      // A desktop may have network positioning but no precise GPS fix.
+      // Retry once, keeping the same cache age and respecting permission denial.
+      if (retryWithLowAccuracy && settings.enableHighAccuracy && [2, 3].includes(error.code)) {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          ...settings,
+          enableHighAccuracy: false,
+          timeout: Math.min(settings.timeout, 10000),
+        });
+        return;
+      }
+      reject(error);
+    }, settings);
   });
 }

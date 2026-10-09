@@ -7,6 +7,7 @@ function getCleanToken() {
   return localStorage.getItem("access")?.replaceAll('"', "").trim();
 }
 
+let redirectingToLogin = false;
 function handleInvalidToken(data) {
   const message = JSON.stringify(data || "");
 
@@ -16,9 +17,11 @@ function handleInvalidToken(data) {
     message.includes("Token is invalid") ||
     message.includes("Token is expired")
   ) {
+    if (redirectingToLogin) return;
+    redirectingToLogin = true;
+    const loginPath = localStorage.getItem("role") === "livreur" ? "/inscription-livreur" : "/connexion-client";
     localStorage.clear();
-    window.dispatchEvent(new Event("authChanged"));
-    window.location.href = "/connexion-livreur";
+    window.location.replace(loginPath);
   }
 }
 
@@ -139,6 +142,7 @@ export async function loginJWT(credentials) {
       telephone: credentials.telephone,
       ville: livreur.ville,
       vehicule: livreur.vehicule,
+      modele_vehicule: livreur.modele_vehicule || "",
       photo: livreur.photo,
     })
   );
@@ -721,7 +725,9 @@ export async function getCourse(courseId) {
 
   if (!response.ok) {
     handleInvalidToken(data);
-    throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء جلب الرحلة."));
+    const error = new Error(toArabicMessage(data.detail, "حدث خطأ أثناء جلب الرحلة."));
+    error.status = response.status;
+    throw error;
   }
 
   return data;

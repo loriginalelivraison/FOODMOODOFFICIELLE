@@ -1513,6 +1513,13 @@ input::placeholder {
   font-weight: 600;
 }
 
+.pro-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+}
+
 .main-content {
   padding-bottom: 82px;
 }
@@ -1531,8 +1538,33 @@ input::placeholder {
   }
 
   .pro-topbar {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 3000;
+    width: 100%;
+    direction: ltr;
     height: 62px;
-    padding: 8px 4vw;
+    padding: 8px 12px;
+    gap: 8px;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.09);
+  }
+
+  .main-content {
+    padding-top: 62px;
+    padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pro-brand { gap: 7px; flex: 0 0 auto; }
+
+  .pro-topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+    margin-left: auto;
   }
 
   .pro-logo {
@@ -1550,11 +1582,14 @@ input::placeholder {
   }
 
   .pro-auth-status {
+    direction: rtl;
     font-size: 12px;
-    padding: 6px 9px;
-    max-width: 120px;
+    padding: 6px 8px;
+    max-width: min(30vw, 110px);
     overflow: hidden;
     white-space: nowrap;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
   }
 
   .bottom-nav {
@@ -1562,10 +1597,10 @@ input::placeholder {
     left: 12px;
     right: 12px;
     bottom: 12px;
-    z-index: 2000;
+    z-index: 4000;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    background: rgba(255, 255, 255, 0.96);
+    background: #fff;
     border: 1px solid #fed7aa;
     border-radius: 24px;
     padding: 8px;
@@ -1910,7 +1945,7 @@ input::placeholder {
 
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
 
-  z-index: 999;
+  z-index: 4000;
 }
 
 .bottom-link {
@@ -2370,7 +2405,7 @@ input::placeholder {
   border-radius: 8px;
   background: #f4f7f6;
 }
-.course-destination span { color: #68777d; font-size: 11px; }
+.course-destination > span { color: #68777d; font-size: 11px; }
 .course-destination strong { color: #263940; font-size: 14px; overflow-wrap: anywhere; }
 .course-review-card {
   margin: 0;

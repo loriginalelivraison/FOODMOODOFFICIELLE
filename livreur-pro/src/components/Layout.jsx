@@ -1,16 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useNavigation, useLocation } from "react-router-dom";
 import { Home, Users, User, LogIn, Lock, ArrowLeft } from "lucide-react";
 
 import LogoutButton from "./LogoutButton";
 import LoadingSpinner from "./LoadingSpinner";
+import PageScrollManager from "./PageScrollManager.jsx";
 import logo from "../assets/logo3.png";
+import { getHomePath, isValidId, readStoredAccount } from "../utils/navigation.js";
 
 export default function Layout() {
   const navigate = useNavigate();
   const navigation = useNavigation();
   const location = useLocation();
+  const contentRef = useRef(null);
   const driverAccountView = new URLSearchParams(location.search).get("section") === "account";
+  const driverDashboardView = location.pathname.startsWith("/livreur-dashboard/");
 
   const [auth, setAuth] = useState({
     token: null,
@@ -28,11 +32,8 @@ export default function Layout() {
     const token = localStorage.getItem("access");
     const role = localStorage.getItem("role");
 
-    const clientStorage = localStorage.getItem("client");
-    const livreurStorage = localStorage.getItem("livreur");
-
-    const client = clientStorage ? JSON.parse(clientStorage) : null;
-    const livreur = livreurStorage ? JSON.parse(livreurStorage) : null;
+    const client = readStoredAccount("client");
+    const livreur = readStoredAccount("livreur");
 
     setAuth({
       token,
@@ -45,7 +46,7 @@ export default function Layout() {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate("/");
+      navigate(getHomePath(), { replace: true });
     }
   }
 
@@ -61,7 +62,7 @@ export default function Layout() {
   const dashboardLink = !auth.token
     ? "/connexion-client"
     : auth.role === "livreur"
-    ? `/livreur-dashboard/${auth.user?.id}?section=account`
+    ? isValidId(auth.user?.id) ? `/livreur-dashboard/${auth.user.id}?section=account` : "/inscription-livreur"
     : "/client-dashboard";
 
   const homeLink =
@@ -71,7 +72,7 @@ export default function Layout() {
 
 
   return (
-    <div className="app-shell">
+    <div className={"app-shell" + (driverDashboardView && auth.role === "livreur" ? " driver-shell" : "")}>
       <header className="topbar pro-topbar">
         <Link to="/" className="pro-brand">
           <span className="pro-logo">
@@ -83,14 +84,7 @@ export default function Layout() {
           </span>
         </Link>
 
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: "14px",
-          }}
-        >
+        <div className="pro-topbar-actions">
           {auth.token && auth.user && (
             <span className="pro-auth-status">
               <span className="online-dot"></span>
@@ -142,7 +136,8 @@ export default function Layout() {
         </nav>
       </header>
 
-      <main className="main-content">
+      <PageScrollManager contentRef={contentRef} />
+      <main className="main-content" ref={contentRef}>
         {navigation.state === "loading" && (
           <LoadingSpinner label="جاري تحميل الصفحة..." fullPage />
         )}

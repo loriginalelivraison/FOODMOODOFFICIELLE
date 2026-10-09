@@ -125,6 +125,7 @@ export default function TrackingMap({
           name: data.nom,
           city: data.ville,
           vehicle: data.vehicule,
+          vehicleModel: data.modele_vehicule,
           phone: data.telephone,
           latitude: data.latitude,
           longitude: data.longitude,
@@ -255,7 +256,7 @@ export default function TrackingMap({
             <Popup>
               <strong>{currentCourier.name}</strong>
               <br />
-              {vehicleLabels[currentCourier.vehicle] || currentCourier.vehicle}
+              {vehicleLabels[currentCourier.vehicle] || currentCourier.vehicle}{currentCourier.vehicle === "voiture" && currentCourier.vehicleModel ? ` · ${currentCourier.vehicleModel}` : ""}
               <br />
               موقع السائق
             </Popup>

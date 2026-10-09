@@ -12,6 +12,7 @@ import {
 } from "./MapboxMap.jsx";
 
 import MapActionButton from "./MapActionButton.jsx";
+import AddressLabel from "./AddressLabel.jsx";
 
 const ALGERIA_CENTER = [36.0339, 3.6596];
 const NORTHERN_ALGERIA_BOUNDS = [
@@ -365,9 +366,9 @@ export default function CouriersMap({
                 <br />
                 {vehicleLabels[courier.vehicle || courier.vehicule] ||
                   courier.vehicle ||
-                  courier.vehicule}
+                  courier.vehicule}{(courier.vehicle || courier.vehicule) === "voiture" && (courier.vehicleModel || courier.modele_vehicule) ? ` · ${courier.vehicleModel || courier.modele_vehicule}` : ""}
                 <br />
-                {courier.city || courier.ville}
+                <AddressLabel text={courier.city || courier.ville} />
                 <br />
 
                 <small>تظهر تفاصيل التواصل بعد تأكيد السائق.</small>

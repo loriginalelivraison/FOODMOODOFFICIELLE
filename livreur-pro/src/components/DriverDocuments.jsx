@@ -55,7 +55,7 @@ export default function DriverDocuments({ driverId }) {
       </article>;
     })}
     <small>JPEG أو PNG · حتى 5 ميغابايت</small>
-    {message && <p role="status" className="document-success">{message}</p>}
+    {message && <p role="status" data-scroll-step="document-uploaded" className="document-success">{message}</p>}
     {error && <p role="alert" className="course-request-error">{error}</p>}
   </section>;
 }

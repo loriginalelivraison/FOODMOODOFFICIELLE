@@ -187,6 +187,44 @@ void main() {
   );
 
   test(
+    'native address labels stop at five words without changing route data',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      MethodCall? received;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            received = call;
+            return null;
+          });
+      const message = RemoteMessage(
+        data: {
+          'type': 'course_offer',
+          'course_id': '45',
+          'pickup_address': 'Rue Eiffel,  Le Colas, Fin d’Oise, France',
+          'destination': 'حي عشرين أوت وسط مدينة مستغانم الجزائر',
+        },
+      );
+
+      await showPushNotification(FlutterLocalNotificationsPlugin(), message);
+
+      expect(received?.arguments['pickup'], 'Rue Eiffel, Le Colas, Fin...');
+      expect(received?.arguments['destination'], 'حي عشرين أوت وسط مدينة...');
+      expect(
+        message.data['destination'],
+        'حي عشرين أوت وسط مدينة مستغانم الجزائر',
+      );
+      expect(jsonDecode(received?.arguments['payload']), {
+        'type': 'course_offer',
+        'course_id': '45',
+      });
+      expect(
+        notificationDestination(message.data, action: 'accept')?.toString(),
+        'https://www.winrak.fr/livreur-course/45?offer_action=accept',
+      );
+    },
+  );
+
+  test(
     'offers from the previous backend still display their actual price',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;

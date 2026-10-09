@@ -40,7 +40,8 @@ class PrivateDocumentStorage(FileSystemStorage):
     def _save(self, name, content):
         if not self.use_cloudinary:
             return super()._save(name, content)
-        public_id, image_format = name.rsplit(".", 1)
+        # Django generates OS-native paths; Cloudinary IDs require forward slashes.
+        public_id, image_format = name.replace("\\", "/").rsplit(".", 1)
         result = cloudinary.uploader.upload(
             content, public_id=public_id, format=image_format,
             resource_type="image", type="authenticated", overwrite=False,

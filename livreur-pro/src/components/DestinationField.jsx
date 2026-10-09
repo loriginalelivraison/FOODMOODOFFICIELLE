@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import DepartureField from "./DepartureField.jsx";
+import AddressLabel from "./AddressLabel.jsx";
 import { readDestinationHistory, rememberDestination, searchDestinations } from "../utils/destinationSearch.js";
 
 export default function DestinationField({ onSelectPlace, keepHistory = false, ...props }) {
@@ -21,8 +22,8 @@ export default function DestinationField({ onSelectPlace, keepHistory = false, .
         if (keepHistory) setHistory(rememberDestination(place));
         onSelectPlace(place);
       }}>
-        <strong dir="auto">{place.search_name}</strong>
-        <small dir="auto">{place.category} · {place.commune_secteur}</small>
+        <strong dir="auto"><AddressLabel text={place.search_name} /></strong>
+        <small dir="auto">{place.category} · <AddressLabel text={place.commune_secteur} /></small>
       </button>)}
       {props.value.trim() && !results.length && <p>لا يوجد مكان محلي مطابق · Aucun lieu local correspondant</p>}
       <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setOpen(false); props.onToggleMap(); }}>

@@ -11,7 +11,9 @@ import {
   startCourse as startCourseAction,
 } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import AddressLabel from "../components/AddressLabel.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
+import { getDriverDashboardPath } from "../utils/navigation.js";
 import { OfferCountdown } from "../components/LivreurOrders.jsx";
 import useDriverCourseLocation from "../hooks/useDriverCourseLocation.js";
 import { canFinishCourse, getCourseTarget, getCourseStatusLabel, getDriverCourseHint, isDeliveryVehicle, isDropoffStage } from "../utils/courseTracking.js";
@@ -44,6 +46,14 @@ export default function LivreurCourse() {
         const data = await getCourse(id);
         if (!cancelled) setCourse(data);
       } catch (err) {
+        if (!cancelled && err.status === 401) {
+          navigate("/inscription-livreur", { replace: true });
+          return;
+        }
+        if (!cancelled && [403, 404, 410].includes(err.status)) {
+          navigate(getDriverDashboardPath(), { replace: true });
+          return;
+        }
         if (!cancelled) setError(err.message || "تعذر تحميل الرحلة.");
       }
     }
@@ -59,7 +69,7 @@ export default function LivreurCourse() {
       clearInterval(interval);
       window.removeEventListener("winrakPush", handlePush);
     };
-  }, [id]);
+  }, [id, navigate]);
 
   async function startRoute(event) {
     if (!course || !getCourseTarget(course) || updatingStatus) {
@@ -123,7 +133,7 @@ export default function LivreurCourse() {
     try {
       await respondToCourseOffer(course.id, response);
       if (response === "rejected") {
-        navigate(`/livreur-dashboard/${course.livreur || JSON.parse(localStorage.getItem("livreur") || "{}").id}`);
+        navigate(getDriverDashboardPath(course.livreur), { replace: true });
       } else {
         setCourse(await getCourse(course.id));
       }
@@ -162,8 +172,8 @@ export default function LivreurCourse() {
   if (error && !course) {
     return (
       <section className="page" dir="rtl">
-        <p style={{ color: "#b91c1c", textAlign: "center" }}>{error}</p>
-        <button className="primary-btn full" onClick={() => navigate(-1)}>
+        <p role="alert" style={{ color: "#b91c1c", textAlign: "center" }}>{error}</p>
+        <button className="primary-btn full" onClick={() => navigate(getDriverDashboardPath(), { replace: true })}>
           رجوع
         </button>
       </section>
@@ -182,7 +192,7 @@ export default function LivreurCourse() {
     course.client_latitude !== null && course.client_longitude !== null;
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
   if (course.status === "cancelled") {
-    return <CourseCancelledState isDelivery={isDelivery} isDriver cancelledBy={course.cancelled_by_type} onContinue={() => navigate(`/livreur-dashboard/${course.livreur || JSON.parse(localStorage.getItem("livreur") || "{}").id}`, { replace: true })} />;
+    return <CourseCancelledState isDelivery={isDelivery} isDriver cancelledBy={course.cancelled_by_type} onContinue={() => navigate(getDriverDashboardPath(course.livreur), { replace: true })} />;
   }
   const routeIsDestination = isDropoffStage(course.status);
   const routeTarget = getCourseTarget(course);
@@ -213,7 +223,7 @@ export default function LivreurCourse() {
       )}
 
       {(isOffer || ["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"].includes(course.status)) && (
-        <div className="course-stage-card" aria-live="polite">
+        <div className="course-stage-card" aria-live="polite" data-scroll-step={`${course.status}:${course.my_offer_response || ""}`}>
           <span className="course-stage-indicator" aria-hidden="true" />
           <div>
             <strong>{isOffer ? course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد" : getCourseStatusLabel(course)}</strong>
@@ -222,17 +232,17 @@ export default function LivreurCourse() {
         </div>
       )}
       {course.status === "completed" && (
-        <div className="course-terminal-message course-terminal-completed" role="status">
+        <div className="course-terminal-message course-terminal-completed" role="status" data-scroll-step="completed">
           <strong>{isDelivery ? "تم تسليم الطلب بنجاح" : "اكتملت الرحلة بنجاح"}</strong>
           <span>تم تحديث حالة الرحلة للعميل أيضاً. شكراً لك.</span>
-          <button className="secondary-btn" type="button" onClick={() => navigate(`/livreur-dashboard/${course.livreur}`)}>
+          <button className="secondary-btn" type="button" onClick={() => navigate(getDriverDashboardPath(course.livreur), { replace: true })}>
             العودة إلى لوحة السائق
           </button>
         </div>
       )}
       <div className="course-details-banner" aria-label="معلومات إضافية عن الرحلة">
-        <span><b>{isDelivery ? "نقطة الاستلام" : "نقطة الانطلاق"}</b>{course.pickup_address || course.pickup_name || "موقع العميل"}</span>
-        {course.destination && <span><b>{isDelivery ? "نقطة التسليم" : "نقطة الوصول"}</b>{course.destination}</span>}
+        <span><b>{isDelivery ? "نقطة الاستلام" : "نقطة الانطلاق"}</b><AddressLabel text={course.pickup_address || course.pickup_name || "موقع العميل"} /></span>
+        {course.destination && <span><b>{isDelivery ? "نقطة التسليم" : "نقطة الوصول"}</b><AddressLabel text={course.destination} /></span>}
         <span><b>موقع العميل</b>{hasClientLocation ? "متوفر" : "غير متوفر"}</span>
         <span><b>المسافة</b>{course.estimated_distance_km == null ? "غير متوفرة" : `${course.estimated_distance_km} كم`}</span>
         <span><b>المركبة</b>{vehicleLabels[course.vehicle_type] || course.vehicle_type || "غير محددة"}</span>
@@ -264,7 +274,7 @@ export default function LivreurCourse() {
           : isDelivery ? "التوجه إلى نقطة الاستلام عبر Google Maps" : "التوجه إلى نقطة الانطلاق عبر Google Maps"}
       </a>}
 
-      {locationError && <p className="course-request-error" role="status">{locationError}</p>}
+      {locationError && <p className="course-request-error" role="alert">{locationError}</p>}
       {error && <p className="course-request-error" role="alert">{error}</p>}
 
       {["driver_selected", "driver_arriving"].includes(course.status) && (
@@ -309,7 +319,7 @@ export default function LivreurCourse() {
               <option value="other">سبب آخر</option>
             </select>
           </label>
-          {reason === "other" && <label>توضيح<textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={500} required /></label>}
+          {reason === "other" && <label data-scroll-step="cancel-reason">توضيح<textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={500} required /></label>}
           <button type="submit" disabled={updatingStatus}>{updatingStatus ? "جارٍ الإلغاء…" : "تأكيد الإلغاء"}</button>
         </form>
       )}

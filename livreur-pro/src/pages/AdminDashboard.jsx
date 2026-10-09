@@ -4,6 +4,7 @@ import { getLivreurs } from "../livreursapi";
 import { ClipboardList, ShieldCheck, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import AddressLabel from "../components/AddressLabel.jsx";
 
 
 export default function AdminDashboard() {
@@ -36,6 +37,7 @@ useEffect(() => {
           name: livreur.nom,
           city: livreur.ville,
           vehicle: livreur.vehicule,
+          vehicleModel: livreur.modele_vehicule,
           available: livreur.disponible,
           rating: livreur.note || 5,
           deliveries: livreur.nombre_livraisons || 0,
@@ -71,7 +73,7 @@ useEffect(() => {
   if (error) {
     return (
       <section className="page">
-        <p style={{ color: "red" }}>{error}</p>
+        <p role="alert" style={{ color: "red" }}>{error}</p>
       </section>
     );
   }
@@ -126,8 +128,8 @@ useEffect(() => {
               {couriers.map((courier) => (
                 <tr key={courier.id}>
                   <td>{courier.name}</td>
-                  <td>{courier.city}</td>
-                  <td>{courier.vehicle}</td>
+                  <td><AddressLabel text={courier.city} /></td>
+                  <td>{courier.vehicle}{courier.vehicle === "voiture" && courier.vehicleModel ? ` · ${courier.vehicleModel}` : ""}</td>
                   <td>
                     {courier.available ? "Disponible" : "Indisponible"}
                   </td>

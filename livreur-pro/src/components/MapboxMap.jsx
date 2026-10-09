@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "mapbox-gl/dist/mapbox-gl.css";
+import LoadingSpinner from "./LoadingSpinner.jsx";
 
 const MapContext = createContext(null);
 const MarkerContext = createContext(null);
@@ -8,11 +9,12 @@ const lngLat = ([lat, lng]) => [Number(lng), Number(lat)];
 export const createMarkerIcon = (options) => options;
 export const useMap = () => useContext(MapContext);
 
-export function MapContainer({ center, zoom, style, children }) {
+export function MapContainer({ center, zoom, style, children, interactive = true, controls = true, loadingLabel }) {
   const container = useRef(null);
   const initial = useRef({ center, zoom });
   const [adapter, setAdapter] = useState(null);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     let disposed = false;
     let map;
@@ -33,14 +35,16 @@ export function MapContainer({ center, zoom, style, children }) {
           container: container.current, accessToken: token,
           style: "mapbox://styles/mapbox/streets-v12",
           center: lngLat(initial.current.center), zoom: initial.current.zoom,
+          interactive,
         });
-        map.addControl(new gl.NavigationControl({ showCompass: false }), "top-left");
+        if (controls) map.addControl(new gl.NavigationControl({ showCompass: false }), "top-left");
         map.on("error", () => setError("تعذر تحميل الخريطة. تحقق من اتصال الإنترنت."));
-        map.on("load", () => setError(""));
+        map.on("load", () => { if (!disposed) { setError(""); setLoaded(true); } });
         resize = new ResizeObserver(() => map.resize());
         resize.observe(container.current);
         setAdapter({
           raw: map, gl,
+          isDisposed: () => disposed,
           flyTo: (point, level, options = {}) => map.flyTo({ center: lngLat(point), zoom: level, duration: (options.duration ?? 1.2) * 1000 }),
           fitBounds: (points, options) => {
             const bounds = new gl.LngLatBounds();
@@ -71,6 +75,7 @@ export function MapContainer({ center, zoom, style, children }) {
   return <div style={{ ...style, position: "relative" }}>
     <div ref={container} className="mapbox-map-container" style={{ height: "100%", width: "100%" }} />
     {adapter && <MapContext.Provider value={adapter}>{children}</MapContext.Provider>}
+    {loadingLabel && !loaded && !error && <div className="mapbox-loading"><LoadingSpinner label={loadingLabel} /></div>}
     {error && <div className="mapbox-error" role="alert">{error}</div>}
   </div>;
 }
@@ -132,6 +137,7 @@ export function Polyline({ positions, pathOptions }) {
   latest.current = { positions, pathOptions };
   useEffect(() => {
     const update = () => {
+      if (map.isDisposed()) return;
       const current = latest.current;
       const data = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: current.positions.map(lngLat) } };
       const paint = { "line-color": current.pathOptions.color, "line-width": current.pathOptions.weight, "line-dasharray": current.pathOptions.dashArray ? [2, 2] : [1, 0] };
@@ -148,6 +154,8 @@ export function Polyline({ positions, pathOptions }) {
     return () => map.raw.off("load", update);
   }, [map, id, key]);
   useEffect(() => () => {
+    // The container may already have destroyed the map during page navigation.
+    if (map.isDisposed()) return;
     if (map.raw.getLayer(id)) map.raw.removeLayer(id);
     if (map.raw.getSource(id)) map.raw.removeSource(id);
   }, [map, id]);

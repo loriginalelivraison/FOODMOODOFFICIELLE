@@ -12,7 +12,9 @@ import {
 import TrackingMap from "./TrackingMap.jsx";
 import pasdephoto from "../assets/pasdephoto.png";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import AddressLabel from "../components/AddressLabel.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
+import { clearCurrentClientCourse, readStoredAccount } from "../utils/navigation.js";
 import {
   getLocationErrorMessage,
   isIOSDevice,
@@ -102,6 +104,7 @@ export default function Tracking() {
           if (clientWatchRef.current !== null) navigator.geolocation.clearWatch(clientWatchRef.current);
           clientWatchRef.current = null;
           localStorage.removeItem(`activeTrackingCourse_${id}`);
+          clearCurrentClientCourse(course.id);
           setCancelledCourse(course);
           return;
         }
@@ -141,6 +144,7 @@ export default function Tracking() {
           name: livreur.nom,
           city: livreur.ville,
           vehicle: livreur.vehicule,
+          vehicleModel: livreur.modele_vehicule,
           available: Boolean(livreur.disponible) && livreur.est_en_ligne !== false,
           phone: livreur.telephone,
           photo: livreur.photo,
@@ -218,8 +222,7 @@ export default function Tracking() {
 
   async function handleCourseAccepted() {
     if (!requireClientAuth()) return;
-    const clientStorage = localStorage.getItem("client");
-    const client = clientStorage ? JSON.parse(clientStorage) : null;
+    const client = readStoredAccount("client");
 
     if (!client?.id) {
       navigate("/connexion-client");
@@ -523,7 +526,7 @@ export default function Tracking() {
   if (error) {
     return (
       <section className="page" dir="rtl">
-        {error}
+        <p role="alert">{error}</p>
       </section>
     );
   }
@@ -586,7 +589,7 @@ export default function Tracking() {
                 fontWeight: "600",
               }}
             >
-              📍 {courier.city}
+              📍 <AddressLabel text={courier.city} />
             </p>
 
             <p
@@ -596,7 +599,7 @@ export default function Tracking() {
                 fontWeight: "700",
               }}
             >
-              {getVehicleLabel(courier.vehicle)}
+              {getVehicleLabel(courier.vehicle)}{courier.vehicle === "voiture" && courier.vehicleModel ? ` · ${courier.vehicleModel}` : ""}
             </p>
 
             <p
@@ -680,7 +683,7 @@ export default function Tracking() {
       </div>
 
       {showAcceptedQuestion && !courseStarted && (
-        <div className="tracking-card">
+        <div className="tracking-card" data-scroll-step="confirm-driver">
           <h3>هل قبل السائق الرحلة؟</h3>
 
           <div
@@ -746,6 +749,7 @@ export default function Tracking() {
 
       {showCommentQuestion && !showCommentForm && (
         <div
+          data-scroll-step="review-question"
           className="tracking-card"
           style={{
             textAlign: "center",
@@ -804,7 +808,7 @@ export default function Tracking() {
       )}
 
       {showCommentForm && (
-        <form className="tracking-card" onSubmit={handleSubmitComment}>
+        <form className="tracking-card" data-scroll-step="review" onSubmit={handleSubmitComment}>
           <h3>
             {courseFinished
               ? "هل تريد ترك تعليق حول السائق؟"
@@ -863,13 +867,15 @@ export default function Tracking() {
           </button>
 
           {commentError && (
-            <p style={{ color: "red" }}>{commentError}</p>
+            <p role="alert" style={{ color: "red" }}>{commentError}</p>
           )}
         </form>
       )}
 
       {commentSuccess && (
         <p
+          role="status"
+          data-scroll-step="review-sent"
           style={{
             color: "green",
             textAlign: "center",

@@ -139,6 +139,7 @@ class CourseSerializer(serializers.ModelSerializer):
                 "id": driver.id,
                 "nom": driver.nom,
                 "vehicule": driver.vehicule,
+                "modele_vehicule": driver.modele_vehicule,
                 "telephone": driver.telephone if obj.active and obj.livreur_id == driver.id else None,
                 "est_en_ligne": driver.est_en_ligne,
                 "photo": OptionalPhotoField(use_url=True).to_representation(driver.photo),

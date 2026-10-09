@@ -1,0 +1,159 @@
+/* Driver screens only: the client interface keeps its existing styles. */
+.driver-shell { background: #f8f9fb; }
+.driver-shell .pro-topbar { background: #fff; border-color: #eceef2; box-shadow: none; }
+.driver-shell .pro-auth-status { display: none; }
+.driver-shell .main-content { padding-bottom: 100px; }
+.driver-dashboard-page { width: min(540px, calc(100% - 28px)); max-width: 540px; padding-block: 14px 16px; gap: 12px; }
+.driver-dashboard-page button, .driver-dashboard-page input, .driver-dashboard-page select { font: inherit; }
+.driver-dashboard-page button:focus-visible, .driver-dashboard-page a:focus-visible, .driver-dashboard-page summary:focus-visible {
+  outline: 3px solid #fdba74; outline-offset: 3px;
+}
+.driver-dashboard-page .driver-home-header { display: flex; justify-content: space-between; gap: 10px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.driver-home-identity { display: flex; align-items: center; gap: 11px; min-width: 0; border: 0; padding: 0; background: transparent; text-align: start; cursor: pointer; }
+.driver-home-identity .account-avatar { width: 48px; height: 48px; border: 2px solid #fff; background: #fff0e4; }
+.driver-home-identity .account-identity h1 { font-size: 17px; line-height: 1.4; }
+.driver-home-identity .account-role { font-size: 12px; color: #7b8493; }
+.driver-dashboard-page .account-role { justify-self: start; width: fit-content; margin: 0; line-height: 1.4; }
+.driver-availability { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 96px; min-height: 44px; padding: 8px 15px; border: 0; border-radius: 24px; font-size: 14px; font-weight: 750; white-space: nowrap; cursor: pointer; }
+.driver-availability.is-online { color: #12864c; background: #e6f6ed; }
+.driver-availability.is-offline { color: #697386; background: #eceff3; }
+.driver-availability:disabled { cursor: default; }
+.driver-status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.driver-status-hint { margin: -6px 0 0; color: #697386; font-size: 13px; text-align: center; }
+.driver-dashboard-page .orders-board { display: grid; gap: 12px; }
+.driver-dashboard-page .orders-board-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.driver-dashboard-page .orders-tile { padding: 10px 6px; min-height: 90px; border: 1px solid transparent; border-radius: 19px; gap: 4px; }
+.driver-dashboard-page .orders-tile strong { color: #202937; font-size: 24px; font-weight: 800; }
+.driver-dashboard-page .orders-tile small { color: #697386; font-size: 12px; font-weight: 500; }
+.driver-dashboard-page .orders-tile.is-offer { background: #fff5ec; }
+.driver-dashboard-page .orders-tile.is-offer.has-orders { border-color: #f7bc94; background: #fff0e7; }
+.driver-dashboard-page .orders-tile.is-waiting { background: #fff9ef; }
+.driver-dashboard-page .orders-tile.is-ongoing { background: #edf4ff; }
+.driver-dashboard-page .orders-tile.is-ongoing svg { color: #4b83d8; }
+.driver-dashboard-page .orders-tile.is-offer svg, .driver-dashboard-page .orders-tile.is-waiting svg { color: #f07820; }
+.driver-dashboard-page .orders-group { gap: 10px; }
+.driver-dashboard-page .orders-group.has-single-course > h3 { display: none; }
+.driver-dashboard-page .orders-group > h3 { color: #6a7483; font-size: 13px; font-weight: 650; margin: 0; }
+.driver-dashboard-page .orders-count { min-width: 21px; height: 21px; background: #eef0f4; color: #6a7483; }
+.driver-dashboard-page .driver-course-card { display: block; padding: 0; border: 1px solid #edf0f3; border-radius: 23px; overflow: hidden; background: #fff; box-shadow: 0 7px 24px #24304306; }
+.driver-offer-map { height: 145px; background: #edf1f3; position: relative; }
+.driver-offer-map .mapboxgl-ctrl-attrib { font-size: 9px; }
+.driver-route-unavailable { min-height: 104px; display: grid; justify-items: center; align-content: center; gap: 6px; padding: 16px; color: #778292; background: #f1f4f7; font-size: 13px; }
+.driver-route-unavailable svg { color: #9aa5b4; }
+.driver-route-unavailable small { color: #8c95a2; font-size: 11px; }
+.driver-route-pin { display: block; width: 25px; height: 25px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid #fff; box-shadow: 0 2px 6px #15223430; position: relative; }
+.driver-route-pin::after { content: ''; position: absolute; width: 7px; height: 7px; background: #fff; border-radius: 50%; inset: 6px; }
+.driver-route-pin.is-pickup { background: #10a163; }
+.driver-route-pin.is-destination { background: #f97316; }
+.driver-course-body { display: grid; gap: 8px; padding: 13px 16px 12px; }
+.driver-course-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.driver-course-heading > strong { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #273142; }
+.driver-course-heading > strong svg { color: #f29122; flex-shrink: 0; }
+.driver-vehicle-tag { padding: 5px 8px; border-radius: 20px; background: #fff3e9; color: #bd591c; font-size: 11px; white-space: nowrap; }
+.driver-course-price { display: grid; justify-items: center; gap: 1px; }
+.driver-course-price > strong { font-size: 36px; line-height: 1.3; letter-spacing: -.6px; color: #f47721; font-weight: 800; }
+.driver-course-price small { font-size: 18px; font-weight: 700; letter-spacing: 0; }
+.driver-course-price > span { color: #9099a6; font-size: 11px; }
+.driver-course-stops { display: grid; gap: 10px; position: relative; }
+.driver-course-stops::before { content: ''; position: absolute; inset-inline-start: 10px; top: 25px; bottom: 24px; border-inline-start: 1px dashed #cfd6dd; }
+.driver-course-stop { display: flex; align-items: flex-start; gap: 10px; }
+.driver-course-stop > svg { margin-top: 3px; flex-shrink: 0; background: #fff; z-index: 1; }
+.driver-course-stop > div { min-width: 0; }
+.driver-course-stop > div > span { font-size: 11px; font-weight: 750; }
+.driver-course-stop.is-pickup { color: #14975c; }
+.driver-course-stop.is-destination { color: #f07820; }
+.driver-course-stop p { margin: 3px 0 0; font-size: 14px; line-height: 1.6; color: #475569; overflow-wrap: anywhere; }
+.driver-course-metrics { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 20px; color: #6b7686; padding-block: 7px; border-top: 1px solid #f2f3f5; font-size: 12px; }
+.driver-course-metrics > span { display: inline-flex; gap: 5px; align-items: center; }
+.driver-course-metrics svg { color: #9aa4b3; }
+.driver-course-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
+.driver-course-controls:empty { display: none; }
+.driver-dashboard-page .driver-offer-actions { margin: 0; display: flex; gap: 10px; }
+.driver-dashboard-page .driver-offer-actions button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 50px; border: 0; border-radius: 13px; background: #0b9d58; color: #fff; font-size: 17px; font-weight: 750; cursor: pointer; }
+.driver-dashboard-page .driver-offer-actions button + button { background: #f04450; }
+.driver-dashboard-page .driver-offer-actions button:disabled { opacity: .55; cursor: default; }
+.driver-offer-expiry { display: grid; gap: 7px; color: #929ba7; text-align: center; font-size: 11px; }
+.driver-offer-expiry progress { display: block; width: 100%; height: 5px; border: 0; border-radius: 8px; overflow: hidden; background: #edf0f3; direction: ltr; accent-color: #f58227; }
+.driver-offer-expiry progress::-webkit-progress-bar { background: #edf0f3; border-radius: 8px; }
+.driver-offer-expiry progress::-webkit-progress-value { background: #f58227; border-radius: 8px; }
+.driver-offer-expiry progress::-moz-progress-bar { background: #f58227; border-radius: 8px; }
+.driver-offer-expiry.is-urgent { color: #d64545; }
+.driver-course-details { color: #858f9d; font-size: 11px; text-decoration: none; text-align: center; padding-block: 2px; }
+.driver-dashboard-page .order-btn-main { min-height: 46px; display: flex; justify-content: center; align-items: center; background: #f97316; text-decoration: none; }
+.driver-dashboard-page .order-card-hint { color: #758091; line-height: 1.7; font-size: 13px; }
+.driver-dashboard-page .order-card-waiting { border-color: #f8e7cf; }
+.driver-dashboard-page .order-card-ongoing { border-color: #d9e7fb; }
+.driver-dashboard-page .orders-empty { display: grid; justify-items: center; align-content: center; min-height: 285px; padding: 32px 12px; }
+.driver-dashboard-page .orders-empty-car { width: 108px; height: 108px; background: #fff0e4; color: #efb181; border-radius: 50%; }
+.driver-dashboard-page .orders-empty h3 { font-size: 21px; color: #273142; margin: 22px 0 0; }
+.driver-dashboard-page .orders-empty p { font-size: 13px; color: #929ba8; margin: 8px 0 0; }
+.driver-orders-error { display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f3d9bf; border-radius: 16px; padding: 15px; margin: 0; font-size: 13px; line-height: 1.8; color: #91612e; background: #fff9f0; }
+.driver-orders-error svg { flex-shrink: 0; margin-top: 4px; }
+.driver-dashboard-page .driver-rewards-card { display: flex; padding: 16px; gap: 12px; border: 1px solid #eceff3; border-radius: 20px; background: #fff; color: #f07820; }
+.driver-reward-icon { display: grid; place-items: center; width: 43px; height: 43px; flex-shrink: 0; border-radius: 14px; background: #ff8a26; color: #fff; }
+.driver-dashboard-page .driver-reward-copy { display: grid; gap: 3px; text-align: start; }
+.driver-reward-copy strong { font-size: 17px; }
+.driver-reward-copy > span { color: #8a94a4; font-size: 12px; }
+.driver-rewards-card > svg { margin-inline-start: auto; color: #758091; }
+.driver-account-title { display: grid; gap: 4px; }
+.driver-account-title h1 { font-size: 24px; color: #263142; margin: 0; }
+.driver-account-title > span { color: #8a94a4; font-size: 13px; }
+.driver-dashboard-page .account-card { border-radius: 20px; border-color: #eceff3; padding: 18px; gap: 14px; box-shadow: none; }
+.driver-profile-heading { display: flex; align-items: center; gap: 12px; }
+.driver-profile-heading .account-avatar { width: 58px; height: 58px; border: 0; background: #fff1e6; }
+.driver-profile-heading .account-identity { flex: 1; }
+.driver-profile-heading .account-identity h2 { margin: 0; font-size: 18px; color: #283242; overflow-wrap: anywhere; }
+.driver-profile-heading .account-role { color: #f07820; font-size: 12px; }
+.driver-profile-phone { display: flex; align-items: center; gap: 5px; color: #7e8998; font-size: 13px; }
+.driver-edit-button { display: flex; align-items: center; gap: 5px; min-height: 42px; padding: 8px 10px; border: 0; border-radius: 12px; background: #fff2e8; color: #dd7022; font-weight: 650; cursor: pointer; }
+.driver-dashboard-page .account-row { padding: 10px 0 0; }
+.driver-dashboard-page .account-row-label, .driver-dashboard-page .account-row-value { font-size: 13px; }
+.driver-dashboard-page .account-card > h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.driver-profile-form { padding-top: 14px; border-top: 1px solid #edf0f3; }
+.driver-profile-form input, .driver-profile-form select { min-height: 46px; }
+.driver-dashboard-page .driver-documents { padding: 12px 0 0; border: 0; border-top: 1px solid #edf0f3; border-radius: 0; box-shadow: none; }
+.driver-dashboard-page .driver-documents > h2 { font-size: 14px; }
+.driver-dashboard-page .driver-documents .account-points-hint { font-size: 12px; margin: 0; }
+.driver-dashboard-page .document-card { gap: 10px; padding-block: 12px; }
+.driver-dashboard-page .document-card strong { font-size: 13px; }
+.driver-dashboard-page .document-card p { font-size: 11px; line-height: 1.6; }
+.driver-dashboard-page .document-upload { min-height: 42px; display: grid; place-items: center; font-size: 12px; padding: 8px 12px; }
+.driver-dashboard-page .document-open { min-height: 40px; grid-column: 2 / -1; justify-self: start; font-size: 12px; }
+.driver-reward-line { display: flex; align-items: center; gap: 12px; }
+.driver-reward-line > div { display: grid; gap: 3px; }
+.driver-reward-line strong { color: #f07820; font-size: 18px; }
+.driver-reward-line span:not(.driver-reward-icon) { color: #8a94a4; font-size: 12px; }
+.driver-account-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 14px; border-top: 1px solid #edf0f3; }
+.driver-account-stats > span { display: flex; align-items: center; gap: 5px; color: #3f4c5e; font-weight: 650; }
+.driver-account-stats small { color: #8a94a4; font-size: 11px; font-weight: 400; }
+.driver-account-stats svg { color: #edb949; }
+.driver-account-archive { border-top: 1px solid #edf0f3; padding-top: 14px; }
+.driver-account-archive > summary { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; list-style: none; font-size: 13px; color: #586576; }
+.driver-account-archive > summary::-webkit-details-marker { display: none; }
+.driver-account-archive > summary svg:last-child { margin-inline-start: auto; }
+.driver-account-archive[open] > summary svg:last-child { transform: rotate(180deg); }
+.driver-account-history { display: grid; gap: 12px; padding-top: 10px; }
+.driver-account-history h3 { margin: 0; font-size: 13px; color: #7c8797; }
+.driver-account-history p { margin: 0; color: #6c7889; font-size: 13px; }
+.driver-dashboard-page .driver-account-settings .account-link { display: flex; align-items: center; min-height: 44px; font-size: 13px; padding: 0; margin: 0; }
+.driver-dashboard-page .account-logout { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 13px; margin: 0; background: #fff0e6; color: #cb661e; border: 0; }
+.driver-dashboard-page .account-delete { background: none; border: 0; min-height: 44px; color: #ac7777; font-size: 12px; }
+.driver-feedback { padding: 13px; margin: 0; border-radius: 14px; font-size: 13px; line-height: 1.7; }
+.driver-feedback.is-success { color: #18784e; background: #eaf7ef; }
+.driver-feedback.is-error { color: #b54747; background: #fff0ef; }
+.mapbox-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #f0f3f6e8; color: #7c8899; z-index: 1; font-size: 12px; }
+@media (max-width: 860px) {
+  .driver-shell .bottom-nav { grid-template-columns: repeat(3, 1fr); border-color: #edf0f3; border-radius: 22px; box-shadow: 0 7px 30px #2430430c; }
+  .driver-shell .bottom-nav > button { display: none !important; }
+  .driver-shell .bottom-link { min-height: 48px; }
+}
+@media (max-width: 360px) {
+  .driver-dashboard-page { width: calc(100% - 22px); }
+  .driver-course-body { padding-inline: 12px; }
+  .driver-dashboard-page .orders-tile small { font-size: 11px; }
+  .driver-dashboard-page .orders-board-summary { gap: 7px; }
+  .driver-home-identity .account-identity h1 { font-size: 15px; }
+  .driver-profile-heading { gap: 8px; }
+  .driver-profile-heading .account-avatar { width: 46px; height: 46px; }
+  .driver-profile-heading .account-identity h2 { font-size: 16px; }
+}

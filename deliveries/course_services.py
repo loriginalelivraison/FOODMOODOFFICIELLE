@@ -217,9 +217,10 @@ def eligible_drivers_for_course(course):
         livreur__isnull=True
     ).values_list("livreur_id", flat=True)
 
+    # Le jeton FCM sert aux notifications push ; les offres restent accessibles
+    # depuis le tableau de bord sans ce jeton.
     candidates = Livreur.objects.select_related("user").filter(
         user__is_active=True,
-        fcm_token__gt="",
         latitude__isnull=False,
         longitude__isnull=False,
         est_en_ligne=True,

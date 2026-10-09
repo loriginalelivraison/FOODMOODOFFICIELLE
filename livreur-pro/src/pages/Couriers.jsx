@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Minus, Plus, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import {
   createCommentaireLivreur,
   createCourseRequest,
@@ -11,10 +11,13 @@ import {
   selectCourseDriver,
 } from "../livreursapi.js";
 import CouriersMap from "../components/CouriersMap.jsx";
+import BookingSummary from "../components/BookingSummary.jsx";
+import AddressLabel from "../components/AddressLabel.jsx";
 import { MY_LOCATION_LABEL } from "../components/DepartureField.jsx";
 import DestinationField from "../components/DestinationField.jsx";
 import { destinationCoordinates } from "../utils/destinationSearch.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import { clearCurrentClientCourse, isValidId } from "../utils/navigation.js";
 import defaultAvatar from "../assets/pasdephoto.png";
 import {
   getLocationErrorMessage,
@@ -125,6 +128,7 @@ function CourseTrackingPanel({
         id: selectedDriver.id,
         name: selectedDriver.nom,
         vehicle: selectedDriver.vehicule,
+        vehicleModel: selectedDriver.modele_vehicule,
         available: true,
         latitude: Number(selectedDriver.latitude),
         longitude: Number(selectedDriver.longitude),
@@ -197,6 +201,7 @@ function CourseTrackingPanel({
 
       <div
         className={`course-tracking-stage status-${course.status}`}
+        data-scroll-step={course.status}
         aria-live="polite"
       >
         {course.status === "searching" && (
@@ -210,7 +215,7 @@ function CourseTrackingPanel({
           <div className="course-details-banner" aria-label="معلومات المتجر">
             <span>
               <b>المتجر</b>
-              {course.pickup_name || course.pickup_address || "موقع محدد على الخريطة"}
+              <AddressLabel text={course.pickup_name || course.pickup_address || "موقع محدد على الخريطة"} />
             </span>
             {course.pickup_phone && (
               <span>
@@ -241,7 +246,7 @@ function CourseTrackingPanel({
                       <div className="accepted-driver-details">
                         <strong>{driver.nom}</strong>
                         <span>
-                          {vehicleLabels[driver.vehicule] || driver.vehicule}
+                          {vehicleLabels[driver.vehicule] || driver.vehicule}{driver.vehicule === "voiture" && driver.modele_vehicule ? ` · ${driver.modele_vehicule}` : ""}
                           {driver.note != null && (
                             <> · <Star size={14} fill="currentColor" aria-hidden="true" /> {driver.note}</>
                           )}
@@ -296,7 +301,7 @@ function CourseTrackingPanel({
                 />
                 <div className="confirmed-driver-details">
                   <strong>{selectedDriver.nom}</strong>
-                  <span>{vehicleLabels[selectedDriver.vehicule] || selectedDriver.vehicule}</span>
+                  <span>{vehicleLabels[selectedDriver.vehicule] || selectedDriver.vehicule}{selectedDriver.vehicule === "voiture" && selectedDriver.modele_vehicule ? ` · ${selectedDriver.modele_vehicule}` : ""}</span>
                   {course.status !== "driver_arrived" && (
                     <span className="confirmed-driver-meta">
                       {selectedDriver.note != null && <>★ {selectedDriver.note}</>}
@@ -341,13 +346,13 @@ function CourseTrackingPanel({
             {isDelivery && (course.pickup_name || course.pickup_address) && (
               <div className="course-destination">
                 <span>تم الاستلام من</span>
-                <strong>{course.pickup_name || course.pickup_address}</strong>
+                <strong><AddressLabel text={course.pickup_name || course.pickup_address} /></strong>
               </div>
             )}
             {course.destination && (
               <div className="course-destination">
                 <span>{isDelivery ? "التسليم" : "الوجهة"}</span>
-                <strong>{course.destination}</strong>
+                <strong><AddressLabel text={course.destination} /></strong>
               </div>
             )}
 
@@ -458,7 +463,8 @@ export default function Couriers() {
   const [selectingDriverId, setSelectingDriverId] = useState(null);
   const [calledDriverCourseId, setCalledDriverCourseId] = useState(null);
   const [arrivalConfirmedCourseId, setArrivalConfirmedCourseId] = useState(null);
-  const cancellationReason = "changed_mind";
+  const [cancellationReason, setCancellationReason] = useState("changed_mind");
+  const [cancellationComment, setCancellationComment] = useState("");
   const [cancellingCourse, setCancellingCourse] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewMessage, setReviewMessage] = useState("");
@@ -573,6 +579,12 @@ export default function Couriers() {
         const course = await getCourse(requestedCourseId);
         if (!cancelled) setRequestedCourse(course);
       } catch (err) {
+        if (!cancelled && [403, 404, 410].includes(err.status)) {
+          clearCurrentClientCourse(requestedCourseId);
+          setRequestedCourseId(null);
+          setRequestedCourse(null);
+          return;
+        }
         if (!cancelled) setBookingError(err.message);
       }
     }
@@ -586,7 +598,10 @@ export default function Couriers() {
   }, [requestedCourseId]);
 
   useEffect(() => {
-    if (requestedCourseId) {
+    if (requestedCourseId && !isValidId(requestedCourseId)) {
+      clearCurrentClientCourse(requestedCourseId);
+      setRequestedCourseId(null);
+    } else if (requestedCourseId) {
       navigate(`/course/${requestedCourseId}`, { replace: true });
     }
   }, [navigate, requestedCourseId]);
@@ -725,13 +740,17 @@ export default function Couriers() {
     }
   }
 
-  async function handleCancelRequest() {
+  async function handleCancelRequest(event) {
+    event?.preventDefault();
     if (!requestedCourse || cancellingCourse) return;
     setCancellingCourse(true);
     setBookingError("");
     try {
-      const updated = await cancelCourse(requestedCourse.id, cancellationReason);
-      setRequestedCourse(updated);
+      await cancelCourse(requestedCourse.id, cancellationReason, cancellationComment);
+      clearCurrentClientCourse(requestedCourse.id);
+      setRequestedCourse(null);
+      setRequestedCourseId(null);
+      navigate("/livreurs", { replace: true });
     } catch (err) {
       setBookingError(err.message || "تعذر إلغاء الطلب.");
     } finally {
@@ -773,12 +792,17 @@ export default function Couriers() {
   }
 
   function handleLocationError(error) {
-    console.error("Erreur GPS client :", error);
+    console.error("Erreur GPS client :", {
+      code: error.code,
+      message: error.message,
+      origin: window.location.origin,
+      secureContext: window.isSecureContext,
+    });
     const isIOS = isIOSDevice();
     const message = getLocationErrorMessage(error, isIOS);
 
     setSearchingLocation(false);
-    setLocationError(`يرجى تفعيل موقعك ثم إعادة المحاولة. ${message}`);
+    setLocationError(message);
   }
 
   async function handleFindAroundMe({ watch = true } = {}) {
@@ -789,6 +813,7 @@ export default function Couriers() {
 
     if (clientWatchRef.current !== null) {
       navigator.geolocation.clearWatch(clientWatchRef.current);
+      clientWatchRef.current = null;
     }
 
     setSearchingLocation(true);
@@ -799,6 +824,7 @@ export default function Couriers() {
         enableHighAccuracy: true,
         maximumAge: 10000,
         timeout: 20000,
+        retryWithLowAccuracy: true,
       });
 
       handleLocationSuccess(initialPosition);
@@ -1062,7 +1088,7 @@ export default function Couriers() {
       {!requestedCourseId && selectedVehicle && (!isDelivery || showClientPoint) && destinationField}
 
       {(requestedCourseId || priceCalculating || priceQuote || bookingError) && (
-      <section className="course-request-panel" aria-labelledby="course-request-title">
+      <section className={`course-request-panel${!requestedCourseId && priceQuote && !priceCalculating ? " has-booking-summary" : ""}`} aria-label="تفاصيل الرحلة">
         {!requestedCourseId && selectedVehicle && hasDestination && priceCalculating && (
           <div className="course-price-loading" role="status" aria-live="polite">
             <LoadingSpinner label="" size={34} />
@@ -1071,54 +1097,22 @@ export default function Couriers() {
         )}
 
         {!requestedCourseId && priceQuote && !priceCalculating && (
-          <div className="course-request-form">
-            <div className="course-price-block">
-              <span className="course-price-label">السعر المقترح</span>
-
-              <span className="course-price-stepper" dir="ltr">
-                <button
-                  type="button"
-                  aria-label="زيادة السعر"
-                  title="زيادة السعر"
-                  disabled={bookingLoading}
-                  onClick={() => adjustProposedPrice(PRICE_ADJUSTMENT_DZD)}
-                >
-                  <Plus size={24} aria-hidden="true" />
-                </button>
-                <span className="course-price-field" dir="rtl">
-                  <input
-                    type="number"
-                    value={proposedPrice}
-                    onChange={(event) => setProposedPrice(event.target.value)}
-                    min={MIN_COURSE_PRICE_DZD}
-                    step="1"
-                    required
-                    aria-label="السعر المقترح بالدينار الجزائري"
-                  />
-                  <span aria-hidden="true">دج</span>
-                </span>
-                <button
-                  type="button"
-                  aria-label="خفض السعر"
-                  title="خفض السعر"
-                  disabled={bookingLoading || Number(proposedPrice) <= MIN_COURSE_PRICE_DZD}
-                  onClick={() => adjustProposedPrice(-PRICE_ADJUSTMENT_DZD)}
-                >
-                  <Minus size={24} aria-hidden="true" />
-                </button>
-              </span>
-
-              <span className="course-quote-distance">المسافة التقديرية: {priceQuote.estimated_distance_km} كم</span>
-
-              {proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD && (
-                <small className="course-price-error">الحد الأدنى للسعر هو {MIN_COURSE_PRICE_DZD} دج.</small>
-              )}
-            </div>
-
-          </div>
+          <BookingSummary
+            quote={priceQuote}
+            pickup={pickup.trim() || MY_LOCATION_LABEL}
+            destination={priceQuote.destination || destination}
+            isDelivery={isDelivery}
+            price={proposedPrice}
+            onPriceChange={setProposedPrice}
+            onAdjustPrice={adjustProposedPrice}
+            minPrice={MIN_COURSE_PRICE_DZD}
+            priceStep={PRICE_ADJUSTMENT_DZD}
+            busy={bookingLoading}
+          />
         )}
 
-        {bookingError && <p className="course-request-error" role="alert">{bookingError}</p>}
+        {bookingError && <p className="course-request-error" role="alert"
+          data-error-for={proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD ? "booking-price" : !destinationPosition ? "destination-input" : !pickupPosition ? "departure-input" : undefined}>{bookingError}</p>}
 
         {requestedCourseId && !requestedCourse && (
           <div className="course-progress-notice" role="status" aria-live="polite">

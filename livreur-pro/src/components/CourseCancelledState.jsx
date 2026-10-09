@@ -11,7 +11,7 @@ export default function CourseCancelledState({ isDelivery, isDriver = false, can
   }, []);
   return (
     <section className="page" dir="rtl">
-      <div className="course-cancelled-state">
+      <div className="course-cancelled-state" data-scroll-step="cancelled">
         <CircleX className="course-cancelled-icon" size={40} aria-hidden="true" />
         <h1>{isDelivery ? "تم إلغاء الطلب" : "تم إلغاء الرحلة"}</h1>
         <p role="status">{cancellationMessage(cancelledBy, isDriver)}</p>

@@ -23,6 +23,7 @@ class Livreur(models.Model):
     telephone = models.CharField(max_length=30)
     ville = models.CharField(max_length=100)
     vehicule = models.CharField(max_length=30, choices=VEHICULE_CHOICES)
+    modele_vehicule = models.CharField(max_length=50, blank=True, default="")
     disponible = models.BooleanField(default=True)
     # Bascule "en ligne / hors ligne" façon Uber : un livreur hors ligne
     # ne reçoit plus aucune offre, même s'il a une position GPS connue.

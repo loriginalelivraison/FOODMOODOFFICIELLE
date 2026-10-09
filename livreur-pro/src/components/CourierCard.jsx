@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Star } from "lucide-react";
 import defaultAvatar from "../assets/pasdephoto.png";
+import AddressLabel from "./AddressLabel.jsx";
 
 export default function CourierCard({ courier }) {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ export default function CourierCard({ courier }) {
 
           <div className="pro-info-line pro-city-line">
             <span className="pro-loc-dot" />
-            <span>{courier.city || "غير محددة"}</span>
+            <AddressLabel text={courier.city || "غير محددة"} />
           </div>
 
           <div className="pro-info-line pro-vehicle-line">

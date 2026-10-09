@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { UploadCloud } from "lucide-react";
 import { loginJWT, createLivreur } from "../livreursapi.js";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +13,6 @@ import {
 
 export default function CourierRegister({ onChooseClient }) {
   const navigate = useNavigate();
-  const formRef = useRef(null);
 
   // L'écran revient en haut à l'ouverture du formulaire d'inscription
   useEffect(() => scrollToPageTopWhenReady(), []);
@@ -93,6 +92,7 @@ export default function CourierRegister({ onChooseClient }) {
     telephone: "",
     ville: "",
     vehicule: "",
+    modele_vehicule: "",
     disponible: true,
     password: "",
     services: "",
@@ -101,27 +101,20 @@ export default function CourierRegister({ onChooseClient }) {
 
   const [locationConsent, setLocationConsent] = useState(false);
 
-  function focusErrorField(element) {
-    if (!element) return;
-
-    element.focus?.();
-    element.scrollIntoView({ behavior: "smooth", block: "center" });
-    window.scrollTo({
-      top: window.scrollY - 80,
-      behavior: "smooth",
-    });
-  }
-
   function handleInvalidField(e) {
     if (e.target.validity.valueMissing) {
       e.target.setCustomValidity("يرجى ملء هذه الخانة");
     }
-
-    focusErrorField(e.target);
   }
 
   function clearInvalidMessage(e) {
     e.target.setCustomValidity("");
+  }
+
+  function changeMode(nextMode) {
+    setMode(nextMode);
+    setError("");
+    setGpsError(false);
   }
 
 async function handleSubmit(e) {
@@ -135,9 +128,6 @@ async function handleSubmit(e) {
   if (!locationConsent) {
     setGpsError(true);
     setError("يجب الموافقة على استخدام بيانات الموقع الجغرافي للمتابعة");
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 50);
     return;
   }
 
@@ -163,6 +153,7 @@ async function handleSubmit(e) {
     data.append("telephone", registerForm.telephone);
     data.append("ville", registerForm.ville);
     data.append("vehicule", registerForm.vehicule);
+    data.append("modele_vehicule", registerForm.vehicule === "voiture" ? registerForm.modele_vehicule.trim() : "");
     data.append("disponible", registerForm.disponible);
     data.append("password", registerForm.password);
     data.append("services", registerForm.services);
@@ -196,9 +187,6 @@ async function handleSubmit(e) {
     setShowLocationSettingsButton(err.code === 1 && isIOS);
     setError(message);
 
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 50);
   } finally {
     setLoading(false);
   }
@@ -239,7 +227,7 @@ async function handleSubmit(e) {
   }
 
   return (
-    <section className="page auth-page" dir="rtl">
+    <section className="page auth-page" data-scroll-page="courier-auth" dir="rtl">
       <div className="auth-card">
         {onChooseClient && (
           <div className="auth-switch" aria-label="نوع الحساب">
@@ -282,7 +270,7 @@ async function handleSubmit(e) {
             className={
               mode === "register" ? "primary-btn small" : "secondary-btn small"
             }
-            onClick={() => setMode("register")}
+            onClick={() => changeMode("register")}
           >
             تسجيل جديد
           </button>
@@ -293,7 +281,7 @@ async function handleSubmit(e) {
             className={
               mode === "login" ? "primary-btn small" : "secondary-btn small"
             }
-            onClick={() => setMode("login")}
+            onClick={() => changeMode("login")}
           >
             لدي حساب بالفعل
           </button>
@@ -301,14 +289,14 @@ async function handleSubmit(e) {
 
         {mode === "login" ? (
           <form
-            ref={formRef}
+            data-scroll-step={mode}
             className="auth-form"
             onSubmit={handleLogin}
             onInvalid={handleInvalidField}
             onInput={clearInvalidMessage}
           >
             {error && (
-              <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
+              <p id="courier-login-error" role="alert" style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
                 {error}
               </p>
             )}
@@ -316,6 +304,7 @@ async function handleSubmit(e) {
             <label>
               رقم الهاتف
                               <input
+                  id="courier-login-phone"
                   type="text"
                   required
                   value={loginForm.telephone}
@@ -336,6 +325,7 @@ async function handleSubmit(e) {
             <label>
               كلمة المرور
               <input
+                id="courier-login-password"
                 type="password"
                 required
                 placeholder="أدخل كلمة المرور"
@@ -355,15 +345,15 @@ async function handleSubmit(e) {
           </form>
         ) : (
           <form
-            ref={formRef}
+            data-scroll-step={mode}
             className="auth-form"
             onSubmit={handleSubmit}
             encType="multipart/form-data"
             onInvalid={handleInvalidField}
             onInput={clearInvalidMessage}
           >
-            {error && (
-              <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
+            {error && !gpsError && (
+              <p id="courier-register-error" role="alert" style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
                 {error}
               </p>
             )}
@@ -371,6 +361,7 @@ async function handleSubmit(e) {
             <label>
               الاسم الكامل
               <input
+                id="courier-register-name"
                 required
                 maxLength={20}
                 placeholder="مثال: أمين"
@@ -387,6 +378,7 @@ async function handleSubmit(e) {
             <label>
               رقم الهاتف
             <input
+  id="courier-register-phone"
   type="text"
   required
   value={registerForm.telephone}
@@ -407,6 +399,7 @@ async function handleSubmit(e) {
             <label>
               منطقة العمل
               <select
+                id="courier-register-city"
                 required
                 value={registerForm.ville}
                 onChange={(e) =>
@@ -430,12 +423,14 @@ async function handleSubmit(e) {
             <label>
               نوع المركبة
               <select
+                id="courier-register-vehicle"
                 required
                 value={registerForm.vehicule}
                 onChange={(e) =>
                   setRegisterForm({
                     ...registerForm,
                     vehicule: e.target.value,
+                    modele_vehicule: e.target.value === "voiture" ? registerForm.modele_vehicule : "",
                   })
                 }
               >
@@ -449,9 +444,25 @@ async function handleSubmit(e) {
               </select>
             </label>
 
+            {registerForm.vehicule === "voiture" && (
+              <label>
+                {"\u0627\u0633\u0645 \u0645\u0648\u062f\u064a\u0644 \u0627\u0644\u0633\u064a\u0627\u0631\u0629"}
+                <input
+                  id="courier-register-vehicle-model"
+                  value={registerForm.modele_vehicule}
+                  onChange={(e) => setRegisterForm({ ...registerForm, modele_vehicule: e.target.value })}
+                  maxLength={50}
+                  placeholder={"\u0645\u062b\u0627\u0644: Clio 2 \u0623\u0648 Peugeot 208"}
+                  aria-label={"\u0627\u0633\u0645 \u0645\u0648\u062f\u064a\u0644 \u0627\u0644\u0633\u064a\u0627\u0631\u0629"}
+                  required
+                />
+              </label>
+            )}
+
             <label>
               الحالة
               <select
+                id="courier-register-availability"
                 required
                 value={registerForm.disponible ? "true" : "false"}
                 onChange={(e) =>
@@ -469,6 +480,7 @@ async function handleSubmit(e) {
             <label>
               الخدمات المقترحة
               <textarea
+                id="courier-register-services"
                 rows="4"
                 placeholder="توصيل أكل، وثائق، طرود صغيرة، مشتريات، ..."
                 value={registerForm.services}
@@ -484,6 +496,7 @@ async function handleSubmit(e) {
             <label>
               كلمة المرور
               <input
+                id="courier-register-password"
                 type="password"
                 required
                 placeholder="أدخل كلمة المرور"
@@ -500,6 +513,7 @@ async function handleSubmit(e) {
                       <label>
             صورة السائق
             <input
+                id="courier-register-photo"
                 type="file"
                 accept="image/jpeg,image/png,image/jpg"
                 onChange={handlePhotoChange}
@@ -513,6 +527,9 @@ async function handleSubmit(e) {
           )}
            
             <div
+              id="courier-location-section"
+              tabIndex={-1}
+              aria-describedby={gpsError && error ? "courier-location-error" : undefined}
               style={{
                 background: gpsError
                   ? "rgba(239,68,68,0.12)"
@@ -551,6 +568,16 @@ async function handleSubmit(e) {
                   ? "يجب السماح بالوصول إلى موقعك لإكمال إنشاء الحساب"
                   : "يجمع تطبيق WinRak بيانات الموقع الجغرافي للسائق لتتبع موقعه أثناء عملية التوصيل ومشاركة موقعه مع العميل، حتى عندما يعمل التطبيق في الخلفية أو يكون مغلقًا أو غير مستخدم."}
               </span>
+              {gpsError && error && (
+                <p
+                  id="courier-location-error"
+                  role="alert"
+                  data-error-for={!locationConsent ? "courier-location-consent" : "courier-location-section"}
+                  style={{ margin: "8px 0", color: "#b91c1c", fontWeight: "bold" }}
+                >
+                  {error}
+                </p>
+              )}
               <div
   style={{
     display: "flex",
@@ -565,10 +592,20 @@ async function handleSubmit(e) {
   </span>
 
   <button
+    id="courier-location-consent"
     type="button"
     role="switch"
     aria-checked={locationConsent}
-    onClick={() => setLocationConsent(!locationConsent)}
+    aria-label="أوافق على استخدام بيانات الموقع الجغرافي"
+    aria-invalid={(gpsError && !locationConsent) || undefined}
+    aria-describedby={gpsError && error ? "courier-location-error" : undefined}
+    onClick={() => {
+      setLocationConsent(!locationConsent);
+      if (!locationConsent && gpsError) {
+        setGpsError(false);
+        setError("");
+      }
+    }}
     style={{
       width: "54px",
       height: "30px",

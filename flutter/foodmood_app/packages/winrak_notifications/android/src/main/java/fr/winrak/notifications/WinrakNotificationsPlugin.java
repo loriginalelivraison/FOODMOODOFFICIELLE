@@ -88,7 +88,8 @@ public final class WinrakNotificationsPlugin implements FlutterPlugin {
             view.setTextViewText(R.id.offer_pickup, "📍 الانطلاق · \u2068" + pickup + "\u2069");
             view.setTextViewText(R.id.offer_destination, "🏁 الوصول · \u2068" + destination + "\u2069");
             if (layout == R.layout.offer_heads_up) {
-                view.setTextViewText(R.id.offer_pickup, "\u2068" + pickup + "\u2069 \u2190 \u2068" + destination + "\u2069");
+                view.setTextViewText(R.id.offer_pickup, "\u0645\u0646: \u2068" + pickup + "\u2069");
+                view.setTextViewText(R.id.offer_destination, "\u0625\u0644\u0649: \u2068" + destination + "\u2069");
             }
             view.setOnClickPendingIntent(R.id.offer_accept, accept);
             view.setOnClickPendingIntent(R.id.offer_reject, reject);

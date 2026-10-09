@@ -352,6 +352,27 @@ class DriverOnlineOfferTests(TestCase):
 		)
 		self.assertEqual(self.driver_api.get("/api/courses/offers/").data, [])
 
+	def test_browser_driver_without_push_token_can_receive_and_accept_offers(self):
+		self.set_online()
+		for index, token in enumerate((None, "")):
+			with self.subTest(token=token):
+				Livreur.objects.filter(pk=self.driver.pk).update(fcm_token=token)
+				response = self.request_with_stubs(request_key=f"browser-offer-{index}")
+				self.assertEqual(response.status_code, 201)
+				course_id = response.data["id"]
+				offers = self.driver_api.get("/api/courses/offers/")
+				self.assertEqual(offers.status_code, 200)
+				self.assertEqual([course["id"] for course in offers.data], [course_id])
+				accepted = self.driver_api.post(
+					f"/api/courses/{course_id}/respond/", {"response": "accepted"}, format="json",
+				)
+				self.assertEqual(accepted.status_code, 200)
+				self.assertEqual(accepted.data["status"], "driver_accepted")
+				cancelled = self.client_api.post(
+					f"/api/courses/{course_id}/cancel/", {"reason": "changed_mind"}, format="json",
+				)
+				self.assertEqual(cancelled.status_code, 200)
+
 	def test_offline_driver_cannot_accept_an_offer(self):
 		self.set_online()
 		course_id = self.request_with_stubs().data["id"]

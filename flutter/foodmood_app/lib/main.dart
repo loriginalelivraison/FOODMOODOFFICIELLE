@@ -132,6 +132,11 @@ NotificationDetails notificationPlatformDetails({required bool courseOffer}) =>
       ),
     );
 
+String _notificationAddressLabel(String address) {
+  final words = address.trim().split(RegExp(r'\s+'));
+  return words.length > 5 ? '${words.take(5).join(' ')}...' : address;
+}
+
 Future<void> showPushNotification(
   FlutterLocalNotificationsPlugin notifications,
   RemoteMessage message,
@@ -177,9 +182,12 @@ Future<void> showPushNotification(
         'price': message.data['price'] != null
             ? '${message.data['price']} دج'
             : body,
-        'pickup': message.data['pickup_address']?.toString() ?? 'موقع العميل',
-        'destination':
-            message.data['destination']?.toString() ?? 'تفاصيل الرحلة',
+        'pickup': _notificationAddressLabel(
+          message.data['pickup_address']?.toString() ?? 'موقع العميل',
+        ),
+        'destination': _notificationAddressLabel(
+          message.data['destination']?.toString() ?? 'تفاصيل الرحلة',
+        ),
         'payload': jsonEncode(notificationPayload(message.data)),
       });
       return;

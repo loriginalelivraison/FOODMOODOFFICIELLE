@@ -1,12 +1,12 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getClientReturnPath } from "../utils/navigation.js";
 import { createClient, loginClient } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import CourierRegister from "./CourierRegister.jsx";
 
 export default function ClientAuth() {
   const navigate = useNavigate();
-  const formRef = useRef(null);
 
   const [mode, setMode] = useState("register");
   const [accountType, setAccountType] = useState("client");
@@ -15,26 +15,14 @@ export default function ClientAuth() {
   const [password, setPassword] = useState("");
 
   const [error, setError] = useState("");
+  const [errorField, setErrorField] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-
-  function focusErrorField(element) {
-    if (!element) return;
-
-    element.focus?.();
-    element.scrollIntoView({ behavior: "smooth", block: "center" });
-    window.scrollTo({
-      top: window.scrollY - 80,
-      behavior: "smooth",
-    });
-  }
 
   function handleInvalidField(e) {
     if (e.target.validity.valueMissing) {
       e.target.setCustomValidity("يرجى ملء هذه الخانة");
     }
-
-    focusErrorField(e.target);
   }
 
   function clearInvalidMessage(e) {
@@ -45,13 +33,12 @@ export default function ClientAuth() {
     e.preventDefault();
 
     setError("");
+    setErrorField("");
     setMessage("");
 
     if (password.trim().length < 6) {
+      setErrorField("client-auth-password");
       setError("كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل");
-      setTimeout(() => {
-        formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
       return;
     }
 
@@ -73,16 +60,13 @@ export default function ClientAuth() {
       });
 
       const redirect =
-        localStorage.getItem("redirectAfterLogin") || "/livreurs";
+        getClientReturnPath(localStorage.getItem("redirectAfterLogin"));
 
       localStorage.removeItem("redirectAfterLogin");
-      navigate(redirect);
+      navigate(redirect, { replace: true });
     } catch (err) {
       console.error(err);
       setError(err?.message || "حدث خطأ أثناء تسجيل الدخول أو إنشاء الحساب");
-      setTimeout(() => {
-        formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
     } finally {
       setLoading(false);
     }
@@ -94,6 +78,7 @@ export default function ClientAuth() {
         onChooseClient={() => {
           setAccountType("client");
           setError("");
+          setErrorField("");
           setMessage("");
         }}
       />
@@ -101,7 +86,7 @@ export default function ClientAuth() {
   }
 
   return (
-    <section className="page auth-page" dir="rtl">
+    <section className="page auth-page" data-scroll-page="client-auth" dir="rtl">
       <div className="auth-card">
         <center>
           <h2>هل أنت؟</h2>
@@ -145,6 +130,7 @@ export default function ClientAuth() {
             onClick={() => {
               setMode("register");
               setError("");
+              setErrorField("");
               setMessage("");
             }}
           >
@@ -160,6 +146,7 @@ export default function ClientAuth() {
             onClick={() => {
               setMode("login");
               setError("");
+              setErrorField("");
               setMessage("");
             }}
           >
@@ -168,20 +155,25 @@ export default function ClientAuth() {
         </div>
 
         <form
-          ref={formRef}
+          data-scroll-step={mode}
           onSubmit={handleSubmit}
           className="auth-form"
           onInvalid={handleInvalidField}
           onInput={clearInvalidMessage}
         >
-          {error && (
-            <p style={{ color: "red", textAlign: "center", fontWeight: "bold" }}>
+          {error && !errorField && (
+            <p
+              id="client-auth-error"
+              role="alert"
+              data-error-for={errorField || undefined}
+              style={{ color: "red", textAlign: "center", fontWeight: "bold" }}
+            >
               {error}
             </p>
           )}
 
           {message && (
-            <p style={{ color: "green", textAlign: "center", fontWeight: "bold" }}>
+            <p role="status" style={{ color: "green", textAlign: "center", fontWeight: "bold" }}>
               {message}
             </p>
           )}
@@ -190,6 +182,7 @@ export default function ClientAuth() {
             <label>
               الاسم الكامل
               <input
+                id="client-auth-name"
                 type="text"
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
@@ -203,6 +196,7 @@ export default function ClientAuth() {
           <label>
   رقم الهاتف
   <input
+    id="client-auth-phone"
     type="text"
     value={telephone}
     onChange={(e) =>
@@ -218,14 +212,33 @@ export default function ClientAuth() {
           <label>
             كلمة المرور
             <input
+              id="client-auth-password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              aria-invalid={errorField === "client-auth-password" || undefined}
+              aria-describedby={errorField === "client-auth-password" ? "client-auth-error" : undefined}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errorField === "client-auth-password") {
+                  setError("");
+                  setErrorField("");
+                }
+              }}
               placeholder="******"
               minLength={6}
               title="كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل"
               required
             />
+            {errorField === "client-auth-password" && error && (
+              <span
+                id="client-auth-error"
+                role="alert"
+                data-error-for="client-auth-password"
+                style={{ color: "red", fontWeight: "bold" }}
+              >
+                {error}
+              </span>
+            )}
           </label>
 
           <button className="primary-btn full" type="submit" disabled={loading}>

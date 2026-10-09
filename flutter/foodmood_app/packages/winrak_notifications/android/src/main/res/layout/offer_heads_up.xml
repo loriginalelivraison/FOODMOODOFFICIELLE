@@ -1,13 +1,109 @@
-<?xml version="1.0" ?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layoutDirection="rtl" android:paddingTop="2dp" android:paddingBottom="2dp">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/offer_title" android:layout_width="0dp" android:layout_height="wrap_content" android:text="رحلة جديدة" android:textSize="12sp" android:textDirection="rtl" android:gravity="right|center_vertical" android:textAppearance="@style/TextAppearance.Compat.Notification" android:includeFontPadding="false" android:layout_weight="1" android:alpha="0.65"/>
-        <TextView android:id="@+id/offer_price" android:layout_width="0dp" android:layout_height="wrap_content" android:text="دج" android:textSize="20sp" android:textDirection="rtl" android:gravity="right|center_vertical" android:textAppearance="@style/TextAppearance.Compat.Notification" android:includeFontPadding="false" android:layout_weight="1" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layoutDirection="rtl"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/offer_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.8"
+            android:alpha="0.7"
+            android:ellipsize="end"
+            android:gravity="right|center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="&#1585;&#1581;&#1604;&#1577; &#1580;&#1583;&#1610;&#1583;&#1577;"
+            android:textAppearance="@style/TextAppearance.Compat.Notification"
+            android:textDirection="rtl"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/offer_price"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.2"
+            android:ellipsize="end"
+            android:gravity="right|center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="&#1583;&#1580;"
+            android:textAppearance="@style/TextAppearance.Compat.Notification"
+            android:textDirection="rtl"
+            android:textSize="22sp"
+            android:textStyle="bold" />
     </LinearLayout>
-    <TextView android:id="@+id/offer_pickup" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="📍 الانطلاق" android:textSize="11sp" android:textDirection="rtl" android:gravity="right|center_vertical" android:textAppearance="@style/TextAppearance.Compat.Notification" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end"/>
-    <TextView android:id="@+id/offer_destination" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="🏁 الوصول" android:textSize="11sp" android:textDirection="rtl" android:gravity="right|center_vertical" android:textAppearance="@style/TextAppearance.Compat.Notification" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end"/>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="2dp">
-        <TextView android:id="@+id/offer_accept" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp" android:background="@drawable/offer_accept" android:text="قبول" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:gravity="center" android:layout_marginEnd="4dp"/>
-        <TextView android:id="@+id/offer_reject" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp" android:background="@drawable/offer_reject" android:text="رفض" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:gravity="center" android:layout_marginStart="4dp"/>
+
+    <TextView
+        android:id="@+id/offer_pickup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:ellipsize="end"
+        android:gravity="right|center_vertical"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Compat.Notification"
+        android:textDirection="rtl"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/offer_destination"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:gravity="right|center_vertical"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Compat.Notification"
+        android:textDirection="rtl"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/offer_accept"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/offer_accept"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="&#1602;&#1576;&#1608;&#1604;"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/offer_reject"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/offer_reject"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="&#1585;&#1601;&#1590;"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

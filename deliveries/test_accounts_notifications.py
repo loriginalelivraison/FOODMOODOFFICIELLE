@@ -1,4 +1,5 @@
 import io
+import ntpath
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -205,7 +206,12 @@ class AccountSecurityTests(TestCase):
         from .private_storage import PrivateDocumentStorage
         upload.return_value = {"type": "authenticated", "public_id": "drivers/7/random", "format": "png"}
         storage = PrivateDocumentStorage()
-        name = storage.save("drivers/7/random.png", self.image_upload())
+        for path in ("drivers/7/random.png", r"drivers\7\random.png"):
+            with self.subTest(path=path):
+                name = storage.save(path, self.image_upload())
+                self.assertEqual(upload.call_args.kwargs["public_id"], "drivers/7/random")
+                self.assertEqual(upload.call_args.kwargs["format"], "png")
+                self.assertEqual(name, "drivers/7/random.png")
         self.assertEqual(upload.call_args.kwargs["type"], "authenticated")
         self.assertFalse(upload.call_args.kwargs["overwrite"])
         get.return_value.__enter__.return_value.iter_content.return_value = [b"private-image-data"]
@@ -215,6 +221,30 @@ class AccountSecurityTests(TestCase):
             storage.url(name)
         storage.delete(name)
         self.assertEqual(destroy.call_args.kwargs["type"], "authenticated")
+
+    @override_settings(PRIVATE_DOCUMENT_BACKEND="cloudinary")
+    @patch("deliveries.private_storage.cloudinary.uploader.upload")
+    def test_cloud_document_upload_normalizes_windows_paths(self, upload):
+        def cloud_upload(content, **options):
+            self.assertNotIn("\\", options["public_id"])
+            self.assertTrue(options["public_id"].startswith(f"drivers/{self.driver.id}/"))
+            self.assertEqual(options["type"], "authenticated")
+            return {"type": "authenticated", "public_id": options["public_id"], "format": options["format"]}
+
+        upload.side_effect = cloud_upload
+        storage = DriverDocument._meta.get_field("file").storage
+        # Reproduce Django's Windows filename generation on every platform.
+        with patch.object(storage, "generate_filename", side_effect=ntpath.normpath):
+            for kind in ("license", "vehicle"):
+                with self.subTest(kind=kind):
+                    response = self.driver_api.post(self.documents_url(), {
+                        "kind": kind, "file": self.image_upload(),
+                    }, format="multipart")
+                    self.assertEqual(response.status_code, 200)
+                    document = DriverDocument.objects.get(livreur=self.driver, kind=kind)
+                    self.assertEqual(document.file.name, f"{upload.call_args.kwargs['public_id']}.png")
+                    self.assertEqual(document.status, "pending")
+                    self.assertNotIn("file", response.data[0])
 
     def test_document_file_is_deleted_when_driver_account_is_deleted(self):
         self.driver_api.post(self.documents_url(), {"kind": "license", "file": self.image_upload()}, format="multipart")

@@ -9,7 +9,9 @@ import {
 } from "../livreursapi.js";
 import CouriersMap from "../components/CouriersMap.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import AddressLabel from "../components/AddressLabel.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
+import { clearCurrentClientCourse } from "../utils/navigation.js";
 import defaultAvatar from "../assets/pasdephoto.png";
 import { getCourseSteps, getCourseStepIndex, getCourseStatusLabel, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
 const VEHICLE_LABELS = {
@@ -48,12 +50,21 @@ export default function ClientCourse() {
           setCourse(data);
           setError("");
           if (["completed", "cancelled"].includes(data.status)) {
-            localStorage.removeItem("currentClientCourseId");
+            clearCurrentClientCourse(data.id);
           } else {
             localStorage.setItem("currentClientCourseId", String(data.id));
           }
         }
       } catch (err) {
+        if (!cancelled && err.status === 401) {
+          navigate("/connexion-client", { replace: true });
+          return;
+        }
+        if (!cancelled && [403, 404, 410].includes(err.status)) {
+          clearCurrentClientCourse(id);
+          navigate("/livreurs", { replace: true });
+          return;
+        }
         if (!cancelled) setError(err.message || "تعذر تحميل الرحلة.");
       }
     }
@@ -69,7 +80,7 @@ export default function ClientCourse() {
       clearInterval(interval);
       window.removeEventListener("winrakPush", handlePush);
     };
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     if (course?.status !== "completed") return undefined;
@@ -84,7 +95,7 @@ export default function ClientCourse() {
     try {
       const updated = await cancelCourse(course.id, "changed_mind");
       setCourse(updated);
-      localStorage.removeItem("currentClientCourseId");
+      clearCurrentClientCourse(course.id);
     } catch (err) {
       setError(err.message || (isDeliveryVehicle(course.vehicle_type) ? "تعذر إلغاء الطلب." : "تعذر إلغاء الرحلة."));
     } finally {
@@ -189,6 +200,7 @@ export default function ClientCourse() {
       id: driver.id,
       name: driver.nom,
       vehicle: driver.vehicule,
+      vehicleModel: driver.modele_vehicule,
       available: true,
       latitude: Number(driver.latitude),
       longitude: Number(driver.longitude),
@@ -238,7 +250,7 @@ export default function ClientCourse() {
 
       {active && <div className="course-live-bar" aria-hidden="true" />}
 
-      <div className="course-tracking-stage" aria-live="polite">
+      <div className="course-tracking-stage" aria-live="polite" data-scroll-step={course.status}>
         {course.status === "searching" && (
           <div className="course-searching-state">
             <span className="course-search-pulse" aria-hidden="true" />
@@ -258,7 +270,7 @@ export default function ClientCourse() {
                 <div className="accepted-driver-details">
                   <strong>{driver.nom}</strong>
                   <span>
-                    {VEHICLE_LABELS[driver.vehicule] || driver.vehicule}
+                    {VEHICLE_LABELS[driver.vehicule] || driver.vehicule}{driver.vehicule === "voiture" && driver.modele_vehicule ? ` · ${driver.modele_vehicule}` : ""}
                     {driver.note != null && <> · ★ {driver.note}</>}
                     {driver.distance_km != null && <> · {driver.distance_km} كم</>}
                   </span>
@@ -333,13 +345,13 @@ export default function ClientCourse() {
             {isDelivery && (course.pickup_name || course.pickup_address) && (
               <div className="course-destination">
                 <span>تم الاستلام من</span>
-                <strong>{course.pickup_name || course.pickup_address}</strong>
+                <strong><AddressLabel text={course.pickup_name || course.pickup_address} /></strong>
               </div>
             )}
             {course.destination && (
               <div className="course-destination">
                 <span>{isDelivery ? "التسليم" : "الوجهة"}</span>
-                <strong>{course.destination}</strong>
+                <strong><AddressLabel text={course.destination} /></strong>
               </div>
             )}
           </>
