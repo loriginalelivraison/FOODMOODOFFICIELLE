@@ -7,7 +7,8 @@ export default function DestinationField({ onSelectPlace, keepHistory = false, s
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState(readDestinationHistory);
   const isEmpty = !props.value.trim();
-  const results = isEmpty ? suggestedPlaces : searchDestinations(props.value);
+  const allResults = isEmpty ? suggestedPlaces : searchDestinations(props.value);
+  const results = allResults.slice(0, 50);
   const recent = isEmpty && keepHistory
     ? history.filter((place) => !suggestedPlaces.some((suggestion) => suggestion.id === place.id))
     : [];
@@ -30,9 +31,12 @@ export default function DestinationField({ onSelectPlace, keepHistory = false, s
     {open && !props.disabled && <div className="local-destination-results" dir="rtl">
       {isEmpty && results.length > 0 && <p>أماكن مقترحة</p>}
       {results.map(renderPlace)}
+      {allResults.length > results.length && <p>نتائج أخرى متاحة، اكتب اسمًا أدق.</p>}
       {recent.length > 0 && <p>الوجهات الأخيرة</p>}
       {recent.map(renderPlace)}
       {!isEmpty && !results.length && <p>لا يوجد مكان محلي مطابق</p>}
+      {results.some((place) => typeof place.id === "string" && place.id.startsWith("osm:")) &&
+        <p>بيانات الأماكن © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">مساهمو OpenStreetMap</a></p>}
       <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setOpen(false); props.onToggleMap(); }}>
         اختيار على الخريطة
       </button>

@@ -6,7 +6,7 @@ export function normalizeSearch(value) {
     .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/œ/g, "oe")
     .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
-const index = destinations.map((place) => ({ place, text: normalizeSearch(`${place.search_name} ${place.commune_secteur} ${place.category}`) }));
+const index = destinations.map((place) => ({ place, text: normalizeSearch(`${place.search_name} ${place.search_aliases || ""} ${place.commune_secteur} ${place.category}`) }));
 export const suggestedDestinations = [34, 33, 171].map((id) => destinations.find((place) => place.id === id));
 export const suggestedDeliveryPickups = [116, 123, 172].map((id) => destinations.find((place) => place.id === id));
 export function searchDestinations(query) {

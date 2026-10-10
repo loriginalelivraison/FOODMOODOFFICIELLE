@@ -1,3 +1,5 @@
+import osmDestinations from "./osmDestinations.js";
+
 // Table locale de Mostaganem. Coordonnées fournies, accès routiers non vérifiés.
 const communes = [
   [1, "مستغانم", "Mostaganem", 35.9751637, 0.0448868],
@@ -69,6 +71,43 @@ const places = [
   [172, "كارنتيكا كحلة 1", "Karantika Kahla 1", "Restaurant", "Mostaganem", 35.9319183, 0.1112622, publicStatus, "Google Maps : Karantika Kahla 1 (W4J6+RF2)", "position indiquée sur la carte fournie ; entrée routière à confirmer"],
 ];
 
+// Lieux fournis pour Mostaganem (WGS84). Les repères et leurs accès restent à vérifier.
+const mostaganemPlaces = [
+  [1, "تيجديت", "Tijditt", 35.93796, 0.08975, "localite"],
+  [2, "المطمر", "Matemore", 35.93433, 0.09366, "localite"],
+  [3, "العرصة", "El Arsa", 35.93528, 0.09789, "repere_station_tramway"],
+  [4, "الحرية", "El Houria", 35.92595, 0.08595, "repere_mosquee"],
+  [5, "الحشم", "Hachem Fouaga", 35.97185, 0.12007, "localite"],
+  [6, "300 مسكن", "Cité 300 LPP - Mezaghrane", 35.90209, 0.06311, "cite_identifiee"],
+  [7, "600 مسكن", "Cité 600 - Kharrouba", 35.97537, 0.10938, "cite_identifiee"],
+  [8, "400 مسكن", "Cité 400 Logements", 35.92704, 0.07846, "cite_identifiee"],
+  [9, "طريق وهران", "Route d’Oran", 35.9179, 0.0753, "repere_sur_route"],
+  [10, "زغلول", "Zaghloul", 35.92313, 0.09035, "repere_ecole"],
+  [11, "صابلات", "Les Sablettes", 35.89533, 0.04759, "localite"],
+  [12, "صلامندر", "Salamandre", 35.92189, 0.06046, "localite"],
+  [13, "دبدابة", "Debdab", 35.90776, 0.12253, "localite"],
+  [14, "سيدي فلاق", "Douar Sidi Fellag", 35.93042, 0.14025, "localite"],
+  [15, "سيدي عثمان", "Sidi Othmane", 35.94309, 0.12198, "repere_sanctuaire"],
+  [16, "ولاد حمو", "Douar Ouled Hamou", 35.95061, 0.17289, "localite"],
+  [17, "348 مسكن", "Cité 348 Logements", 35.9566, 0.1027, "repere_mosquee_ennour"],
+  [18, "بيبينيار", "Pépinière", 35.92666, 0.08465, "repere_bureau_poste"],
+  [19, "موشتي", "Mouchti", 35.926105, 0.113086, "repere_cite_160_logements"],
+  [20, "جامعة مستغانم ITA", "Université de Mostaganem - ITA", 35.93256, 0.0876, "campus"],
+  [21, "كلية الطب", "Faculté de médecine", 35.96405, 0.10567, "campus"],
+  [22, "كلية الحقوق", "Faculté de droit", 35.9214, 0.06275, "campus"],
+  [23, "كلية العلوم الدقيقة والإعلام الآلي", "Faculté des sciences exactes et informatique", 35.91516, 0.0885, "campus"],
+  [24, "كلية العلوم الاقتصادية", "Faculté des sciences économiques", 35.98235, 0.11108, "campus"],
+  [25, "قسم الهندسة المعمارية", "Département d’architecture", 35.93922, 0.11373, "campus"],
+  [26, "صيادة", "Sayada", 35.95097, 0.13103, "localite"],
+  [27, "الرادار", "Radar", null, null, "inconnu"],
+  [28, "حي الوئام", "El Wiam", null, null, "inconnu"],
+  [29, "مونبليزير", "Montplaisir", null, null, "inconnu"],
+  [30, "بالفودار", "Belfoudar", null, null, "inconnu"],
+  [31, "برايس", "Brais", null, null, "inconnu"],
+  [32, "سوق الليل", "Souk Ellil", null, null, "inconnu"],
+  [33, "مونادور", "Monador", null, null, "inconnu"],
+];
+
 export const destinations = [
   ...communes.map(([id, ar, fr, lat, lng]) => [id, ar, fr, "Commune", fr, lat, lng,
     "coordonnée de référence communale ; non adaptée au routage",
@@ -84,4 +123,47 @@ export const destinations = [
     || commune_secteur,
   latitude, longitude, gps_status, source_gps, precision_gps,
   position_gps: latitude == null || longitude == null ? "" : `${latitude}, ${longitude}`,
+})).concat(mostaganemPlaces.map(([id, name_ar, name_fr, latitude, longitude, type_position]) => {
+  const hasCoordinates = latitude != null && longitude != null;
+  const category = type_position === "localite" ? "Quartier"
+    : type_position === "cite_identifiee" ? "Cité"
+      : type_position === "campus" ? "Campus" : type_position === "inconnu" ? "Lieu" : "Repère";
+  return {
+    id: `mostaganem:${id}`, search_name: `${name_ar} - ${name_fr}`,
+    name_ar, name_fr, category,
+    category_ar: ({ Quartier: "حي", Cité: "حي سكني", Campus: "حرم جامعي", Lieu: "مكان", Repère: "معلم" })[category],
+    commune_secteur: "Mostaganem", commune_secteur_ar: "مستغانم",
+    latitude, longitude, type_position,
+    statut_verification: hasCoordinates ? "a_verifier" : "coordonnees_manquantes",
+    gps_status: hasCoordinates ? "Coordonnées fournies ; position et accès à vérifier" : "Coordonnées manquantes ; choisir sur la carte",
+    source_gps: "Données fournies par l'utilisateur (WGS84 EPSG:4326)",
+    precision_gps: hasCoordinates ? type_position.replaceAll("_", " ") : "Point à choisir sur la carte",
+    position_gps: hasCoordinates ? `${latitude}, ${longitude}` : "",
+  };
+})).concat(osmDestinations.map((place) => {
+  const name_fr = place.name_fr || place.name;
+  const name_ar = place.name_ar;
+  const category = ({
+    city: "Ville", town: "Ville", village: "Village", hamlet: "Hameau",
+    suburb: "Quartier", neighbourhood: "Quartier", quarter: "Quartier", locality: "Localité",
+    restaurant: "Restaurant", cafe: "Café", fast_food: "Restauration rapide",
+    pharmacy: "Pharmacie", hospital: "Hôpital", clinic: "Clinique", doctors: "Médecin",
+    school: "École", university: "Université", post_office: "Bureau de poste",
+    police: "Police", bank: "Banque", atm: "Distributeur", fuel: "Station-service",
+    hotel: "Hôtel", supermarket: "Supermarché", bakery: "Boulangerie",
+    convenience: "Épicerie", clothes: "Vêtements", place_of_worship: "Lieu de culte",
+  })[place.category] || place.category.replaceAll("_", " ");
+  return {
+    id: place.id,
+    search_name: name_ar && name_ar !== name_fr ? `${name_ar} - ${name_fr}` : name_fr,
+    name_ar, name_fr, category, category_ar: category,
+    commune_secteur: place.city || place.street,
+    commune_secteur_ar: place.city || place.street,
+    latitude: place.latitude, longitude: place.longitude,
+    gps_status: "Point OpenStreetMap ; accès routier à vérifier",
+    source_gps: `OpenStreetMap ${place.id.slice(4)}`,
+    precision_gps: "Point cartographique ; entrée non vérifiée",
+    position_gps: `${place.latitude}, ${place.longitude}`,
+    search_aliases: [place.name, place.name_ar, place.name_fr, place.city, place.street].filter(Boolean).join(" "),
+  };
 }));
