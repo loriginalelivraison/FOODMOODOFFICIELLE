@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
-const base = process.env.WINRAK_PREVIEW_URL || 'http://localhost:5176';
+const base = process.argv[2] || process.env.WINRAK_PREVIEW_URL || 'http://localhost:5176';
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 },
   geolocation: { latitude: 36.75, longitude: 3.06 }, permissions: ['geolocation'] });
@@ -15,6 +15,7 @@ const driver = { id: 7, nom: 'Test', telephone: '0555000000', ville: 'Alger', ve
 const client = { id: 8, nom: 'Test', telephone: '0555000001' };
 let malformed = false;
 let crash = false;
+let withHistory = false;
 
 await context.route('**/*', async route => {
   const url = new URL(route.request().url());
@@ -24,7 +25,9 @@ await context.route('**/*', async route => {
     else if (url.pathname.endsWith('/courses/active/')) data = { active: false };
     else if (url.pathname.endsWith('/livreurs/7/')) data = driver;
     else if (url.pathname.endsWith('/livreurs/7/documents/')) data = malformed ? { detail: 'Invalid response' } : [];
-    else if (url.pathname.endsWith('/courses/')) data = malformed ? { results: { detail: 'Invalid response' } } : [];
+    else if (url.pathname.endsWith('/courses/')) data = malformed ? { results: { detail: 'Invalid response' } }
+      : withHistory ? [{ id: 42, client: 8, status: 'completed', active: false,
+        vehicle_type: 'voiture', created_at: '2026-10-09T10:00:00Z', destination: 'Alger' }] : [];
     else if (url.pathname.endsWith('/clients/')) data = [{ ...client, nom: crash ? { invalid: true } : client.nom }];
     await route.fulfill({ json: data });
   } else if (url.origin === base) await route.continue();
@@ -48,6 +51,14 @@ try {
     assert.deepEqual(errors, [], 'client login: browser errors');
     console.log(`PASS: client login returns to ${returnPath || '/client-dashboard'}`);
   }
+  withHistory = true;
+  errors.length = 0;
+  await page.goto(`${base}/client-dashboard`);
+  await page.locator('.course-complaint-toggle').waitFor();
+  assert.equal(await page.locator('.account-page').count(), 1);
+  assert.deepEqual(errors, [], 'client history: browser errors');
+  console.log('PASS: client account renders a completed trip and complaint control');
+  withHistory = false;
   for (const [role, account] of [['client', client], ['livreur', driver]]) for (malformed of [false, true]) {
     errors.length = 0;
     await page.goto(`${base}/livreurs`);
