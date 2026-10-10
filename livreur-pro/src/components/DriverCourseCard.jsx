@@ -6,8 +6,9 @@ import { formatDriverNumber, getOfferPresentation } from "../utils/driverOrders.
 import OfferCountdown from "./OfferCountdown.jsx";
 import AddressLabel from "./AddressLabel.jsx";
 
-export default function DriverCourseCard({ course, badge, variant, busy, children }) {
+export default function DriverCourseCard({ course, badge, variant, busy, children, detailView = false, statusTone = "new", onExpire }) {
   const offer = variant === "offer";
+  const requestView = offer || detailView;
   const delivery = isDeliveryVehicle(course.vehicle_type);
   const data = getOfferPresentation(course);
   const [expired, setExpired] = useState(course.my_offer_expires_in === 0);
@@ -15,13 +16,15 @@ export default function DriverCourseCard({ course, badge, variant, busy, childre
   const price = course.my_offer_price ?? course.final_price ?? course.proposed_price;
   const vehicle = { voiture: "سيارة", moto: "دراجة نارية", scooter: "دراجة نارية", camion: "شاحنة" }[course.vehicle_type]
     || course.vehicle_type || "غير محددة";
-  if (offer) return <article className="driver-request" aria-busy={busy || undefined} aria-label={`طلب رحلة رقم ${course.id}`}>
+  if (requestView) return <article className={`driver-request status-${statusTone}`} aria-busy={busy || undefined} aria-label={`طلب رحلة رقم ${course.id}`}>
     <div className="driver-request-trip">
       <div className="driver-request-heading">
         <strong>{badge}</strong>
-        <OfferCountdown seconds={course.my_offer_expires_in} chip onExpire={() => setExpired(true)} />
+        {offer && course.my_offer_response === "pending" && <OfferCountdown seconds={course.my_offer_expires_in} chip
+          onExpire={() => { setExpired(true); onExpire?.(); }} />}
       </div>
-      <Link className="driver-request-number" to={`/livreur-course/${course.id}`}>الرحلة رقم <bdi>{course.id}</bdi></Link>
+      {detailView ? <span className="driver-request-number">الرحلة رقم <bdi>{course.id}</bdi></span>
+        : <Link className="driver-request-number" to={`/livreur-course/${course.id}`}>الرحلة رقم <bdi>{course.id}</bdi></Link>}
       <div className="driver-request-stops">
         <div className="driver-request-stop is-pickup">
           <CircleDot size={26} aria-hidden="true" />
@@ -39,7 +42,7 @@ export default function DriverCourseCard({ course, badge, variant, busy, childre
         <div><Route size={24} aria-hidden="true" /><strong>{data.distance == null ? "—" : <><bdi>{formatDriverNumber(data.distance)}</bdi> <small>كم</small></>}</strong><span>المسافة التقريبية</span></div>
       </div>
     </div>
-    <fieldset className="driver-course-controls" disabled={Boolean(busy) || expired}>{children}</fieldset>
+    {children && <fieldset className="driver-course-controls" disabled={Boolean(busy) || (offer && expired)}>{children}</fieldset>}
   </article>;
   return <article className={`order-card order-card-${variant} driver-course-card`} aria-busy={busy || undefined}>
     <div className="driver-course-body">

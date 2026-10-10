@@ -13,14 +13,13 @@ import {
   startCourse as startCourseAction,
 } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
-import AddressLabel from "../components/AddressLabel.jsx";
+import DriverCourseCard from "../components/DriverCourseCard.jsx";
 import DriverOfferActions from "../components/DriverOfferActions.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
 import { getDriverDashboardPath, readStoredAccount } from "../utils/navigation.js";
 import { canRespondToDriverOffer, formatDriverNumber } from "../utils/driverOrders.js";
-import { OfferCountdown } from "../components/LivreurOrders.jsx";
 import useDriverCourseLocation from "../hooks/useDriverCourseLocation.js";
-import { canFinishCourse, getCourseTarget, getCourseStatusLabel, getDriverCourseHint, isDeliveryVehicle, isDropoffStage } from "../utils/courseTracking.js";
+import { canFinishCourse, getCourseTarget, getCourseStatusLabel, isDeliveryVehicle, isDropoffStage } from "../utils/courseTracking.js";
 
 function getGoogleMapsUrl(latitude, longitude) {
   const destination = `${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
@@ -259,10 +258,6 @@ export default function LivreurCourse() {
     );
   }
 
-  const hasClientLocation =
-    course.client_latitude != null && course.client_longitude != null
-    && course.client_latitude !== "" && course.client_longitude !== ""
-    && Number.isFinite(Number(course.client_latitude)) && Number.isFinite(Number(course.client_longitude));
   const isDelivery = isDeliveryVehicle(course.vehicle_type);
   if (course.status === "cancelled") {
     return <CourseCancelledState isDelivery={isDelivery} isDriver cancelledBy={course.cancelled_by_type} onContinue={() => navigate(getDriverDashboardPath(course.livreur), { replace: true })} />;
@@ -274,39 +269,25 @@ export default function LivreurCourse() {
   const unavailableOffer = isOffer && course.my_offer_response !== "accepted" && !canRespond;
   const offerLabel = unavailableOffer ? "الطلب غير متاح" : course.my_offer_response === "accepted" ? "بانتظار اختيار العميل" : "طلب جديد";
   const hasRouteTarget = Boolean(routeTarget);
-  const courseStatusClass = isOffer && course.my_offer_response === "accepted"
-    ? "driver_accepted"
+  const requestStatus = isOffer
+    ? unavailableOffer ? "expired" : course.my_offer_response === "accepted" ? "waiting" : "new"
     : course.status;
-  const vehicleLabels = { moto: "دراجة نارية", scooter: "دراجة نارية", voiture: "سيارة", camion: "شاحنة" };
+  const shownPrice = course.my_offer_price ?? (isOffer ? course.proposed_price : course.final_price) ?? course.proposed_price;
 
   return (
     <section className="page driver-course-page" dir="rtl">
-      <header className="course-follow-header">
-        <div>
-          <span className="course-request-kicker">WinRak · الرحلة رقم {course.id}</span>
-          <h1>{isDelivery ? "تفاصيل التوصيل" : "تفاصيل الرحلة"}</h1>
-        </div>
-        <strong className={`course-status-badge status-${courseStatusClass}`}>
-          {isOffer ? offerLabel : getCourseStatusLabel(course)}
-        </strong>
-      </header>
-
-      {isOffer && course.my_offer_response === "pending" && !offerExpired && (
-        <div className="offer-countdown-banner">
-          <OfferCountdown seconds={course.my_offer_expires_in} onExpire={() => setOfferExpired(true)} />
-          <span>اقبل الطلب قبل انتهاء المهلة.</span>
-        </div>
-      )}
-
-      {(isOffer || ["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"].includes(course.status)) && (
-        <div className="course-stage-card" aria-live="polite" data-scroll-step={`${course.status}:${course.my_offer_response || ""}`}>
-          <span className="course-stage-indicator" aria-hidden="true" />
-          <div>
-            <strong>{isOffer ? offerLabel : getCourseStatusLabel(course)}</strong>
-            <p>{isOffer ? unavailableOffer ? "انتهت مهلة الطلب أو لم يعد متاحاً. ارجع إلى الطلبات للاطلاع على الفرص الجديدة." : course.my_offer_response === "accepted" ? "وصل ردك إلى العميل. بانتظار اختياره للسائق." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : getDriverCourseHint(course)}</p>
-          </div>
-        </div>
-      )}
+      <DriverCourseCard course={course} variant={isOffer ? "offer" : "ongoing"}
+        badge={isOffer ? offerLabel : getCourseStatusLabel(course)} statusTone={requestStatus}
+        detailView busy={busy} onExpire={() => setOfferExpired(true)}>
+        {canRespond ? <DriverOfferActions course={course} busy={busy} requestLayout
+          onAccept={(_, price) => handleOfferResponse("accepted", price)}
+          onReject={() => handleOfferResponse("rejected")} />
+          : <div className="driver-request-price-summary">
+            <span>{isOffer ? course.my_offer_response === "accepted" ? "سعرك المرسل إلى الزبون" : "السعر المقترح من الزبون" : "سعر الرحلة"}</span>
+            <strong><bdi>{formatDriverNumber(shownPrice)}</bdi> دج</strong>
+            {isOffer && course.my_offer_response === "accepted" && <small>بانتظار اختيار الزبون للسائق</small>}
+          </div>}
+      </DriverCourseCard>
       {unavailableOffer && <button className="secondary-btn full" type="button" onClick={() => navigate(getDriverDashboardPath(), { replace: true })}>العودة إلى الطلبات</button>}
       {course.status === "completed" && (
         <div className="course-terminal-message course-terminal-completed" role="status" data-scroll-step="completed">
@@ -363,25 +344,12 @@ export default function LivreurCourse() {
           </div>}
         </section>
       )}
-      <div className="course-details-banner" aria-label="معلومات إضافية عن الرحلة">
-        <span><b>{isDelivery ? "نقطة الاستلام" : "نقطة الانطلاق"}</b><AddressLabel text={course.pickup_address || course.pickup_name || "موقع العميل"} /></span>
-        {course.destination && <span><b>{isDelivery ? "نقطة التسليم" : "نقطة الوصول"}</b><AddressLabel text={course.destination} /></span>}
-        <span><b>موقع العميل</b>{hasClientLocation ? "متوفر" : "غير متوفر"}</span>
-        <span><b>المسافة</b>{course.estimated_distance_km == null ? "غير متوفرة" : `${course.estimated_distance_km} كم`}</span>
-        <span><b>المركبة</b>{vehicleLabels[course.vehicle_type] || course.vehicle_type || "غير محددة"}</span>
-        <span><b>السعر</b><bdi>{formatDriverNumber(course.my_offer_price ?? (canRespond ? course.proposed_price : course.final_price) ?? course.proposed_price)}</bdi> دج</span>
-      </div>
-
       {course.active && course.livreur && (course.client_phone || course.pickup_phone) && (
         <div className="driver-course-contacts" aria-label="جهات الاتصال">
           {course.client_phone && <a className="secondary-btn" href={`tel:${course.client_phone}`}>الاتصال بالعميل{course.client_name ? ` · ${course.client_name}` : ""}</a>}
           {isDelivery && course.pickup_phone && <a className="secondary-btn" href={`tel:${course.pickup_phone}`}>الاتصال بنقطة الاستلام</a>}
         </div>
       )}
-
-      {canRespond && <DriverOfferActions course={course} busy={busy}
-        onAccept={(_, price) => handleOfferResponse("accepted", price)}
-        onReject={() => handleOfferResponse("rejected")} />}
 
       {course.livreur && hasRouteTarget && !["completed", "cancelled"].includes(course.status) && <a
         className="primary-btn full"

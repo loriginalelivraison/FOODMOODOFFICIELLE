@@ -43,15 +43,25 @@
 .driver-dashboard-page .orders-group { gap: 10px; }
 .driver-dashboard-page .orders-group > h3 { color: #344054; font-size: 14px; font-weight: 750; margin: 8px 2px 0; }
 .driver-dashboard-page .orders-count { min-width: 21px; height: 21px; background: #eef0f4; color: #6a7483; }
-.driver-request { display: grid; gap: 12px; color: #172637; }
+.driver-course-page { width: min(540px, calc(100% - 28px)); padding-block: 14px 28px; }
+.driver-request { --request-accent: #ea580c; --request-border: #fed7aa; --request-tint: #fff7ed; display: grid; gap: 12px; color: #172637; }
+.driver-request.status-waiting { --request-accent: #7c3aed; --request-border: #ddd6fe; --request-tint: #f7f3ff; }
+.driver-request.status-driver_selected { --request-accent: #15803d; --request-border: #bbf7d0; --request-tint: #f0fdf4; }
+.driver-request.status-driver_arriving { --request-accent: #2563eb; --request-border: #bfdbfe; --request-tint: #eff6ff; }
+.driver-request.status-driver_arrived { --request-accent: #0f766e; --request-border: #99f6e4; --request-tint: #f0fdfa; }
+.driver-request.status-picked_up { --request-accent: #b45309; --request-border: #fde68a; --request-tint: #fffbeb; }
+.driver-request.status-in_progress { --request-accent: #4338ca; --request-border: #c7d2fe; --request-tint: #eef2ff; }
+.driver-request.status-completed { --request-accent: #047857; --request-border: #a7f3d0; --request-tint: #ecfdf5; }
+.driver-request.status-expired { --request-accent: #64748b; --request-border: #cbd5e1; --request-tint: #f8fafc; }
 .driver-request-trip, .driver-request .driver-offer-price-panel { border: 1px solid #e0e6ed; border-radius: 20px; background: #fff; }
+.driver-request-trip { border-color: var(--request-border); background: linear-gradient(180deg, var(--request-tint), #fff 46%); }
 .driver-request-trip { display: grid; gap: 10px; padding: 17px 16px 0; }
 .driver-request-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.driver-request-heading > strong { padding: 6px 12px; border: 1px solid #fed7aa; border-radius: 10px; background: #fff7ed; color: #ea580c; font-size: 17px; font-weight: 800; }
+.driver-request-heading > strong { padding: 6px 12px; border: 1px solid var(--request-border); border-radius: 10px; background: var(--request-tint); color: var(--request-accent); font-size: 17px; font-weight: 800; }
 .driver-request-timer { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #fdba74; border-radius: 10px; background: #fff7ed; color: #ea580c; font-size: 15px; font-weight: 800; white-space: nowrap; }
 .driver-request-timer.is-urgent { border-color: #fca5a5; background: #fff1f2; color: #dc2626; }
 .driver-request-number { justify-self: start; color: #758091; font-size: 12px; text-decoration: none; }
-.driver-request-number:hover { color: #ea580c; text-decoration: underline; }
+.driver-request-number:hover { color: var(--request-accent); text-decoration: underline; }
 .driver-request-stops { position: relative; display: grid; gap: 20px; padding: 4px 0 18px; }
 .driver-request-stops::before { content: ""; position: absolute; inset-inline-start: 13px; top: 30px; bottom: 42px; border-inline-start: 1px dashed #aeb8c4; }
 .driver-request-stop { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
@@ -82,14 +92,19 @@
 .driver-request .booking-summary-amount.is-caption-inside small { color: #7b8796; font-size: 11px; font-weight: 500; }
 .driver-request-price-hint { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 3px 0 0; color: #8993a1; font-size: 11px; text-align: center; }
 .driver-request-price-hint svg { flex: 0 0 auto; }
-.driver-dashboard-page .driver-request .driver-offer-actions { gap: 8px; }
-.driver-dashboard-page .driver-request .driver-offer-actions button { min-height: 54px; border-radius: 12px; font-size: 16px; }
-.driver-dashboard-page .driver-request .driver-offer-actions button + button { border: 2px solid #e11d27; background: #fff7f8; color: #d71920; }
+.driver-request-price-summary { display: grid; justify-items: center; gap: 5px; padding: 18px 12px; border: 1px solid var(--request-border); border-radius: 20px; background: #fff; text-align: center; }
+.driver-request-price-summary > span { color: #5d6979; font-size: 13px; }
+.driver-request-price-summary > strong { color: var(--request-accent); font-size: 25px; }
+.driver-request-price-summary > small { color: #7b8796; font-size: 12px; }
+:is(.driver-dashboard-page, .driver-course-page) .driver-request .driver-offer-actions { gap: 8px; margin: 0; display: flex; }
+:is(.driver-dashboard-page, .driver-course-page) .driver-request .driver-offer-actions button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 54px; border: 0; border-radius: 12px; background: #11735f; color: #fff; font-size: 16px; font-weight: 750; cursor: pointer; }
+:is(.driver-dashboard-page, .driver-course-page) .driver-request .driver-offer-actions button + button { border: 2px solid #e11d27; background: #fff7f8; color: #d71920; }
+:is(.driver-dashboard-page, .driver-course-page) .driver-request .driver-offer-actions button:disabled { opacity: .55; cursor: default; }
 @media (max-width: 380px) {
   .driver-request-trip { padding-inline: 12px; }
   .driver-request .driver-offer-price-actions .booking-summary-stepper > button { flex-basis: 42px; width: 42px; height: 42px; }
   .driver-request .driver-offer-price-actions .booking-summary-amount input { font-size: 26px; }
-  .driver-dashboard-page .driver-request .driver-offer-actions button { font-size: 14px; }
+  :is(.driver-dashboard-page, .driver-course-page) .driver-request .driver-offer-actions button { font-size: 14px; }
 }
 .driver-dashboard-page .driver-course-card { display: block; padding: 0; border: 1px solid #edf0f3; border-radius: 23px; overflow: hidden; background: #fff; box-shadow: 0 7px 24px #24304306; }
 .driver-offer-map { height: 108px; background: #edf1f3; position: relative; }
