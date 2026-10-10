@@ -288,3 +288,15 @@ class CourseEvent(models.Model):
 
     class Meta:
         ordering = ["created_at", "id"]
+
+
+class CommentaireClient(models.Model):
+    course = models.OneToOneField(Course, on_delete=models.CASCADE, related_name="client_review")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="reviews")
+    livreur = models.ForeignKey(Livreur, on_delete=models.CASCADE, related_name="client_reviews")
+    note = models.PositiveSmallIntegerField()
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

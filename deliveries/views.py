@@ -20,13 +20,14 @@ from decimal import Decimal, InvalidOperation
 from math import isfinite
 from uuid import uuid4
 
-from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course, CourseOffer, DriverDocument
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, CommentaireClient, Client, Course, CourseOffer, DriverDocument
 from .serializers import (
     AccountRegistrationSerializer,
     DriverRegistrationSerializer,
     LivreurSerializer,
     DemandeLivraisonSerializer,
     CommentaireLivreurSerializer,
+    ClientReviewInputSerializer,
     ClientSerializer,
     CourseSerializer,
 )
@@ -475,6 +476,30 @@ class CourseViewSet(ModelViewSet):
             ).distinct()
 
         return Course.objects.none()
+
+    @action(detail=True, methods=["post"], url_path="review-client")
+    def review_client(self, request, pk=None):
+        review_input = ClientReviewInputSerializer(data=request.data)
+        review_input.is_valid(raise_exception=True)
+        with transaction.atomic():
+            course = Course.objects.select_for_update().filter(pk=pk).first()
+            if not course:
+                return Response({"detail": "Course introuvable."}, status=404)
+            if not course.livreur_id or course.livreur.user_id != request.user.id:
+                raise PermissionDenied("Seul le chauffeur de cette course peut évaluer le client.")
+            if course.status != "completed" or course.active or not course.client_confirmed:
+                raise CourseConflict("L'évaluation du client est possible après une course terminée.")
+            if CommentaireClient.objects.filter(course=course).exists():
+                raise CourseConflict("Ce client a déjà été évalué pour cette course.")
+            review = CommentaireClient.objects.create(
+                course=course, client=course.client, livreur=course.livreur,
+                note=review_input.validated_data["note"],
+                message=review_input.validated_data.get("message", ""),
+            )
+        return Response({
+            "id": review.id, "note": review.note, "message": review.message,
+            "created_at": review.created_at,
+        }, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         client = serializer.validated_data.get("client")

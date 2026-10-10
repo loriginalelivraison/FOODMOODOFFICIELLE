@@ -44,7 +44,7 @@
 .driver-dashboard-page .orders-group > h3 { color: #344054; font-size: 14px; font-weight: 750; margin: 8px 2px 0; }
 .driver-dashboard-page .orders-count { min-width: 21px; height: 21px; background: #eef0f4; color: #6a7483; }
 .driver-dashboard-page .driver-course-card { display: block; padding: 0; border: 1px solid #edf0f3; border-radius: 23px; overflow: hidden; background: #fff; box-shadow: 0 7px 24px #24304306; }
-.driver-offer-map { height: 130px; background: #edf1f3; position: relative; }
+.driver-offer-map { height: 108px; background: #edf1f3; position: relative; }
 .driver-offer-map .mapboxgl-ctrl-attrib { font-size: 9px; }
 .driver-route-unavailable { min-height: 104px; display: grid; justify-items: center; align-content: center; gap: 6px; padding: 16px; color: #778292; background: #f1f4f7; font-size: 13px; }
 .driver-route-unavailable svg { color: #9aa5b4; }
@@ -53,12 +53,12 @@
 .driver-route-pin::after { content: ''; position: absolute; width: 7px; height: 7px; background: #fff; border-radius: 50%; inset: 6px; }
 .driver-route-pin.is-pickup { background: #10a163; }
 .driver-route-pin.is-destination { background: #f97316; }
-.driver-course-body { display: grid; gap: 8px; padding: 13px 16px 12px; }
+.driver-course-body { display: grid; gap: 7px; padding: 12px 16px; }
 .driver-course-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .driver-course-heading > strong { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #273142; }
 .driver-course-heading > strong svg { color: #f29122; flex-shrink: 0; }
 .driver-vehicle-tag { padding: 5px 8px; border-radius: 20px; background: #fff3e9; color: #bd591c; font-size: 11px; white-space: nowrap; }
-.driver-course-price { display: grid; justify-items: center; gap: 1px; }
+.driver-course-price { display: grid; justify-items: center; gap: 1px; padding: 2px 0; }
 .driver-course-price > strong { font-size: 30px; line-height: 1.3; letter-spacing: -.6px; color: #e56c1b; font-weight: 800; }
 .driver-course-price small { font-size: 18px; font-weight: 700; letter-spacing: 0; }
 .driver-course-price > span { color: #9099a6; font-size: 11px; }
@@ -71,16 +71,17 @@
 .driver-course-stop.is-pickup { color: #14975c; }
 .driver-course-stop.is-destination { color: #f07820; }
 .driver-course-stop p { margin: 3px 0 0; font-size: 14px; line-height: 1.6; color: #475569; overflow-wrap: anywhere; }
-.driver-course-metrics { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 20px; color: #6b7686; padding-block: 7px; border-top: 1px solid #f2f3f5; font-size: 12px; }
+.driver-course-metrics { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 16px; color: #6b7686; padding-block: 7px; border-top: 1px solid #f2f3f5; font-size: 12px; }
 .driver-course-metrics > span { display: inline-flex; gap: 5px; align-items: center; }
 .driver-course-metrics:empty { display: none; }
 .driver-course-metrics svg { color: #9aa4b3; }
 .driver-course-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
 .driver-course-controls:empty { display: none; }
-.driver-offer-price-actions { display: grid; gap: 9px; margin-block: 8px; }
-.driver-offer-price-label { display: grid; gap: 5px; color: #475569; font-size: 13px; font-weight: 650; }
-.driver-offer-price-label input { box-sizing: border-box; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #202937; font: inherit; direction: ltr; text-align: right; }
-.driver-offer-price-error { color: #b91c1c; font-size: 12px; }
+.driver-offer-price-actions { display: grid; gap: 7px; }
+.driver-offer-price-actions .booking-summary-price { padding: 5px 0 2px; }
+.driver-offer-price-actions .booking-summary-stepper { gap: 12px; }
+.driver-offer-price-actions .booking-summary-amount input { min-height: 40px; font-size: 28px; }
+.driver-offer-price-actions .booking-summary-stepper > button { width: 40px; height: 40px; flex-basis: 40px; border-radius: 11px; }
 .driver-offer-price-actions .driver-offer-actions { display: flex; gap: 10px; }
 .driver-offer-price-actions .driver-offer-actions button { flex: 1; }
 .driver-dashboard-page .driver-offer-actions { margin: 0; display: flex; gap: 10px; }

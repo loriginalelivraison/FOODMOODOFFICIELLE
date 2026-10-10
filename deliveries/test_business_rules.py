@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .course_services import broadcast_course_offers, dispatch_expired_courses
-from .models import Client, CommentaireLivreur, Course, CourseOffer, DemandeLivraison, Livreur
+from .models import Client, CommentaireClient, CommentaireLivreur, Course, CourseOffer, DemandeLivraison, Livreur
 
 
 class BusinessRulesTests(TestCase):
@@ -264,6 +264,67 @@ class BusinessRulesTests(TestCase):
                 **payload, "note": note,
             }).status_code, 400)
         self.assertEqual(self.other_api.delete(f"/api/commentaires-livreurs/{response.data['id']}/").status_code, 403)
+
+    def test_driver_can_review_customer_once_after_completed_course(self):
+        course = self.make_course()
+        url = f"/api/courses/{course.id}/review-client/"
+        payload = {"note": 4, "message": "Client ponctuel", "client": self.other_customer.id}
+        self.assertEqual(APIClient().post(url, payload, format="json").status_code, 401)
+        self.assertEqual(self.customer_api.post(url, payload, format="json").status_code, 403)
+        self.assertEqual(self.driver_api.post(url, payload, format="json").status_code, 409)
+        course.status = "completed"
+        course.active = False
+        course.save(update_fields=["status", "active"])
+        other_driver = Livreur.objects.create(
+            user=User.objects.create_user("rules-review-driver"), nom="Autre chauffeur",
+            telephone="0555001099", ville="Alger", vehicule="voiture",
+        )
+        other_driver_api = APIClient()
+        other_driver_api.force_authenticate(other_driver.user)
+        self.assertEqual(other_driver_api.post(url, payload, format="json").status_code, 403)
+        for note in (0, 6):
+            self.assertEqual(self.driver_api.post(url, {**payload, "note": note}, format="json").status_code, 400)
+        response = self.driver_api.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        review = CommentaireClient.objects.get(course=course)
+        self.assertEqual(review.client_id, self.customer.id)
+        self.assertEqual(review.livreur_id, self.driver.id)
+        self.assertEqual(review.note, 4)
+        self.assertEqual(self.driver_api.post(url, payload, format="json").status_code, 409)
+        self.assertTrue(self.driver_api.get(f"/api/courses/{course.id}/").data["client_review_submitted"])
+
+    def test_customer_reviews_and_photo_only_visible_to_assigned_driver(self):
+        previous = self.make_course(status="completed", active=False)
+        CommentaireClient.objects.create(course=previous, client=self.customer, livreur=self.driver,
+                                         note=5, message="Très bien")
+        self.customer.photo = "clients/profile.jpg"
+        self.customer.save(update_fields=["photo"])
+        course = self.make_course(livreur=None, status="driver_accepted", client_confirmed=False)
+        CourseOffer.objects.create(course=course, livreur=self.driver, response="accepted")
+        url = f"/api/courses/{course.id}/"
+        candidate = self.driver_api.get(url).data
+        self.assertIsNone(candidate["client_name"])
+        self.assertIsNone(candidate["client_photo"])
+        self.assertIsNone(candidate["client_rating"])
+        self.assertIsNone(candidate["client_review_count"])
+        self.assertEqual(candidate["client_reviews"], [])
+        course.livreur = self.driver
+        course.client_confirmed = True
+        course.status = "driver_selected"
+        course.save(update_fields=["livreur", "client_confirmed", "status"])
+        assigned = self.driver_api.get(url).data
+        self.assertEqual(assigned["client_name"], self.customer.nom)
+        self.assertIn("clients/profile.jpg", assigned["client_photo"])
+        self.assertEqual(assigned["client_rating"], 5)
+        self.assertEqual(assigned["client_review_count"], 1)
+        self.assertEqual(assigned["client_reviews"][0]["message"], "Très bien")
+        self.assertEqual(self.other_api.get(url).status_code, 404)
+        course.active = False
+        course.status = "completed"
+        course.save(update_fields=["active", "status"])
+        completed = self.driver_api.get(url).data
+        self.assertIsNone(completed["client_photo"])
+        self.assertEqual(completed["client_reviews"], [])
 
     def test_profile_patch_cannot_change_login_identity_or_driver_availability(self):
         response = self.customer_api.patch(f"/api/clients/{self.customer.id}/", {

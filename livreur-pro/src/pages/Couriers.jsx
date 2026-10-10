@@ -13,6 +13,7 @@ import { destinationCoordinates, suggestedDeliveryPickups, suggestedDestinations
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import { clearCurrentClientCourse, isValidId } from "../utils/navigation.js";
 import { isDeliveryVehicle } from "../utils/courseTracking.js";
+import { adjustCoursePrice, MIN_COURSE_PRICE_DZD, PRICE_ADJUSTMENT_DZD } from "../utils/priceAdjustment.js";
 import {
   getLocationErrorMessage,
   isIOSDevice,
@@ -23,8 +24,6 @@ import {
   scrollToSection,
 } from "../utils/scroll.js";
 
-const MIN_COURSE_PRICE_DZD = 100;
-const PRICE_ADJUSTMENT_DZD = 50;
 const VEHICLE_TYPES = [
   { value: "moto", label: "موصّل" },
   { value: "voiture", label: "سيارة" },
@@ -122,10 +121,7 @@ export default function Couriers() {
   }
 
   function adjustProposedPrice(amount) {
-    setProposedPrice((currentValue) => {
-      const currentPrice = Number(currentValue || priceQuote?.proposed_price || MIN_COURSE_PRICE_DZD);
-      return String(Math.max(MIN_COURSE_PRICE_DZD, currentPrice + amount));
-    });
+    setProposedPrice((currentValue) => adjustCoursePrice(currentValue, priceQuote?.proposed_price, amount));
   }
 
   useEffect(() => {

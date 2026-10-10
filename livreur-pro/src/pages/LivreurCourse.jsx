@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Star, User } from "lucide-react";
 import {
   cancelCourse,
   finishCourse,
@@ -8,6 +9,7 @@ import {
   markCourseEnroute,
   pickupCourse,
   respondToCourseOffer,
+  reviewClient,
   startCourse as startCourseAction,
 } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -40,6 +42,10 @@ export default function LivreurCourse() {
   const [responding, setResponding] = useState(false);
   const [offerExpired, setOfferExpired] = useState(false);
   const [refreshError, setRefreshError] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const actionInFlight = useRef(false);
   const revision = useRef(0);
   const locationError = useDriverCourseLocation(course);
@@ -219,6 +225,21 @@ export default function LivreurCourse() {
     }
   }
 
+  async function handleReviewSubmit(event) {
+    event.preventDefault();
+    if (!course || course.status !== "completed" || course.client_review_submitted || submittingReview) return;
+    setSubmittingReview(true);
+    setReviewError("");
+    try {
+      await reviewClient(course.id, { note: reviewRating, message: reviewMessage.trim() });
+      setCourse((current) => current?.id === course.id ? { ...current, client_review_submitted: true } : current);
+    } catch (err) {
+      setReviewError(err.message || "تعذر إرسال تقييم العميل.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
+
   if ((error || refreshError) && !course) {
     return (
       <section className="page" dir="rtl">
@@ -282,7 +303,7 @@ export default function LivreurCourse() {
           <span className="course-stage-indicator" aria-hidden="true" />
           <div>
             <strong>{isOffer ? offerLabel : getCourseStatusLabel(course)}</strong>
-            <p>{isOffer ? unavailableOffer ? "انتهت مهلة الطلب أو لم يعد متاحاً. ارجع إلى الطلبات للاطلاع على الفرص الجديدة." : course.my_offer_response === "accepted" ? "تم إرسال قبولك. سيظهر تحديث هنا بعد اختيارك." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : getDriverCourseHint(course)}</p>
+            <p>{isOffer ? unavailableOffer ? "انتهت مهلة الطلب أو لم يعد متاحاً. ارجع إلى الطلبات للاطلاع على الفرص الجديدة." : course.my_offer_response === "accepted" ? "وصل ردك إلى العميل. بانتظار اختياره للسائق." : "راجع معلومات الرحلة، ثم اختر قبول أو رفض." : getDriverCourseHint(course)}</p>
           </div>
         </div>
       )}
@@ -291,10 +312,56 @@ export default function LivreurCourse() {
         <div className="course-terminal-message course-terminal-completed" role="status" data-scroll-step="completed">
           <strong>{isDelivery ? "تم تسليم الطلب بنجاح" : "اكتملت الرحلة بنجاح"}</strong>
           <span>تم تحديث حالة الرحلة للعميل أيضاً. شكراً لك.</span>
-          <button className="secondary-btn" type="button" onClick={() => navigate(getDriverDashboardPath(course.livreur), { replace: true })}>
-            العودة إلى لوحة السائق
-          </button>
         </div>
+      )}
+      {course.status === "completed" && course.client_confirmed && (
+        <section className="course-review-card" aria-label="تقييم العميل">
+          {course.client_review_submitted ? (
+            <strong className="course-review-success" role="status">شكراً لك على تقييم العميل</strong>
+          ) : (
+            <form onSubmit={handleReviewSubmit}>
+              <h2>كيف كان تعاملك مع العميل؟</h2>
+              <div className="course-review-stars" role="group" aria-label="تقييم العميل من نجمة إلى خمس نجوم" dir="ltr">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button type="button" key={rating} aria-label={`${rating} نجوم`}
+                    aria-pressed={reviewRating === rating} onClick={() => setReviewRating(rating)}>
+                    <Star size={27} fill={rating <= reviewRating ? "currentColor" : "none"} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+              <label><span className="visually-hidden">تعليق اختياري</span>
+                <textarea value={reviewMessage} onChange={(event) => setReviewMessage(event.target.value)}
+                  maxLength={1000} placeholder="تعليق اختياري" /></label>
+              {reviewError && <p className="course-request-error" role="alert">{reviewError}</p>}
+              <button type="submit" disabled={submittingReview}>
+                {submittingReview ? "جارٍ الإرسال…" : "إرسال التقييم"}
+              </button>
+            </form>
+          )}
+        </section>
+      )}
+      {course.status === "completed" && <button className="secondary-btn full" type="button"
+        onClick={() => navigate(getDriverDashboardPath(course.livreur), { replace: true })}>
+        العودة إلى لوحة السائق
+      </button>}
+      {course.client_name && (
+        <section className="driver-client-card" aria-label="معلومات العميل">
+          <div className="driver-client-heading">
+            <span className="driver-client-avatar">
+              {course.client_photo ? <img src={course.client_photo} alt={course.client_name} /> : <User size={24} aria-hidden="true" />}
+            </span>
+            <div><h2>{course.client_name}</h2>
+              <span>{course.client_rating == null ? "لا توجد تقييمات بعد" : `★ ${course.client_rating} / 5 · ${course.client_review_count} تقييم`}</span>
+            </div>
+          </div>
+          {course.client_reviews?.length > 0 && <div className="driver-client-reviews">
+            <h3>آراء السائقين عن العميل</h3>
+            {course.client_reviews.map((review, index) => <article key={`${review.created_at}-${index}`}>
+              <strong>★ {review.note} / 5</strong>
+              {review.message && <p>{review.message}</p>}
+            </article>)}
+          </div>}
+        </section>
       )}
       <div className="course-details-banner" aria-label="معلومات إضافية عن الرحلة">
         <span><b>{isDelivery ? "نقطة الاستلام" : "نقطة الانطلاق"}</b><AddressLabel text={course.pickup_address || course.pickup_name || "موقع العميل"} /></span>
@@ -302,7 +369,7 @@ export default function LivreurCourse() {
         <span><b>موقع العميل</b>{hasClientLocation ? "متوفر" : "غير متوفر"}</span>
         <span><b>المسافة</b>{course.estimated_distance_km == null ? "غير متوفرة" : `${course.estimated_distance_km} كم`}</span>
         <span><b>المركبة</b>{vehicleLabels[course.vehicle_type] || course.vehicle_type || "غير محددة"}</span>
-        <span><b>السعر</b><bdi>{formatDriverNumber(course.my_offer_price ?? course.final_price ?? course.proposed_price)}</bdi> دج</span>
+        <span><b>السعر</b><bdi>{formatDriverNumber(course.my_offer_price ?? (canRespond ? course.proposed_price : course.final_price) ?? course.proposed_price)}</bdi> دج</span>
       </div>
 
       {course.active && course.livreur && (course.client_phone || course.pickup_phone) && (

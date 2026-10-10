@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { CarFront, ChevronDown, History, LogOut, Pencil, Phone, ShieldCheck, Star, Trophy, User } from "lucide-react";
 import DriverDocuments from "./DriverDocuments.jsx";
 import LoadingSpinner from "./LoadingSpinner.jsx";
@@ -22,7 +23,11 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
     <header className="driver-account-title"><h1>حسابي</h1></header>
     <section className="account-card driver-profile-card" id="personal-info">
       <div className="driver-profile-heading">
-        <div className="account-avatar">{photo ? <img src={photo} alt={name} /> : <User size={30} aria-hidden="true" />}</div>
+        <div className="account-photo-wrap">
+          {photo ? <><a className="account-avatar" href={photo} target="_blank" rel="noopener noreferrer" aria-label="عرض صورتي الشخصية"><img src={photo} alt={name} /></a>
+            <a className="account-photo-view" href={photo} target="_blank" rel="noopener noreferrer">عرض الصورة</a></>
+            : <div className="account-avatar"><User size={30} aria-hidden="true" /></div>}
+        </div>
         <div className="account-identity"><h2>{name}</h2>
           <span className="driver-profile-phone"><Phone size={15} aria-hidden="true" /><bdi>{profile?.telephone || livreur.telephone}</bdi></span>
         </div>
@@ -36,6 +41,7 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
         <label>الاسم<input value={form.name} onChange={(event) => form.setName(event.target.value)} maxLength={100} required /></label>
         <label>رقم الهاتف<input value={livreur.telephone || ""} disabled readOnly dir="ltr" /></label>
         <label>المدينة<input value={form.city} onChange={(event) => form.setCity(event.target.value)} maxLength={100} /></label>
+        <label>صورة الحساب (اختيارية)<input type="file" accept="image/*" onChange={(event) => form.setPhoto(event.target.files?.[0] || null)} /></label>
         <label>نوع المركبة<select value={form.vehicle} onChange={(event) => form.setVehicle(event.target.value)}>
           <option value="moto">دراجة نارية</option><option value="voiture">سيارة</option>
           <option value="camion">شاحنة</option><option value="velo">دراجة</option>
@@ -84,6 +90,9 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
               {course.destination && <AddressLabel text={course.destination} />}
               {(course.final_price ?? course.proposed_price) != null && <span className="account-item-price"><bdi>{formatDriverNumber(course.final_price ?? course.proposed_price)}</bdi> دج</span>}
             </div>
+            {course.status === "completed" && course.client_confirmed && <Link className="account-history-action" to={`/livreur-course/${course.id}`}>
+              {course.client_review_submitted ? "عرض الرحلة" : "تقييم العميل"}
+            </Link>}
           </article>)}
           {reviews.length > 0 && <><h3>تقييمات الزبائن</h3>{reviews.map((review) => <article className="account-item" key={review.id}>
             <div className="account-item-head"><strong>★ {review.note ?? "—"} / 5</strong><span>{formatDate(review.created_at)}</span></div>

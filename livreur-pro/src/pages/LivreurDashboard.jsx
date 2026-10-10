@@ -40,6 +40,7 @@ export default function LivreurDashboard() {
   const [editVille, setEditVille] = useState(livreur?.ville || "");
   const [editVehicule, setEditVehicule] = useState(livreur?.vehicule || "moto");
   const [editModeleVehicule, setEditModeleVehicule] = useState(livreur?.modele_vehicule || "");
+  const [editPhoto, setEditPhoto] = useState(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [message, setMessage] = useState("");
@@ -382,6 +383,7 @@ export default function LivreurDashboard() {
       } catch (profileErr) {
         console.error("Erreur rafraîchissement profil :", profileErr);
       }
+      navigate(`/livreur-course/${targetCourse.id}`);
     } catch (err) {
       setError(err.message || "حدث خطأ أثناء إنهاء الرحلة.");
     } finally {
@@ -400,6 +402,10 @@ export default function LivreurDashboard() {
       setError("الاسم مطلوب.");
       return;
     }
+    if (editPhoto && editPhoto.size > 5 * 1024 * 1024) {
+      setError("حجم الصورة يجب ألا يتجاوز 5 ميغابايت.");
+      return;
+    }
 
     setSavingProfile(true);
     profileRevision.current += 1;
@@ -411,6 +417,7 @@ export default function LivreurDashboard() {
         ville,
         vehicule: editVehicule,
         modele_vehicule: editVehicule === "voiture" ? editModeleVehicule.trim() : "",
+        ...(editPhoto ? { photo: editPhoto } : {}),
       });
       const nextLivreur = {
         ...livreur,
@@ -418,6 +425,7 @@ export default function LivreurDashboard() {
         ville: updated.ville ?? ville,
         vehicule: updated.vehicule ?? editVehicule,
         modele_vehicule: updated.modele_vehicule ?? (editVehicule === "voiture" ? editModeleVehicule.trim() : ""),
+        photo: updated.photo ?? livreur.photo,
       };
       setLivreur(nextLivreur);
       setProfile((current) => ({ ...current, ...updated }));
@@ -425,6 +433,7 @@ export default function LivreurDashboard() {
       localStorage.setItem("livreur", JSON.stringify(nextLivreur));
       window.dispatchEvent(new Event("authChanged"));
       setEditingProfile(false);
+      setEditPhoto(null);
       setMessage("تم حفظ معلوماتك.");
     } catch (err) {
       setError(err.message || "تعذر تحديث المعلومات.");
@@ -454,6 +463,7 @@ export default function LivreurDashboard() {
     setEditVille(profile?.ville || livreur.ville || "");
     setEditVehicule(profile?.vehicule || livreur.vehicule || "moto");
     setEditModeleVehicule(profile?.modele_vehicule || livreur.modele_vehicule || "");
+    setEditPhoto(null);
     setEditingProfile((value) => !value);
   };
 
@@ -466,7 +476,8 @@ export default function LivreurDashboard() {
         form={{ name: editNom, setName: setEditNom, city: editVille, setCity: setEditVille,
           vehicle: editVehicule, setVehicle: setEditVehicule,
           vehicleModel: editModeleVehicule, setVehicleModel: setEditModeleVehicule, saving: savingProfile,
-          onSave: handleProfileSave, onCancel: () => setEditingProfile(false) }}
+          photo: editPhoto, setPhoto: setEditPhoto,
+          onSave: handleProfileSave, onCancel: () => { setEditingProfile(false); setEditPhoto(null); } }}
         onLogout={logout} onDelete={handleDeleteAccount} onPrivacy={() => navigate("/privacy")}
       /> : <>
         <header className="account-header driver-home-header">

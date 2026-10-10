@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, CarFront, Clock, MapPin, Route } from "lucide-react";
+import { Bell, CarFront, Clock, MapPin, Route, User } from "lucide-react";
 import { isDeliveryVehicle } from "../utils/courseTracking.js";
 import { formatDriverNumber, getOfferPresentation } from "../utils/driverOrders.js";
 import DriverOfferMap from "./DriverOfferMap.jsx";
@@ -13,17 +13,27 @@ export default function DriverCourseCard({ course, badge, variant, busy, childre
   const data = getOfferPresentation(course);
   const [expired, setExpired] = useState(course.my_offer_expires_in === 0);
   useEffect(() => setExpired(course.my_offer_expires_in != null && course.my_offer_expires_in <= 0), [course.my_offer_expires_in]);
-  const price = offer ? course.final_price ?? data.price : course.my_offer_price ?? course.final_price ?? course.proposed_price;
+  const price = offer ? course.proposed_price ?? course.final_price : course.my_offer_price ?? course.final_price ?? course.proposed_price;
+  const vehicle = { voiture: "سيارة", moto: "دراجة نارية", scooter: "دراجة نارية", camion: "شاحنة" }[course.vehicle_type]
+    || course.vehicle_type || "غير محددة";
   return <article className={`order-card order-card-${variant} driver-course-card`} aria-busy={busy || undefined}>
     {offer && <DriverOfferMap route={data.route} pickup={data.pickup} destination={data.destination} />}
     <div className="driver-course-body">
       <div className="driver-course-heading">
         <strong>{offer ? <Bell size={18} aria-hidden="true" /> : <CarFront size={18} aria-hidden="true" />}{badge}</strong>
-        <span className="driver-vehicle-tag">{delivery ? "توصيل طلب" : "رحلة"} · <bdi>#{course.id}</bdi></span>
+        <span className="driver-vehicle-tag"><bdi>#{course.id}</bdi></span>
       </div>
+      {course.client_name && <div className="driver-client-heading driver-client-summary">
+        <span className="driver-client-avatar">
+          {course.client_photo ? <img src={course.client_photo} alt={course.client_name} /> : <User size={20} aria-hidden="true" />}
+        </span>
+        <div><strong>{course.client_name}</strong>
+          <span>{course.client_rating == null ? "لا توجد تقييمات بعد" : `★ ${course.client_rating} / 5 · ${course.client_review_count} تقييم`}</span>
+        </div>
+      </div>}
       <div className="driver-course-price">
         <strong><bdi>{formatDriverNumber(price)}</bdi> <small>دج</small></strong>
-        <span>السعر</span>
+        <span>{offer ? "سعر العميل" : "السعر"}</span>
       </div>
       <div className="driver-course-stops">
         <div className="driver-course-stop is-pickup">
@@ -38,6 +48,7 @@ export default function DriverCourseCard({ course, badge, variant, busy, childre
       </div>
       <div className="driver-course-metrics">
         {data.distance != null && <span><Route size={17} aria-hidden="true" /><bdi>{formatDriverNumber(data.distance)}</bdi> كم</span>}
+        <span><CarFront size={17} aria-hidden="true" />{vehicle}</span>
         {data.minutes != null && <span><Clock size={17} aria-hidden="true" /><bdi>{formatDriverNumber(data.minutes)}</bdi> د</span>}
       </div>
       <fieldset className="driver-course-controls" disabled={Boolean(busy) || (offer && expired)}>{children}</fieldset>

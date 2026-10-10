@@ -2567,6 +2567,8 @@ input::placeholder {
   font-weight: 800;
 }
 .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-photo-wrap { display: grid; justify-items: center; gap: 4px; }
+.account-photo-view { color: #c75d13; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .account-identity { display: grid; gap: 5px; min-width: 0; }
 .account-identity h1 {
   margin: 0;
@@ -3161,6 +3163,38 @@ input::placeholder {
 .course-cancel-form h2 { margin: 0; font-size: 19px; }
 .course-cancel-form select, .course-cancel-form textarea { width: 100%; font: inherit; padding: 12px; color: #18252c; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; }
 .course-cancel-form .account-form-actions { flex-wrap: wrap; }
+.driver-client-card {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #dbe4e8;
+  border-radius: 12px;
+  background: #fff;
+}
+.driver-client-heading { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.driver-client-heading > div { display: grid; gap: 3px; min-width: 0; }
+.driver-client-heading h2 { margin: 0; font-size: 17px; color: #18252c; }
+.driver-client-heading strong { color: #18252c; }
+.driver-client-heading div > span { color: #68777d; font-size: 13px; }
+.driver-client-avatar {
+  display: grid;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #edf4f1;
+  color: #176b53;
+}
+.driver-client-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.driver-client-summary { margin: 4px 0; }
+.driver-client-reviews { display: grid; gap: 8px; }
+.driver-client-reviews h3 { margin: 0; font-size: 14px; color: #263940; }
+.driver-client-reviews article { padding: 10px; border-radius: 9px; background: #f6f8f7; }
+.driver-client-reviews article strong { color: #b45309; font-size: 13px; }
+.driver-client-reviews article p { margin: 5px 0 0; color: #34454b; font-size: 13px; overflow-wrap: anywhere; }
 :where(a, button, input, select, textarea):focus-visible { outline: 3px solid #f97316; outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

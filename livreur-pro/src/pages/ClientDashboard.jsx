@@ -140,7 +140,11 @@ export default function ClientDashboard() {
   return (
     <section className="page account-page" dir="rtl">
       <header className="account-header">
-        <div className="account-avatar" aria-hidden="true">{client.photo ? <img src={client.photo} alt="" /> : client.nom?.trim().charAt(0) || "؟"}</div>
+        <div className="account-photo-wrap">
+          {client.photo ? <><a className="account-avatar" href={client.photo} target="_blank" rel="noopener noreferrer" aria-label="عرض صورتي الشخصية"><img src={client.photo} alt={client.nom} /></a>
+            <a className="account-photo-view" href={client.photo} target="_blank" rel="noopener noreferrer">عرض الصورة</a></>
+            : <div className="account-avatar" aria-hidden="true">{client.nom?.trim().charAt(0) || "؟"}</div>}
+        </div>
         <div className="account-identity">
           <h1>{client.nom}</h1>
           <span className="account-role">حساب عميل</span>

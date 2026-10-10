@@ -542,12 +542,15 @@ export async function updateClientProfile(id, data) {
 }
 
 export async function updateLivreurProfile(id, data) {
+  const hasPhoto = data.photo instanceof File;
+  const body = hasPhoto ? new FormData() : JSON.stringify(data);
+  if (hasPhoto) {
+    Object.entries(data).forEach(([key, value]) => body.append(key, value));
+  }
   const response = await fetch(`${API_BASE_URL}/livreurs/${id}/`, {
     method: "PATCH",
-    headers: authHeaders({
-      "Content-Type": "application/json",
-    }),
-    body: JSON.stringify(data),
+    headers: authHeaders(hasPhoto ? {} : { "Content-Type": "application/json" }),
+    body,
   });
 
   const result = await response.json();
@@ -556,7 +559,7 @@ export async function updateLivreurProfile(id, data) {
     handleInvalidToken(result);
     throw new Error(
       toArabicMessage(
-        result.error || result.vehicule || result.detail,
+        result.photo || result.error || result.vehicule || result.detail,
         "حدث خطأ أثناء تعديل المعلومات."
       )
     );
@@ -792,6 +795,21 @@ export async function finishCourse(courseId) {
     throw new Error(toArabicMessage(data.detail, "حدث خطأ أثناء إنهاء الرحلة."));
   }
 
+  return data;
+}
+
+export async function reviewClient(courseId, review) {
+  const response = await fetch(`${API_BASE_URL}/courses/${courseId}/review-client/`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(review),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail || data.note || data.message,
+      "تعذر إرسال تقييم العميل. حاول مرة أخرى."));
+  }
   return data;
 }
 

@@ -1,6 +1,7 @@
 import React from "react";
-import { CarFront, Clock, MapPin, Minus, Plus, Route } from "lucide-react";
+import { CarFront, Clock, MapPin, Route } from "lucide-react";
 import AddressLabel from "./AddressLabel.jsx";
+import PriceAdjuster from "./PriceAdjuster.jsx";
 import { formatDriverNumber } from "../utils/driverOrders.js";
 import "./booking-summary.css";
 
@@ -15,28 +16,9 @@ export default function BookingSummary({ quote, pickup, destination, isDelivery,
       <span>{isDelivery ? "توصيل طلب" : "رحلة"}</span>
     </header>
 
-    <div className="booking-summary-price">
-      <div className="booking-summary-stepper" dir="ltr">
-        <button type="button" aria-label="خفض السعر" title="خفض السعر"
-          disabled={busy || Number(price) <= minPrice} onClick={() => onAdjustPrice(-priceStep)}>
-          <Minus size={22} aria-hidden="true" />
-        </button>
-        <label className="booking-summary-amount" dir="rtl">
-          <input id="booking-price" type="number" value={price} onChange={event => onPriceChange(event.target.value)}
-            style={{ width: `${Math.max(3, String(price).length)}ch` }}
-            min={minPrice} step="1" required aria-label="السعر المقترح بالدينار الجزائري"
-            aria-invalid={belowMinimum || undefined}
-            aria-describedby={belowMinimum ? "booking-price-error" : undefined} />
-          <span aria-hidden="true">دج</span>
-        </label>
-        <button type="button" aria-label="زيادة السعر" title="زيادة السعر"
-          disabled={busy} onClick={() => onAdjustPrice(priceStep)}>
-          <Plus size={22} aria-hidden="true" />
-        </button>
-      </div>
-      <span className="booking-summary-price-caption">السعر المقترح</span>
-      {belowMinimum && <small id="booking-price-error" className="course-price-error">الحد الأدنى للسعر هو {minPrice} دج.</small>}
-    </div>
+    <PriceAdjuster price={price} onPriceChange={onPriceChange} onAdjustPrice={onAdjustPrice}
+      minPrice={minPrice} priceStep={priceStep} busy={busy} inputId="booking-price"
+      caption="السعر المقترح" error={belowMinimum ? `الحد الأدنى للسعر هو ${minPrice} دج.` : ""} />
 
     <div className="booking-summary-stops">
       <div className="booking-summary-stop is-pickup">

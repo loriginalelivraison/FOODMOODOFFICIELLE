@@ -4,6 +4,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Avg
 from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,11 @@ def navigation_stage(course):
 class LivreurSerializer(serializers.ModelSerializer):
     photo = OptionalPhotoField(required=False, allow_null=True)
 
+    def validate_photo(self, photo):
+        if photo and photo.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("حجم الصورة يجب ألا يتجاوز 5 ميغابايت.")
+        return photo
+
     class Meta:
         model = Livreur
         exclude = ["fcm_token"]
@@ -101,6 +107,11 @@ class CommentaireLivreurSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["nom_client", "created_at"]
 
+
+class ClientReviewInputSerializer(serializers.Serializer):
+    note = serializers.IntegerField(min_value=1, max_value=5)
+    message = serializers.CharField(max_length=1000, required=False, allow_blank=True, trim_whitespace=True)
+
 class ClientSerializer(serializers.ModelSerializer):
     photo = OptionalPhotoField(required=False, allow_null=True)
 
@@ -125,6 +136,11 @@ class ClientSerializer(serializers.ModelSerializer):
 class CourseSerializer(serializers.ModelSerializer):
     client_name = serializers.SerializerMethodField()
     client_phone = serializers.SerializerMethodField()
+    client_photo = serializers.SerializerMethodField()
+    client_rating = serializers.SerializerMethodField()
+    client_review_count = serializers.SerializerMethodField()
+    client_reviews = serializers.SerializerMethodField()
+    client_review_submitted = serializers.SerializerMethodField()
     finished_by_name = serializers.SerializerMethodField()
     finished_by_type = serializers.SerializerMethodField()
     accepted_drivers = serializers.SerializerMethodField()
@@ -151,6 +167,33 @@ class CourseSerializer(serializers.ModelSerializer):
 
     def get_client_phone(self, obj):
         return obj.client.telephone if self._can_read_client_contact(obj) else None
+
+    def get_client_photo(self, obj):
+        if not self._can_read_client_contact(obj):
+            return None
+        return ClientSerializer(obj.client, context=self.context).data["photo"]
+
+    def get_client_rating(self, obj):
+        if not self._can_read_client_contact(obj):
+            return None
+        rating = obj.client.reviews.aggregate(value=Avg("note"))["value"]
+        return round(rating, 1) if rating is not None else None
+
+    def get_client_review_count(self, obj):
+        return obj.client.reviews.count() if self._can_read_client_contact(obj) else None
+
+    def get_client_reviews(self, obj):
+        if not self._can_read_client_contact(obj):
+            return []
+        return list(obj.client.reviews.values("note", "message", "created_at")[:3])
+
+    def get_client_review_submitted(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated or not obj.livreur_id:
+            return False
+        if obj.livreur.user_id != request.user.id or obj.status != "completed":
+            return False
+        return hasattr(obj, "client_review")
 
     def get_my_offer_response(self, obj):
         request = self.context.get("request")
@@ -327,6 +370,11 @@ class CourseSerializer(serializers.ModelSerializer):
             "client",
             "client_name",
             "client_phone",
+            "client_photo",
+            "client_rating",
+            "client_review_count",
+            "client_reviews",
+            "client_review_submitted",
             "livreur",
             "finished_by",
             "finished_by_client",

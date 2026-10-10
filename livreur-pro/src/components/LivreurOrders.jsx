@@ -124,7 +124,8 @@ export default function LivreurOrders({
               key={course.id}
               course={course}
               variant="waiting"
-              badge="تم إرسال قبولك"
+              badge={Number(course.my_offer_price) !== Number(course.proposed_price ?? course.final_price)
+                ? "تم إرسال عرضك" : "بانتظار اختيار العميل"}
               busy={respondingOfferId === course.id}
             />
           ))}
