@@ -29,6 +29,10 @@ function positionIsValid(latitude, longitude) {
     && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
 }
 
+const formatPrice = (price) => new Intl.NumberFormat("fr-DZ", {
+  maximumFractionDigits: 2,
+}).format(Number(price));
+
 export default function ClientCourse() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -47,6 +51,7 @@ export default function ClientCourse() {
   const [cancelComment, setCancelComment] = useState("");
   const mutationVersion = useRef(0);
   const mutationPending = useRef(false);
+  const callFirstRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,6 +139,9 @@ export default function ClientCourse() {
     try {
       const updated = await selectCourseDriver(course.id, driverId);
       setCourse(updated);
+      if (isDeliveryVehicle(updated.vehicle_type)) {
+        requestAnimationFrame(() => callFirstRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+      }
     } catch (err) {
       setError(err.message || "تعذر تأكيد هذا السائق.");
       try {
@@ -311,6 +319,14 @@ export default function ClientCourse() {
       </div>
 
       <div className="course-tracking-stage">
+        {isDelivery && active && hasSelectedDriver && selectedDriver?.telephone && (
+          <div className="course-call-first" ref={callFirstRef}>
+            <strong>أول خطوة: اتصل بعامل التوصيل لتأكيد المشتريات.</strong>
+            <a className="tracking-call-button" href={`tel:${selectedDriver.telephone}`}>
+              اتصال بعامل التوصيل
+            </a>
+          </div>
+        )}
         {course.status === "searching" && (
           <div className="course-searching-state">
             <span className="course-search-pulse" aria-hidden="true" />
@@ -320,8 +336,13 @@ export default function ClientCourse() {
 
         {["searching", "driver_accepted"].includes(course.status) && acceptedDrivers.length > 0 && (
           <div className="accepted-driver-list">
-            {acceptedDrivers.map((driver) => (
-              <article className="accepted-driver-card" key={driver.id}>
+            {acceptedDrivers.map((driver) => {
+              const originalPrice = course.proposed_price ?? course.final_price;
+              const offeredPrice = driver.offered_price ?? course.final_price ?? originalPrice;
+              const priceRaised = offeredPrice != null && originalPrice != null
+                && Number(offeredPrice) > Number(originalPrice);
+
+              return <article className="accepted-driver-card" key={driver.id}>
                 <img src={driver.photo || defaultAvatar} alt="" />
                 <div className="accepted-driver-details">
                   <strong>{driver.nom}</strong>
@@ -330,10 +351,22 @@ export default function ClientCourse() {
                     {driver.note != null && <> · ★ {driver.note}</>}
                     {driver.distance_km != null && <> · {driver.distance_km} كم</>}
                   </span>
-                  {(driver.offered_price ?? course.final_price ?? course.proposed_price) != null && (
-                    <span>سعر السائق: {driver.offered_price ?? course.final_price ?? course.proposed_price} دج</span>
-                  )}
                 </div>
+                {offeredPrice != null && (
+                  <div className={`accepted-driver-price${priceRaised ? " is-raised" : ""}`}>
+                    <span className="accepted-driver-price-label">
+                      {priceRaised ? "عرض السائق الجديد" : "سعر السائق"}
+                    </span>
+                    <strong className="accepted-driver-price-amount">
+                      <bdi>{formatPrice(offeredPrice)}</bdi> <small>دج</small>
+                    </strong>
+                    {priceRaised && (
+                      <span className="accepted-driver-price-previous">
+                        السعر قبل التعديل: <del><bdi>{formatPrice(originalPrice)} دج</bdi></del>
+                      </span>
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => handleSelectDriver(driver.id)}
@@ -341,8 +374,8 @@ export default function ClientCourse() {
                 >
                   {selectingDriverId === driver.id ? "جارٍ التأكيد…" : "اختيار"}
                 </button>
-              </article>
-            ))}
+              </article>;
+            })}
           </div>
         )}
 
@@ -363,7 +396,7 @@ export default function ClientCourse() {
                     </span>
                   )}
                 </div>
-                {selectedDriver.telephone && (
+                {selectedDriver.telephone && !isDelivery && (
                   <a
                     className="tracking-call-button"
                     href={`tel:${selectedDriver.telephone}`}
@@ -503,6 +536,7 @@ export default function ClientCourse() {
       </div>
 
       <div className="course-summary" aria-label="ملخص الطلب">
+        {isDelivery && course.purchase_details && <p><span>المشتريات</span><strong>{course.purchase_details}</strong></p>}
         {(course.pickup_address || course.pickup_name) && <p><span>{isDelivery ? "الاستلام" : "الانطلاق"}</span><AddressLabel text={course.pickup_address || course.pickup_name} /></p>}
         {course.destination && <p><span>{isDelivery ? "التسليم" : "الوجهة"}</span><AddressLabel text={course.destination} /></p>}
         {(course.final_price ?? course.proposed_price) != null && <p><span>السعر</span><strong>{course.final_price ?? course.proposed_price} دج</strong></p>}

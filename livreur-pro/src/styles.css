@@ -2280,7 +2280,7 @@ input::placeholder {
 .accepted-driver-list { gap: 8px; margin-top: 0; }
 .accepted-driver-card {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) auto;
+  grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
   gap: 11px;
   padding: 12px;
@@ -2318,6 +2318,37 @@ input::placeholder {
   color: #53646b;
   font-size: 11px;
 }
+.accepted-driver-price {
+  display: grid;
+  grid-column: 1 / -1;
+  justify-items: center;
+  gap: 3px;
+  padding: 13px 10px;
+  border: 1px solid #dbe8e2;
+  border-radius: 10px;
+  background: #f6faf8;
+  text-align: center;
+}
+.accepted-driver-price.is-raised {
+  border-color: #b9d8ca;
+  background: #edf7f1;
+}
+.accepted-driver-price-label {
+  color: #436759;
+  font-size: 12px;
+  font-weight: 700;
+}
+.accepted-driver-price-amount {
+  color: #12563f;
+  font-size: clamp(26px, 5vw, 32px);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.accepted-driver-price-amount small { font-size: 15px; }
+.accepted-driver-price-previous {
+  color: #66756e;
+  font-size: 12px;
+}
 .accepted-driver-card > button,
 .course-cancel-button,
 .tracking-call-button {
@@ -2336,6 +2367,7 @@ input::placeholder {
 }
 .accepted-driver-card > button:disabled,
 .course-cancel-button:disabled { opacity: .55; cursor: wait; }
+.accepted-driver-card > button { grid-column: 1 / -1; min-height: 42px; }
 .course-cancel-button {
   width: 100%;
   border: 1px solid #f0c9c6;
@@ -2363,6 +2395,11 @@ input::placeholder {
 .confirmed-driver-details strong { font-size: 16px; }
 .confirmed-driver-details .confirmed-driver-meta { color: #176b53; font-weight: 750; }
 .tracking-call-button { min-width: 68px; background: #176b53; text-decoration: none; }
+.course-call-first { display: grid; gap: 10px; padding: 14px; border: 1px solid #a7d9bd; border-radius: 12px; background: #f0faf3; color: #12563f; }
+.course-call-first .tracking-call-button { width: 100%; min-height: 46px; }
+.course-purchase-field { display: grid; gap: 8px; margin: 12px 0; padding: 14px; border: 1px solid #d9e1e6; border-radius: 12px; background: #fff; font-weight: 700; }
+.course-purchase-field textarea { width: 100%; min-height: 86px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 9px; color: #18252c; font: inherit; font-weight: 400; resize: vertical; }
+.driver-purchase-details { margin: 12px 0; padding: 12px; border-radius: 10px; background: #f0faf3; color: #263940; overflow-wrap: anywhere; white-space: pre-wrap; }
 .driver-arrival-choice {
   position: sticky;
   bottom: 10px;
@@ -2564,7 +2601,7 @@ input::placeholder {
   .client-course-page .course-follow-header h1 { font-size: 19px; }
   .course-stepper { margin-bottom: 18px; }
   .course-stepper li { font-size: 9px; }
-  .accepted-driver-card { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 9px; padding: 10px; }
+  .accepted-driver-card { grid-template-columns: 48px minmax(0, 1fr); gap: 9px; padding: 10px; }
   .accepted-driver-card > img { width: 48px; height: 48px; }
   .accepted-driver-card > button { min-width: 58px; min-height: 36px; padding: 6px 8px; }
   .confirmed-driver-card { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 9px; padding: 10px; }

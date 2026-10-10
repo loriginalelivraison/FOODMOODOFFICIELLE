@@ -57,6 +57,7 @@ export default function Couriers() {
   const pickupAddressRequestRef = useRef(0);
   const destinationAddressRequestRef = useRef(0);
   const pickupInputRef = useRef(null);
+  const purchaseDetailsRef = useRef(null);
   const [clientPosition, setClientPosition] = useState(null);
   const [locationError, setLocationError] = useState("");
   const [searchingLocation, setSearchingLocation] = useState(false);
@@ -67,6 +68,7 @@ export default function Couriers() {
   const [pickupPosition, setPickupPosition] = useState(null);
   const [selectingPickup, setSelectingPickup] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [purchaseDetails, setPurchaseDetails] = useState("");
   const [showClientPoint, setShowClientPoint] = useState(false);
   const [proposedPrice, setProposedPrice] = useState("");
   const [priceQuote, setPriceQuote] = useState(null);
@@ -170,7 +172,7 @@ export default function Couriers() {
     if (!selectedVehicle) return undefined;
 
     const frame = requestAnimationFrame(() => {
-      scrollToSection(isDelivery ? pickupInputRef.current : destinationSectionRef.current);
+      scrollToSection(isDelivery ? purchaseDetailsRef.current : destinationSectionRef.current);
     });
     return () => cancelAnimationFrame(frame);
   }, [selectedVehicle, isDelivery]);
@@ -195,6 +197,11 @@ export default function Couriers() {
     }
     if (proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD) {
       setBookingError(`الحد الأدنى للسعر هو ${MIN_COURSE_PRICE_DZD} دج.`);
+      return;
+    }
+    if (isDelivery && !purchaseDetails.trim()) {
+      setBookingError("اكتب ماذا تريد أن يشتري لك عامل التوصيل.");
+      purchaseDetailsRef.current?.focus();
       return;
     }
     if (!destinationPosition) {
@@ -252,6 +259,7 @@ export default function Couriers() {
         client_latitude: position.coords.latitude,
         client_longitude: position.coords.longitude,
         vehicle_type: selectedVehicle,
+        purchase_details: isDelivery ? purchaseDetails.trim() : "",
         request_key: requestKey,
         // Trajet simple départ → arrivée (tous véhicules) : le point carte
         // prime, sinon le texte de départ (géocodé backend), sinon le GPS.
@@ -464,6 +472,7 @@ export default function Couriers() {
     setProposedPrice("");
     setPriceCalculating(false);
     setBookingError("");
+    setPurchaseDetails("");
     setSelectedVehicle(value);
   }
 
@@ -597,6 +606,23 @@ export default function Couriers() {
         </section>
       )}
 
+      {!requestedCourseId && isDelivery && (
+        <label className="course-purchase-field" htmlFor="purchase-details">
+          <span>ماذا تريد أن يشتري لك عامل التوصيل؟</span>
+          <textarea
+            id="purchase-details"
+            ref={purchaseDetailsRef}
+            value={purchaseDetails}
+            onChange={(event) => setPurchaseDetails(event.target.value)}
+            placeholder="مثال: خبز، حليب..."
+            maxLength={500}
+            rows={3}
+            disabled={bookingLoading}
+            required
+          />
+        </label>
+      )}
+
       {!requestedCourseId && selectedVehicle && (isDelivery || showClientPoint) && pickupField}
       {!requestedCourseId && selectedVehicle && (!isDelivery || showClientPoint) && destinationField}
 
@@ -643,7 +669,7 @@ export default function Couriers() {
           type="button"
           onClick={handleRequestCourse}
           disabled={!clientPosition || !hasPickup || !hasDestination || selectingPickup || selectingDestination
-            || bookingLoading || priceCalculating || (proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD)}
+            || (isDelivery && !purchaseDetails.trim()) || bookingLoading || priceCalculating || (proposedPrice !== "" && Number(proposedPrice) < MIN_COURSE_PRICE_DZD)}
         >
           {bookingLoading ? "جارٍ البحث…" : "بحث"}
         </button>

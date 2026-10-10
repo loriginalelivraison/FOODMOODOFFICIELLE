@@ -175,6 +175,7 @@ class Course(models.Model):
     # livraison (dropoff) pour ne casser ni l'existant ni le suivi client.
     pickup_name = models.CharField(max_length=120, blank=True)
     pickup_address = models.CharField(max_length=255, blank=True)
+    purchase_details = models.TextField(blank=True)
     pickup_phone = models.CharField(max_length=30, blank=True)
     pickup_latitude = models.FloatField(null=True, blank=True)
     pickup_longitude = models.FloatField(null=True, blank=True)

@@ -46,6 +46,16 @@ class BusinessRulesTests(TestCase):
         values.update(kwargs)
         return Course.objects.create(**values)
 
+    def test_delivery_purchase_details_are_saved_for_driver(self):
+        response = self.customer_api.post("/api/courses/request/", {
+            **self.payload,
+            "vehicle_type": "moto",
+            "purchase_details": "  خبز وحليب  ",
+        }, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["purchase_details"], "خبز وحليب")
+        self.assertEqual(Course.objects.get(pk=response.data["id"]).purchase_details, "خبز وحليب")
+
     def test_second_active_request_rejected_but_original_can_be_retried(self):
         first = self.customer_api.post("/api/courses/request/", self.payload, format="json")
         self.assertEqual(first.status_code, 201)

@@ -400,6 +400,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "destination_longitude",
             "pickup_name",
             "pickup_address",
+            "purchase_details",
             "pickup_phone",
             "pickup_latitude",
             "pickup_longitude",

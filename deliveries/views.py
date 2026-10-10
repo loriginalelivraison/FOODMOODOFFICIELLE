@@ -715,6 +715,10 @@ class CourseViewSet(ModelViewSet):
         if isinstance(legs, Response):
             return legs
 
+        purchase_details = str(request.data.get("purchase_details", "")).strip()
+        if len(purchase_details) > 500:
+            raise ValidationError({"purchase_details": "اكتب قائمة مشتريات لا تتجاوز 500 حرف."})
+
         start_lat = legs["client_latitude"]
         start_lon = legs["client_longitude"]
         destination = legs["destination"]
@@ -764,6 +768,7 @@ class CourseViewSet(ModelViewSet):
                     destination_longitude=destination_lon,
                     pickup_name=pickup_name,
                     pickup_address=pickup_address,
+                    purchase_details=purchase_details if legs["vehicle_type"] != "voiture" else "",
                     pickup_phone=pickup_phone,
                     pickup_latitude=pickup_lat,
                     pickup_longitude=pickup_lon,

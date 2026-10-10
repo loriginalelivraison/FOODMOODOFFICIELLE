@@ -37,6 +37,7 @@ export default function DriverCourseCard({ course, badge, variant, busy, childre
             <strong><AddressLabel text={course.destination || "غير محدد"} /></strong></div>
         </div>
       </div>
+      {delivery && course.purchase_details && <p className="driver-purchase-details"><strong>ماذا أشتري؟</strong> {course.purchase_details}</p>}
       <div className="driver-request-metrics">
         <div><CarFront size={24} aria-hidden="true" /><strong>{vehicle}</strong><span>نوع المركبة</span></div>
         <div><Route size={24} aria-hidden="true" /><strong>{data.distance == null ? "—" : <><bdi>{formatDriverNumber(data.distance)}</bdi> <small>كم</small></>}</strong><span>المسافة التقريبية</span></div>
@@ -73,6 +74,7 @@ export default function DriverCourseCard({ course, badge, variant, busy, childre
           <div><span>{delivery ? "التسليم" : "الوصول"}</span><p><AddressLabel text={course.destination || "غير محدد"} /></p></div>
         </div>
       </div>
+      {delivery && course.purchase_details && <p className="driver-purchase-details"><strong>ماذا أشتري؟</strong> {course.purchase_details}</p>}
       <div className="driver-course-metrics">
         {data.distance != null && <span><Route size={17} aria-hidden="true" /><bdi>{formatDriverNumber(data.distance)}</bdi> كم</span>}
         <span><CarFront size={17} aria-hidden="true" />{vehicle}</span>
