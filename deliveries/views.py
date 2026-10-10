@@ -20,7 +20,7 @@ from decimal import Decimal, InvalidOperation
 from math import isfinite
 from uuid import uuid4
 
-from .models import Livreur, DemandeLivraison, CommentaireLivreur, CommentaireClient, Client, Course, CourseOffer, DriverDocument
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, CommentaireClient, Client, Course, CourseOffer, CourseComplaint, DriverDocument
 from .serializers import (
     AccountRegistrationSerializer,
     DriverRegistrationSerializer,
@@ -28,6 +28,8 @@ from .serializers import (
     DemandeLivraisonSerializer,
     CommentaireLivreurSerializer,
     ClientReviewInputSerializer,
+    CourseComplaintInputSerializer,
+    CourseComplaintSerializer,
     ClientSerializer,
     CourseSerializer,
 )
@@ -496,6 +498,40 @@ class CourseViewSet(ModelViewSet):
             ).distinct()
 
         return Course.objects.none()
+
+    @action(detail=True, methods=["get", "post"])
+    def complaint(self, request, pk=None):
+        course = self.get_object()
+        if course.client.user_id == request.user.id:
+            reporter_role = "client"
+            allowed_reasons = CourseComplaint.CLIENT_REASONS
+        elif course.livreur_id and course.livreur.user_id == request.user.id:
+            reporter_role = "livreur"
+            allowed_reasons = CourseComplaint.DRIVER_REASONS
+        else:
+            raise PermissionDenied("لا يمكنك الإبلاغ عن مشكلة في هذه الرحلة.")
+
+        existing = CourseComplaint.objects.filter(course=course, reporter=request.user).first()
+        if request.method == "GET":
+            return Response({"complaint": CourseComplaintSerializer(existing).data if existing else None})
+        if existing:
+            return Response(CourseComplaintSerializer(existing).data)
+
+        complaint_input = CourseComplaintInputSerializer(data=request.data)
+        complaint_input.is_valid(raise_exception=True)
+        if complaint_input.validated_data["reason"] not in allowed_reasons:
+            raise ValidationError({"reason": "سبب الشكوى غير صالح لهذا الحساب."})
+
+        with transaction.atomic():
+            complaint, created = CourseComplaint.objects.get_or_create(
+                course=course, reporter=request.user,
+                defaults={
+                    "reporter_role": reporter_role,
+                    "reason": complaint_input.validated_data["reason"],
+                    "comment": complaint_input.validated_data.get("comment", ""),
+                },
+            )
+        return Response(CourseComplaintSerializer(complaint).data, status=201 if created else 200)
 
     @action(detail=True, methods=["post"], url_path="review-client")
     def review_client(self, request, pk=None):

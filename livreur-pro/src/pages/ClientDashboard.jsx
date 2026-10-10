@@ -4,6 +4,7 @@ import { deleteClient, getClientCourses, getClientProfile, updateClientProfile,
   finishCourse, logoutCurrentAccount } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import AddressLabel from "../components/AddressLabel.jsx";
+import CourseComplaint from "../components/CourseComplaint.jsx";
 import { clearStoredSession, readStoredAccount } from "../utils/navigation.js";
 import { canFinishCourse, getCourseStatusLabel, isDeliveryVehicle } from "../utils/courseTracking.js";
 
@@ -207,7 +208,8 @@ export default function ClientDashboard() {
         <h2>سجل الرحلات والطلبات</h2>
         {loading && <LoadingSpinner label="جارٍ تحميل السجل…" />}
         {!loading && !historyError && history.length === 0 && <p className="account-empty">ستظهر هنا رحلاتك وطلباتك السابقة.</p>}
-        {history.map((course) => <Link className="account-item account-history-link" to={`/course/${course.id}`} key={course.id}>
+        {history.map((course) => <article className="account-item" key={course.id}>
+          <Link className="account-history-main" to={`/course/${course.id}`}>
           <div className="account-item-head">
             <strong>{isDeliveryVehicle(course.vehicle_type) ? "طلب" : "رحلة"} رقم {course.id}</strong>
             <span className={`account-status-pill ${course.status === "completed" ? "is-done" : "is-cancel"}`}>{getCourseStatusLabel(course)}</span>
@@ -218,7 +220,9 @@ export default function ClientDashboard() {
             {(course.final_price ?? course.proposed_price) != null && <span className="account-item-price">{course.final_price ?? course.proposed_price} دج</span>}
           </div>
           <span className="account-history-action">عرض التفاصيل</span>
-        </Link>)}
+          </Link>
+          <CourseComplaint courseId={course.id} role="client" compact />
+        </article>)}
       </section>
       <section className="account-card" id="account-settings">
         <h2>الإعدادات والخصوصية</h2>

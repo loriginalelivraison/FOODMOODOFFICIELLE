@@ -1,8 +1,30 @@
 from django.contrib import admin
-from .models import Livreur, DemandeLivraison, DriverDocument
+from .models import Livreur, DemandeLivraison, DriverDocument, CourseComplaint
 from django.urls import path, reverse
 from django.http import FileResponse, Http404
 from django.utils.html import format_html
+
+
+@admin.register(CourseComplaint)
+class CourseComplaintAdmin(admin.ModelAdmin):
+    list_display = ("id", "course_number", "reporter", "reporter_role", "reason", "created_at", "status")
+    list_editable = ("status",)
+    list_filter = ("status", "reporter_role", "reason", "created_at")
+    search_fields = ("=course__id", "reporter__username", "comment")
+    list_select_related = ("course", "reporter")
+    fields = ("course_number", "course", "reporter", "reporter_role", "reason", "comment", "created_at", "status")
+    readonly_fields = ("course_number", "course", "reporter", "reporter_role", "reason", "comment", "created_at")
+
+    @admin.display(description="Course n°", ordering="course_id")
+    def course_number(self, obj):
+        return obj.course_id
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(Livreur)
 class LivreurAdmin(admin.ModelAdmin):

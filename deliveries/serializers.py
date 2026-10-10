@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Avg
-from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course
+from .models import Livreur, DemandeLivraison, CommentaireLivreur, Client, Course, CourseComplaint
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,19 @@ class CommentaireLivreurSerializer(serializers.ModelSerializer):
 class ClientReviewInputSerializer(serializers.Serializer):
     note = serializers.IntegerField(min_value=1, max_value=5)
     message = serializers.CharField(max_length=1000, required=False, allow_blank=True, trim_whitespace=True)
+
+
+class CourseComplaintInputSerializer(serializers.Serializer):
+    reason = serializers.ChoiceField(choices=CourseComplaint.REASON_CHOICES)
+    comment = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+
+
+class CourseComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseComplaint
+        fields = ["id", "course", "reporter_role", "reason", "comment", "status", "created_at"]
+        read_only_fields = fields
+
 
 class ClientSerializer(serializers.ModelSerializer):
     photo = OptionalPhotoField(required=False, allow_null=True)

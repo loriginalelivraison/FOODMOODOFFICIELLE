@@ -4,6 +4,7 @@ import { CarFront, ChevronDown, History, LogOut, Pencil, Phone, ShieldCheck, Sta
 import DriverDocuments from "./DriverDocuments.jsx";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import AddressLabel from "./AddressLabel.jsx";
+import CourseComplaint from "./CourseComplaint.jsx";
 import { formatDriverNumber } from "../utils/driverOrders.js";
 import { getCourseStatusLabel } from "../utils/courseTracking.js";
 
@@ -93,6 +94,7 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
             {course.status === "completed" && course.client_confirmed && <Link className="account-history-action" to={`/livreur-course/${course.id}`}>
               {course.client_review_submitted ? "عرض الرحلة" : "تقييم العميل"}
             </Link>}
+            <CourseComplaint courseId={course.id} role="livreur" compact />
           </article>)}
           {reviews.length > 0 && <><h3>تقييمات الزبائن</h3>{reviews.map((review) => <article className="account-item" key={review.id}>
             <div className="account-item-head"><strong>★ {review.note ?? "—"} / 5</strong><span>{formatDate(review.created_at)}</span></div>

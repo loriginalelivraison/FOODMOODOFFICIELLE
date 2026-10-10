@@ -12,6 +12,7 @@ import CouriersMap from "../components/CouriersMap.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import AddressLabel from "../components/AddressLabel.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
+import CourseComplaint from "../components/CourseComplaint.jsx";
 import { clearCurrentClientCourse } from "../utils/navigation.js";
 import defaultAvatar from "../assets/pasdephoto.png";
 import { canFinishCourse, getCourseSteps, getCourseStepIndex, getCourseStatusLabel, getPickupPosition, isDeliveryVehicle } from "../utils/courseTracking.js";
@@ -255,7 +256,7 @@ export default function ClientCourse() {
         : null;
 
   return (
-    <section className="page" dir="rtl">
+    <section className="page client-course-page" dir="rtl">
       <header className="course-follow-header">
         <div>
           <span className="course-request-kicker">WinRak · {isDelivery ? "الطلب" : "الرحلة"} رقم {course.id}</span>
@@ -263,50 +264,58 @@ export default function ClientCourse() {
         </div>
       </header>
 
-      <div className="course-summary" aria-label="ملخص الطلب">
-        {(course.pickup_address || course.pickup_name) && <p><span>{isDelivery ? "الاستلام" : "الانطلاق"}</span><AddressLabel text={course.pickup_address || course.pickup_name} /></p>}
-        {course.destination && <p><span>{isDelivery ? "التسليم" : "الوجهة"}</span><AddressLabel text={course.destination} /></p>}
-        {(course.final_price ?? course.proposed_price) != null && <p><span>السعر</span><strong>{course.final_price ?? course.proposed_price} دج</strong></p>}
+      <div className="course-tracking-focus" data-scroll-step={course.status}>
+        <div className="course-tracking-focus-heading">
+          {stepIndex >= 0 && <span className="course-tracking-focus-count">المرحلة {stepIndex + 1} من {steps.length}</span>}
+          {active && <span className="course-tracking-focus-live"><span aria-hidden="true" />متابعة مباشرة</span>}
+        </div>
+        <h2 className="course-tracking-focus-title" aria-live="polite" aria-atomic="true">
+          <span key={course.status}>
+            {course.status === "driver_accepted"
+              ? isDelivery ? "اختر عامل التوصيل المناسب" : "اختر السائق المناسب"
+              : getCourseStatusLabel(course)}
+          </span>
+        </h2>
+        {["searching", "driver_accepted"].includes(course.status) && acceptedDrivers.length > 0 && (
+          <p className="course-tracking-offers">العروض المتاحة: <strong>{acceptedDrivers.length}</strong></p>
+        )}
+        {stepIndex >= 0 && (
+          <nav
+            className="course-stepper"
+            aria-label="مراحل الرحلة"
+            style={{ "--course-progress": `${(stepIndex / (steps.length - 1)) * 84}%` }}
+          >
+            <ol>
+              {steps.map((step, index) => (
+                <li
+                  className={[
+                    index < stepIndex ? "step-complete" : "",
+                    index === stepIndex ? "step-active" : "",
+                  ].filter(Boolean).join(" ")}
+                  key={step}
+                  aria-current={index === stepIndex ? "step" : undefined}
+                >
+                  <span className="course-step-dot" aria-hidden="true">
+                    {index < stepIndex ? "✓" : index + 1}
+                  </span>
+                  <span className="course-step-label">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        )}
+        {stepIndex >= 0 && stepIndex < steps.length - 1 && (
+          <p className="course-tracking-next">المرحلة التالية: <strong>{steps[stepIndex + 1]}</strong></p>
+        )}
+        {active && <div className="course-live-bar" aria-hidden="true" />}
       </div>
 
-      {stepIndex >= 0 && (
-        <nav
-          className="course-stepper"
-          aria-label="مراحل الرحلة"
-          style={{ "--course-progress": `${(stepIndex / (steps.length - 1)) * 84}%` }}
-        >
-          <ol>
-            {steps.map((step, index) => (
-              <li
-                className={[
-                  index < stepIndex ? "step-complete" : "",
-                  index === stepIndex ? "step-active" : "",
-                ].filter(Boolean).join(" ")}
-                key={step}
-                aria-current={index === stepIndex ? "step" : undefined}
-              >
-                <span className="course-step-dot" aria-hidden="true">
-                  {index < stepIndex ? "✓" : index + 1}
-                </span>
-                <span className="course-step-label">{step}</span>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
-
-      {active && <div className="course-live-bar" aria-hidden="true" />}
-
-      <div className="course-tracking-stage" aria-live="polite" data-scroll-step={course.status}>
+      <div className="course-tracking-stage">
         {course.status === "searching" && (
           <div className="course-searching-state">
             <span className="course-search-pulse" aria-hidden="true" />
             <strong>{isDelivery ? "جارٍ البحث عن عامل توصيل قريب" : "جارٍ البحث عن سائق قريب"}</strong>
           </div>
-        )}
-
-        {course.status === "driver_accepted" && (
-          <h2 className="course-tracking-title">{isDelivery ? "اختر عامل التوصيل المناسب" : "اختر السائق المناسب"}</h2>
         )}
 
         {["searching", "driver_accepted"].includes(course.status) && acceptedDrivers.length > 0 && (
@@ -339,15 +348,6 @@ export default function ClientCourse() {
 
         {["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"].includes(course.status) && (
           <>
-            {course.status === "driver_selected" && (
-              <h2 className="course-tracking-title">{getCourseStatusLabel(course)}</h2>
-            )}
-            {course.status === "driver_arriving" && (
-              <h2 className="course-tracking-title">{getCourseStatusLabel(course)}</h2>
-            )}
-            {course.status === "driver_arrived" && (
-              <h2 className="course-arrived-title">{getCourseStatusLabel(course)}</h2>
-            )}
             {selectedDriver && (
               <article className="confirmed-driver-card">
                 <img src={selectedDriver.photo || defaultAvatar} alt="" className="confirmed-driver-photo" />
@@ -379,16 +379,12 @@ export default function ClientCourse() {
 
         {course.status === "picked_up" && (
           <>
-            <h2 className="course-tracking-title">{getCourseStatusLabel(course)}</h2>
             <p className="muted">{isDelivery ? "تم استلام الطلب، وسيبدأ عامل التوصيل التوجه إلى نقطة التسليم." : "السائق جاهز لبدء الرحلة."}</p>
           </>
         )}
 
         {course.status === "in_progress" && (
           <>
-            <h2 className="course-tracking-title">
-              {getCourseStatusLabel(course)}
-            </h2>
             {isDelivery && (course.pickup_name || course.pickup_address) && (
               <div className="course-destination">
                 <span>تم الاستلام من</span>
@@ -506,6 +502,13 @@ export default function ClientCourse() {
         </form>}
       </div>
 
+      <div className="course-summary" aria-label="ملخص الطلب">
+        {(course.pickup_address || course.pickup_name) && <p><span>{isDelivery ? "الاستلام" : "الانطلاق"}</span><AddressLabel text={course.pickup_address || course.pickup_name} /></p>}
+        {course.destination && <p><span>{isDelivery ? "التسليم" : "الوجهة"}</span><AddressLabel text={course.destination} /></p>}
+        {(course.final_price ?? course.proposed_price) != null && <p><span>السعر</span><strong>{course.final_price ?? course.proposed_price} دج</strong></p>}
+      </div>
+
+      <CourseComplaint key={course.id} courseId={course.id} role="client" />
       {error && <p className="course-request-error" role="alert">{error}</p>}
     </section>
   );

@@ -16,6 +16,7 @@ import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import DriverCourseCard from "../components/DriverCourseCard.jsx";
 import DriverOfferActions from "../components/DriverOfferActions.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
+import CourseComplaint from "../components/CourseComplaint.jsx";
 import { getDriverDashboardPath, readStoredAccount } from "../utils/navigation.js";
 import { canRespondToDriverOffer, formatDriverNumber } from "../utils/driverOrders.js";
 import useDriverCourseLocation from "../hooks/useDriverCourseLocation.js";
@@ -419,6 +420,7 @@ export default function LivreurCourse() {
           <button type="submit" disabled={busy}>{updatingStatus ? "جارٍ الإلغاء…" : "تأكيد الإلغاء"}</button>
         </form>
       )}
+      {course.livreur && <CourseComplaint key={course.id} courseId={course.id} role="livreur" />}
     </section>
   );
 }

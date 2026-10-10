@@ -290,6 +290,45 @@ class CourseEvent(models.Model):
         ordering = ["created_at", "id"]
 
 
+class CourseComplaint(models.Model):
+    STATUS_CHOICES = [
+        ("new", "Nouvelle"),
+        ("in_progress", "En cours"),
+        ("resolved", "Résolue"),
+    ]
+    CLIENT_REASONS = ["driver_delay", "driver_behavior", "price", "payment", "other"]
+    DRIVER_REASONS = ["client_absent", "client_behavior", "payment", "route", "other"]
+    REASON_CHOICES = [
+        ("driver_delay", "Retard du chauffeur"),
+        ("driver_behavior", "Comportement du chauffeur"),
+        ("price", "Prix de la course"),
+        ("payment", "Paiement"),
+        ("client_absent", "Client absent"),
+        ("client_behavior", "Comportement du client"),
+        ("route", "Trajet ou adresse"),
+        ("other", "Autre problème"),
+    ]
+
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="complaints")
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name="course_complaints")
+    reporter_role = models.CharField(max_length=8, choices=[("client", "Client"), ("livreur", "Chauffeur")])
+    reason = models.CharField(max_length=32, choices=REASON_CHOICES)
+    comment = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="new")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Réclamation"
+        verbose_name_plural = "Réclamations"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["course", "reporter"], name="unique_course_complaint_per_reporter"),
+        ]
+
+    def __str__(self):
+        return f"Réclamation {self.pk} · course {self.course_id}"
+
+
 class CommentaireClient(models.Model):
     course = models.OneToOneField(Course, on_delete=models.CASCADE, related_name="client_review")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="reviews")

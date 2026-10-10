@@ -782,6 +782,33 @@ export async function getCourse(courseId) {
   return data;
 }
 
+export async function getCourseComplaint(courseId) {
+  const response = await fetch(`${API_BASE_URL}/courses/${courseId}/complaint/`, {
+    headers: authHeaders(),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.detail, "تعذر تحميل الشكوى. حاول مجدداً."));
+  }
+  return data.complaint;
+}
+
+export async function submitCourseComplaint(courseId, reason, comment) {
+  const response = await fetch(`${API_BASE_URL}/courses/${courseId}/complaint/`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ reason, comment }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    handleInvalidToken(data);
+    throw new Error(toArabicMessage(data.reason || data.comment || data.detail,
+      "تعذر إرسال الشكوى. حاول مجدداً."));
+  }
+  return data;
+}
+
 export async function finishCourse(courseId) {
   const response = await fetch(`${API_BASE_URL}/courses/${courseId}/finish/`, {
     method: "PATCH",
