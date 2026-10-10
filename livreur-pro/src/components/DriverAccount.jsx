@@ -5,6 +5,7 @@ import DriverDocuments from "./DriverDocuments.jsx";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import AddressLabel from "./AddressLabel.jsx";
 import CourseComplaint from "./CourseComplaint.jsx";
+import ProfilePhotoViewer from "./ProfilePhotoViewer.jsx";
 import { formatDriverNumber } from "../utils/driverOrders.js";
 import { getCourseStatusLabel } from "../utils/courseTracking.js";
 
@@ -24,11 +25,8 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
     <header className="driver-account-title"><h1>حسابي</h1></header>
     <section className="account-card driver-profile-card" id="personal-info">
       <div className="driver-profile-heading">
-        <div className="account-photo-wrap">
-          {photo ? <><a className="account-avatar" href={photo} target="_blank" rel="noopener noreferrer" aria-label="عرض صورتي الشخصية"><img src={photo} alt={name} /></a>
-            <a className="account-photo-view" href={photo} target="_blank" rel="noopener noreferrer">عرض الصورة</a></>
-            : <div className="account-avatar"><User size={30} aria-hidden="true" /></div>}
-        </div>
+        {photo ? <ProfilePhotoViewer photo={photo} name={name} />
+          : <div className="account-photo-wrap"><div className="account-avatar"><User size={30} aria-hidden="true" /></div></div>}
         <div className="account-identity"><h2>{name}</h2>
           <span className="driver-profile-phone"><Phone size={15} aria-hidden="true" /><bdi>{profile?.telephone || livreur.telephone}</bdi></span>
         </div>

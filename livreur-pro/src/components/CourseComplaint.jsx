@@ -1,4 +1,5 @@
 import React, { useId, useRef, useState } from "react";
+import { ChevronDown, CircleAlert } from "lucide-react";
 import { getCourseComplaint, submitCourseComplaint } from "../livreursapi.js";
 
 const reasons = {
@@ -66,7 +67,9 @@ export default function CourseComplaint({ courseId, role, compact = false }) {
     <div className={`course-complaint${compact ? " course-complaint-compact" : ""}`} dir="rtl">
       <button className="course-complaint-toggle" type="button" aria-expanded={open}
         aria-controls={panelId} onClick={toggle}>
-        الإبلاغ عن مشكلة
+        <CircleAlert size={18} aria-hidden="true" />
+        <span>الإبلاغ عن مشكلة</span>
+        <ChevronDown className="course-complaint-chevron" size={17} aria-hidden="true" />
       </button>
       {open && <div className="course-complaint-panel" id={panelId}>
         {loading ? <p role="status">جارٍ التحميل…</p> : complaint ? (

@@ -2280,9 +2280,9 @@ input::placeholder {
 .accepted-driver-list { gap: 8px; margin-top: 0; }
 .accepted-driver-card {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   padding: 12px;
   border: 1px solid #d9e1e6;
   border-radius: 11px;
@@ -2318,37 +2318,18 @@ input::placeholder {
   color: #53646b;
   font-size: 11px;
 }
+.accepted-driver-details span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .accepted-driver-price {
-  display: grid;
-  grid-column: 1 / -1;
-  justify-items: center;
-  gap: 3px;
-  padding: 13px 10px;
-  border: 1px solid #dbe8e2;
-  border-radius: 10px;
-  background: #f6faf8;
-  text-align: center;
-}
-.accepted-driver-price.is-raised {
-  border-color: #b9d8ca;
-  background: #edf7f1;
-}
-.accepted-driver-price-label {
-  color: #436759;
-  font-size: 12px;
-  font-weight: 700;
+  white-space: nowrap;
+  text-align: end;
 }
 .accepted-driver-price-amount {
   color: #12563f;
-  font-size: clamp(26px, 5vw, 32px);
+  font-size: clamp(23px, 4vw, 32px);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
-.accepted-driver-price-amount small { font-size: 15px; }
-.accepted-driver-price-previous {
-  color: #66756e;
-  font-size: 12px;
-}
+.accepted-driver-price-amount small { font-size: 13px; }
 .accepted-driver-card > button,
 .course-cancel-button,
 .tracking-call-button {
@@ -2367,7 +2348,7 @@ input::placeholder {
 }
 .accepted-driver-card > button:disabled,
 .course-cancel-button:disabled { opacity: .55; cursor: wait; }
-.accepted-driver-card > button { grid-column: 1 / -1; min-height: 42px; }
+.accepted-driver-card > button { min-height: 42px; white-space: nowrap; }
 .course-cancel-button {
   width: 100%;
   border: 1px solid #f0c9c6;
@@ -2601,9 +2582,10 @@ input::placeholder {
   .client-course-page .course-follow-header h1 { font-size: 19px; }
   .course-stepper { margin-bottom: 18px; }
   .course-stepper li { font-size: 9px; }
-  .accepted-driver-card { grid-template-columns: 48px minmax(0, 1fr); gap: 9px; padding: 10px; }
-  .accepted-driver-card > img { width: 48px; height: 48px; }
+  .accepted-driver-card { grid-template-columns: 42px minmax(0, 1fr) auto auto; gap: 7px; padding: 9px; }
+  .accepted-driver-card > img { width: 42px; height: 42px; }
   .accepted-driver-card > button { min-width: 58px; min-height: 36px; padding: 6px 8px; }
+  .accepted-driver-price-amount { font-size: 23px; }
   .confirmed-driver-card { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 9px; padding: 10px; }
   .confirmed-driver-photo { width: 48px; height: 48px; }
   .course-tracking-map { height: 190px; }
@@ -2654,6 +2636,14 @@ input::placeholder {
 .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .account-photo-wrap { display: grid; justify-items: center; gap: 4px; }
 .account-photo-view { color: #c75d13; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.account-photo-trigger { padding: 0; cursor: pointer; }
+button.account-photo-view { padding: 2px; border: 0; background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.account-photo-trigger:hover, .account-photo-trigger:focus-visible { border-color: #fdba74; }
+.profile-photo-overlay { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .82); }
+.profile-photo-dialog { position: relative; display: grid; place-items: center; max-width: min(680px, 100%); max-height: 100%; }
+.profile-photo-dialog > img { display: block; max-width: 100%; max-height: calc(100dvh - 40px); border-radius: 14px; object-fit: contain; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+.profile-photo-close { position: absolute; top: 10px; right: 10px; z-index: 1; display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: #fff; color: #18252c; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); cursor: pointer; }
+.profile-photo-close:hover { background: #fff7ed; color: #c2410c; }
 .account-identity { display: grid; gap: 5px; min-width: 0; }
 .account-identity h1 {
   margin: 0;
@@ -3284,8 +3274,13 @@ input::placeholder {
 .driver-client-reviews article p { margin: 5px 0 0; color: #34454b; font-size: 13px; overflow-wrap: anywhere; }
 .course-complaint { margin-block: 16px; text-align: start; }
 .course-complaint-compact { margin-block: 10px 0; border-top: 1px solid #edf0f2; padding-top: 8px; }
-.course-complaint-toggle { min-height: 36px; padding: 6px 2px; border: 0; background: transparent; color: #475467; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.course-complaint-toggle:hover { color: #9a3412; text-decoration: underline; }
+.course-complaint-toggle { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 14px; border: 1px solid #d8e2e8; border-radius: 12px; background: #fff; color: #344054; font: inherit; font-size: 14px; font-weight: 750; box-shadow: 0 2px 8px rgba(24, 37, 44, .05); cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.course-complaint:not(.course-complaint-compact) .course-complaint-toggle { width: 100%; }
+.course-complaint-toggle > svg:first-child { flex: 0 0 auto; color: #b45309; }
+.course-complaint-chevron { margin-inline-start: auto; transition: transform .15s; }
+.course-complaint-toggle[aria-expanded="true"] .course-complaint-chevron { transform: rotate(180deg); }
+.course-complaint-toggle:hover, .course-complaint-toggle[aria-expanded="true"] { border-color: #f6ad70; background: #fff8f2; color: #9a3412; }
+.course-complaint-compact .course-complaint-toggle { min-height: 38px; padding: 7px 10px; font-size: 12px; box-shadow: none; }
 .course-complaint-panel { max-width: 540px; margin-top: 8px; padding: 16px; border: 1px solid #e4e7ec; border-radius: 14px; background: #fff; color: #18252c; }
 .course-complaint-compact .course-complaint-panel { padding: 12px; background: #fafbfc; }
 .course-complaint-panel form { display: grid; gap: 12px; }

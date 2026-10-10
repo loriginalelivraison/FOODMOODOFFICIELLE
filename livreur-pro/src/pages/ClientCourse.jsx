@@ -337,10 +337,7 @@ export default function ClientCourse() {
         {["searching", "driver_accepted"].includes(course.status) && acceptedDrivers.length > 0 && (
           <div className="accepted-driver-list">
             {acceptedDrivers.map((driver) => {
-              const originalPrice = course.proposed_price ?? course.final_price;
-              const offeredPrice = driver.offered_price ?? course.final_price ?? originalPrice;
-              const priceRaised = offeredPrice != null && originalPrice != null
-                && Number(offeredPrice) > Number(originalPrice);
+              const offeredPrice = driver.offered_price ?? course.final_price ?? course.proposed_price;
 
               return <article className="accepted-driver-card" key={driver.id}>
                 <img src={driver.photo || defaultAvatar} alt="" />
@@ -353,18 +350,10 @@ export default function ClientCourse() {
                   </span>
                 </div>
                 {offeredPrice != null && (
-                  <div className={`accepted-driver-price${priceRaised ? " is-raised" : ""}`}>
-                    <span className="accepted-driver-price-label">
-                      {priceRaised ? "عرض السائق الجديد" : "سعر السائق"}
-                    </span>
+                  <div className="accepted-driver-price">
                     <strong className="accepted-driver-price-amount">
                       <bdi>{formatPrice(offeredPrice)}</bdi> <small>دج</small>
                     </strong>
-                    {priceRaised && (
-                      <span className="accepted-driver-price-previous">
-                        السعر قبل التعديل: <del><bdi>{formatPrice(originalPrice)} دج</bdi></del>
-                      </span>
-                    )}
                   </div>
                 )}
                 <button

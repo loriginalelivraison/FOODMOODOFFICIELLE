@@ -5,6 +5,7 @@ import { deleteClient, getClientCourses, getClientProfile, updateClientProfile,
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import AddressLabel from "../components/AddressLabel.jsx";
 import CourseComplaint from "../components/CourseComplaint.jsx";
+import ProfilePhotoViewer from "../components/ProfilePhotoViewer.jsx";
 import { clearStoredSession, readStoredAccount } from "../utils/navigation.js";
 import { canFinishCourse, getCourseStatusLabel, isDeliveryVehicle } from "../utils/courseTracking.js";
 
@@ -144,11 +145,8 @@ export default function ClientDashboard() {
   return (
     <section className="page account-page" dir="rtl">
       <header className="account-header">
-        <div className="account-photo-wrap">
-          {client.photo ? <><a className="account-avatar" href={client.photo} target="_blank" rel="noopener noreferrer" aria-label="عرض صورتي الشخصية"><img src={client.photo} alt={client.nom} /></a>
-            <a className="account-photo-view" href={client.photo} target="_blank" rel="noopener noreferrer">عرض الصورة</a></>
-            : <div className="account-avatar" aria-hidden="true">{client.nom?.trim().charAt(0) || "؟"}</div>}
-        </div>
+        {client.photo ? <ProfilePhotoViewer photo={client.photo} name={client.nom} />
+          : <div className="account-photo-wrap"><div className="account-avatar" aria-hidden="true">{client.nom?.trim().charAt(0) || "؟"}</div></div>}
         <div className="account-identity">
           <h1>{client.nom}</h1>
           <span className="account-role">حساب عميل</span>
