@@ -12,6 +12,7 @@ import {
 } from "../livreursapi.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import AddressLabel from "../components/AddressLabel.jsx";
+import DriverOfferActions from "../components/DriverOfferActions.jsx";
 import CourseCancelledState from "../components/CourseCancelledState.jsx";
 import { getDriverDashboardPath, readStoredAccount } from "../utils/navigation.js";
 import { canRespondToDriverOffer, formatDriverNumber } from "../utils/driverOrders.js";
@@ -168,14 +169,14 @@ export default function LivreurCourse() {
     }
   }
 
-  async function handleOfferResponse(response) {
+  async function handleOfferResponse(response, offeredPrice) {
     if (!canRespondToDriverOffer(course) || offerExpired || actionInFlight.current) return;
     actionInFlight.current = true;
     revision.current += 1;
     setResponding(true);
     setError("");
     try {
-      await respondToCourseOffer(course.id, response);
+      await respondToCourseOffer(course.id, response, offeredPrice);
       if (response === "rejected") {
         navigate(getDriverDashboardPath(course.livreur), { replace: true });
       } else {
@@ -301,7 +302,7 @@ export default function LivreurCourse() {
         <span><b>موقع العميل</b>{hasClientLocation ? "متوفر" : "غير متوفر"}</span>
         <span><b>المسافة</b>{course.estimated_distance_km == null ? "غير متوفرة" : `${course.estimated_distance_km} كم`}</span>
         <span><b>المركبة</b>{vehicleLabels[course.vehicle_type] || course.vehicle_type || "غير محددة"}</span>
-        <span><b>السعر</b><bdi>{formatDriverNumber(course.final_price ?? course.proposed_price)}</bdi> دج</span>
+        <span><b>السعر</b><bdi>{formatDriverNumber(course.my_offer_price ?? course.final_price ?? course.proposed_price)}</bdi> دج</span>
       </div>
 
       {course.active && course.livreur && (course.client_phone || course.pickup_phone) && (
@@ -311,12 +312,9 @@ export default function LivreurCourse() {
         </div>
       )}
 
-      {canRespond && (
-        <div className="driver-offer-actions" dir="rtl">
-          <button type="button" onClick={() => handleOfferResponse("accepted")} disabled={busy}>{responding ? "جارٍ الإرسال…" : "قبول"}</button>
-          <button type="button" onClick={() => handleOfferResponse("rejected")} disabled={busy}>رفض</button>
-        </div>
-      )}
+      {canRespond && <DriverOfferActions course={course} busy={busy}
+        onAccept={(_, price) => handleOfferResponse("accepted", price)}
+        onReject={() => handleOfferResponse("rejected")} />}
 
       {course.livreur && hasRouteTarget && !["completed", "cancelled"].includes(course.status) && <a
         className="primary-btn full"

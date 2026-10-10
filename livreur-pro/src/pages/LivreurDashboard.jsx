@@ -101,12 +101,12 @@ export default function LivreurDashboard() {
     return () => { clearInterval(interval); window.removeEventListener("winrakPush", handlePush); };
   }, [livreur?.id]);
 
-  async function handleOfferResponse(courseId, response) {
+  async function handleOfferResponse(courseId, response, offeredPrice) {
     if (respondingOfferId) return;
     setRespondingOfferId(courseId);
     setError("");
     try {
-      await respondToCourseOffer(courseId, response);
+      await respondToCourseOffer(courseId, response, offeredPrice);
       await Promise.all([loadHistory(true), loadActiveCourse()]);
       const updatedOffers = await getCourseOffers();
       setCourseOffers(updatedOffers);
@@ -485,10 +485,9 @@ export default function LivreurDashboard() {
               {!statusLoaded ? "تحديث الحالة" : activeCourse ? "في رحلة" : isOnline ? "متاح" : "غير متاح"}</>}
           </button>
         </header>
-        {statusLoaded && !isOnline && <p className="driver-status-hint">{activeCourse ? "لن تصلك طلبات جديدة. تستمر متابعة الرحلة الحالية حتى إتمامها." : "فعّل استقبال الطلبات عندما تكون جاهزاً."}</p>}
         <LivreurOrders livreurId={livreur.id} courses={visibleCourses} loading={loadingHistory} error={ordersError}
           respondingOfferId={respondingOfferId} finishingCourseId={finishingCourseId} onRetry={() => loadHistory()}
-          onAccept={(courseId) => handleOfferResponse(courseId, "accepted")}
+          onAccept={(courseId, offeredPrice) => handleOfferResponse(courseId, "accepted", offeredPrice)}
           onReject={(courseId) => handleOfferResponse(courseId, "rejected")} onFinish={handleFinishCourse} />
         <button className="driver-rewards-card" type="button"
           onClick={() => navigate("/livreur-dashboard/" + livreur.id + "?section=account")}>

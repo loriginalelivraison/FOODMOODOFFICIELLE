@@ -1,3 +1,4 @@
+from rest_framework import serializers
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action, api_view, permission_classes, parser_classes
 from rest_framework.response import Response
@@ -60,10 +61,10 @@ def read_coordinates(data, latitude_key, longitude_key, *, required=False):
     try:
         latitude, longitude = (float(value) for value in values)
     except (TypeError, ValueError, OverflowError):
-        raise ValidationError({"detail": "Coordonnées GPS complètes et valides obligatoires."})
+        raise ValidationError({"detail": "يرجى إدخال إحداثيات موقع كاملة وصحيحة."})
     if not (isfinite(latitude) and isfinite(longitude)
             and -90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise ValidationError({"detail": "Coordonnées GPS invalides."})
+        raise ValidationError({"detail": "إحداثيات الموقع غير صالحة."})
     return latitude, longitude
 
 
@@ -71,7 +72,7 @@ class LivreurViewSet(ModelViewSet):
     serializer_class = LivreurSerializer
 
     def create(self, request, *args, **kwargs):
-        raise MethodNotAllowed(request.method, "Utilisez l’inscription chauffeur.")
+        raise MethodNotAllowed(request.method, "استخدم تسجيل حساب السائق.")
 
     @action(detail=False, methods=["get"])
     def me(self, request):
@@ -131,7 +132,7 @@ class LivreurViewSet(ModelViewSet):
 
         with transaction.atomic():
             if Course.objects.filter(livreur=instance, active=True).exists():
-                raise CourseConflict("Terminez ou annulez votre course avant de supprimer le compte.")
+                raise CourseConflict("أنهِ رحلتك أو ألغِها قبل حذف الحساب.")
             instance.delete()
             if user:
                 user.delete()
@@ -154,7 +155,7 @@ class LivreurViewSet(ModelViewSet):
         livreur = self.get_object()
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         latitude, longitude = read_coordinates(request.data, "latitude", "longitude", required=True)
 
@@ -163,7 +164,7 @@ class LivreurViewSet(ModelViewSet):
         livreur.save(update_fields=["latitude", "longitude"])
 
         return Response({
-            "message": "Position mise à jour",
+            "message": "تم تحديث الموقع.",
             "id": livreur.id,
             "latitude": livreur.latitude,
             "longitude": livreur.longitude,
@@ -175,7 +176,7 @@ class LivreurViewSet(ModelViewSet):
         livreur = self.get_object()
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         livreur.est_en_ligne = False
         livreur.disponible = False
@@ -193,7 +194,7 @@ class LivreurViewSet(ModelViewSet):
         ).update(status="searching")
 
         return Response({
-            "message": "Livreur passé hors ligne",
+            "message": "السائق غير متصل الآن.",
             "id": livreur.id,
             "est_en_ligne": livreur.est_en_ligne,
             "disponible": livreur.disponible,
@@ -205,11 +206,11 @@ class LivreurViewSet(ModelViewSet):
         livreur = self.get_object()
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         if Course.objects.filter(livreur=livreur, active=True).exists():
             return Response(
-                {"detail": "Terminez la course en cours avant de vous remettre en ligne."},
+                {"detail": "أنهِ الرحلة الحالية قبل العودة إلى حالة الاتصال."},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -218,7 +219,7 @@ class LivreurViewSet(ModelViewSet):
         livreur.save(update_fields=["est_en_ligne", "disponible"])
 
         return Response({
-            "message": "Livreur en ligne",
+            "message": "السائق متصل الآن.",
             "id": livreur.id,
             "est_en_ligne": livreur.est_en_ligne,
             "disponible": livreur.disponible,
@@ -229,13 +230,13 @@ class LivreurViewSet(ModelViewSet):
         livreur = self.get_object()
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         livreur.disponible = False
         livreur.save(update_fields=["disponible"])
 
         return Response({
-            "message": "Livreur passé en occupé",
+            "message": "السائق مشغول الآن.",
             "id": livreur.id,
             "disponible": livreur.disponible,
         })
@@ -245,13 +246,13 @@ class LivreurViewSet(ModelViewSet):
         livreur = self.get_object()
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         token = request.data.get("fcm_token")
 
         if not token:
             return Response(
-                {"error": "fcm_token obligatoire"},
+                {"error": "رمز الإشعارات مطلوب."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -259,7 +260,7 @@ class LivreurViewSet(ModelViewSet):
 
         return Response({
             "success": True,
-            "message": "FCM token enregistré",
+            "message": "تم تسجيل رمز الإشعارات.",
         })
 
     @action(detail=True, methods=["delete"], url_path="clear_fcm_token")
@@ -267,7 +268,7 @@ class LivreurViewSet(ModelViewSet):
         livreur = self.get_object()
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         livreur.fcm_token = None
         livreur.save(update_fields=["fcm_token"])
@@ -315,7 +316,7 @@ def register_livreur(request):
     data = dict(serializer.validated_data)
     latitude, longitude = read_coordinates(request.data, "latitude", "longitude")
     if Livreur.objects.filter(telephone=data["telephone"]).exists():
-        raise ValidationError({"telephone": "Ce téléphone est déjà utilisé par un chauffeur."})
+        raise ValidationError({"telephone": "رقم الهاتف مستخدم بالفعل لحساب سائق."})
     try:
         with transaction.atomic():
             user = User.objects.create_user(username=data["telephone"], password=data.pop("password"))
@@ -324,10 +325,10 @@ def register_livreur(request):
                 disponible=True, est_en_ligne=True,
             )
     except IntegrityError:
-        raise ValidationError({"telephone": "Un compte avec ce téléphone existe déjà."})
+        raise ValidationError({"telephone": "رقم الهاتف مسجّل بالفعل."})
 
     return Response({
-        "message": "Livreur créé avec succès",
+        "message": "تم إنشاء حساب السائق بنجاح.",
         "id": livreur.id,
         "nom": livreur.nom,
         "telephone": livreur.telephone,
@@ -357,7 +358,7 @@ class CommentaireLivreurViewSet(ModelViewSet):
             client=client, livreur=serializer.validated_data["livreur"],
             status="completed", active=False,
         ).exists():
-            raise PermissionDenied("Un avis est possible après une course terminée avec ce chauffeur.")
+            raise PermissionDenied("يمكنك إضافة تقييم بعد إكمال رحلة مع هذا السائق.")
         commentaire = serializer.save(nom_client=client.nom)
 
         self._refresh_rating(commentaire.livreur)
@@ -388,12 +389,12 @@ class ClientViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        raise MethodNotAllowed(request.method, "Utilisez l’inscription client.")
+        raise MethodNotAllowed(request.method, "استخدم تسجيل حساب العميل.")
 
     def perform_destroy(self, instance):
         with transaction.atomic():
             if Course.objects.filter(client=instance, active=True).exists():
-                raise CourseConflict("Terminez ou annulez votre course avant de supprimer le compte.")
+                raise CourseConflict("أنهِ رحلتك أو ألغِها قبل حذف الحساب.")
             instance.user.delete()
 
     @action(detail=True, methods=["patch", "delete"])
@@ -401,7 +402,7 @@ class ClientViewSet(ModelViewSet):
         client = self.get_object()
         token = request.data.get("fcm_token") if request.method == "PATCH" else None
         if request.method == "PATCH" and not token:
-            raise ValidationError({"detail": "fcm_token obligatoire"})
+            raise ValidationError({"detail": "رمز الإشعارات مطلوب."})
         save_fcm_token(client, token)
         return Response({"success": True})
 
@@ -420,10 +421,10 @@ def register_client(request):
             user = User.objects.create_user(username=data["telephone"], password=data.pop("password"))
             client = Client.objects.create(user=user, **data)
     except IntegrityError:
-        raise ValidationError({"telephone": "Un compte avec ce téléphone existe déjà."})
+        raise ValidationError({"telephone": "رقم الهاتف مسجّل بالفعل."})
 
     return Response({
-        "message": "Client créé avec succès",
+        "message": "تم إنشاء حساب العميل بنجاح.",
         "id": client.id,
         "nom": client.nom,
         "telephone": client.telephone,
@@ -453,7 +454,7 @@ class CourseViewSet(ModelViewSet):
         existing = Course.objects.filter(client=client, active=True).first()
         if existing:
             raise CourseConflict({
-                "detail": "Vous avez déjà une course active. Reprenez-la avant une nouvelle demande.",
+                "detail": "لديك رحلة نشطة بالفعل. تابعها قبل إنشاء طلب جديد.",
                 "course_id": existing.id,
             })
 
@@ -528,26 +529,25 @@ class CourseViewSet(ModelViewSet):
         )
         if not destination and destination_lat is None:
             return Response(
-                {"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400
+                {"detail": "الوجهة أو إحداثياتها مطلوبة."}, status=400
             )
 
         start_lat, start_lon = read_coordinates(
             request.data, "client_latitude", "client_longitude", required=True
         )
-        from rest_framework import serializers
         proposed_price = serializers.DecimalField(max_digits=10, decimal_places=2).run_validation(
             request.data.get("proposed_price")
         )
 
         minimum = Decimal(settings.COURSE_MIN_PRICE_DZD)
         if proposed_price < minimum:
-            return Response({"detail": f"Le prix minimum est de {minimum} DZD."}, status=400)
+            return Response({"detail": f"الحد الأدنى للسعر هو {minimum} دج."}, status=400)
         if not (-90 <= start_lat <= 90 and -180 <= start_lon <= 180):
-            return Response({"detail": "Coordonnées GPS invalides."}, status=400)
+            return Response({"detail": "إحداثيات الموقع غير صالحة."}, status=400)
         if destination_lat is not None and not (
             -90 <= destination_lat <= 90 and -180 <= destination_lon <= 180
         ):
-            return Response({"detail": "Coordonnées de destination invalides."}, status=400)
+            return Response({"detail": "إحداثيات الوجهة غير صالحة."}, status=400)
 
         vehicle_type = str(request.data.get("vehicle_type", "voiture")).strip().lower()
         if vehicle_type not in {"moto", "voiture", "camion"}:
@@ -566,7 +566,7 @@ class CourseViewSet(ModelViewSet):
                 pickup_position = resolve_destination(pickup_text)
                 if not pickup_position:
                     return Response(
-                        {"detail": "Point de départ introuvable. Vérifiez l’adresse puis réessayez."},
+                        {"detail": "تعذر العثور على نقطة الانطلاق. تحقق من العنوان ثم أعد المحاولة."},
                         status=422,
                     )
                 pickup_lat, pickup_lon = pickup_position
@@ -574,18 +574,18 @@ class CourseViewSet(ModelViewSet):
                 pickup_text = ""
         if (pickup_lat is None) != (pickup_lon is None):
             return Response(
-                {"detail": "Les coordonnées du commerçant sont incomplètes."}, status=400
+                {"detail": "إحداثيات المتجر غير مكتملة."}, status=400
             )
         if pickup_lat is not None and not (-90 <= pickup_lat <= 90 and -180 <= pickup_lon <= 180):
             return Response(
-                {"detail": "Coordonnées du commerçant invalides."}, status=400
+                {"detail": "إحداثيات المتجر غير صالحة."}, status=400
             )
 
         if destination_lat is None:
             destination_position = resolve_destination(destination)
             if not destination_position:
                 return Response(
-                    {"detail": "Destination introuvable. Vérifiez l’adresse puis réessayez."},
+                    {"detail": "تعذر العثور على الوجهة. تحقق من العنوان ثم أعد المحاولة."},
                     status=422,
                 )
             destination_lat, destination_lon = destination_position
@@ -627,7 +627,7 @@ class CourseViewSet(ModelViewSet):
             if existing:
                 return Response(self.get_serializer(existing).data, status=200)
             if Course.objects.filter(request_key=request_key).exists():
-                raise ValidationError({"detail": "Identifiant de demande déjà utilisé."})
+                raise ValidationError({"detail": "معرّف الطلب مستخدم بالفعل."})
         self._ensure_no_active_course(client)
 
         legs = self._parse_delivery_legs(request)
@@ -664,7 +664,7 @@ class CourseViewSet(ModelViewSet):
         surcharge_percent = current_surcharge_percent()
         final_price = adjusted_price(legs["proposed_price"], surcharge_percent)
         if final_price > Decimal("99999999.99"):
-            raise ValidationError({"detail": "Le prix proposé est trop élevé."})
+            raise ValidationError({"detail": "السعر المقترح مرتفع جداً."})
 
         try:
             with transaction.atomic():
@@ -726,12 +726,12 @@ class CourseViewSet(ModelViewSet):
             latitude = float(request.query_params["latitude"])
             longitude = float(request.query_params["longitude"])
         except (KeyError, TypeError, ValueError):
-            return Response({"detail": "Coordonnées invalides."}, status=400)
+            return Response({"detail": "الإحداثيات غير صالحة."}, status=400)
         if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-            return Response({"detail": "Coordonnées invalides."}, status=400)
+            return Response({"detail": "الإحداثيات غير صالحة."}, status=400)
         address = resolve_destination_label(latitude, longitude, full_address=True)
         if not address:
-            return Response({"detail": "Adresse indisponible."}, status=422)
+            return Response({"detail": "تعذر العثور على العنوان."}, status=422)
         return Response({"address": address[:255]})
 
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
@@ -745,15 +745,15 @@ class CourseViewSet(ModelViewSet):
         )
 
         if not destination and destination_lat is None:
-            return Response({"detail": "La destination ou ses coordonnées sont obligatoires."}, status=400)
+            return Response({"detail": "الوجهة أو إحداثياتها مطلوبة."}, status=400)
         if not (-90 <= start_lat <= 90 and -180 <= start_lon <= 180):
-            return Response({"detail": "Coordonnées GPS invalides."}, status=400)
+            return Response({"detail": "إحداثيات الموقع غير صالحة."}, status=400)
         if destination_lat is not None and not (-90 <= destination_lat <= 90 and -180 <= destination_lon <= 180):
-            return Response({"detail": "Coordonnées de destination invalides."}, status=400)
+            return Response({"detail": "إحداثيات الوجهة غير صالحة."}, status=400)
         if destination_lat is None:
             destination_position = resolve_destination(destination)
             if not destination_position:
-                return Response({"detail": "Destination introuvable. Vérifiez l’adresse puis réessayez."}, status=422)
+                return Response({"detail": "تعذر العثور على الوجهة. تحقق من العنوان ثم أعد المحاولة."}, status=422)
             destination_lat, destination_lon = destination_position
         elif not destination:
             destination = (resolve_destination_label(destination_lat, destination_lon) or "موقع محدد على الخريطة")[:255]
@@ -769,7 +769,7 @@ class CourseViewSet(ModelViewSet):
             if pickup_text and pickup_text != "موقعي الحالي":
                 pickup_position = resolve_destination(pickup_text)
                 if not pickup_position:
-                    return Response({"detail": "Point de départ introuvable. Vérifiez l’adresse puis réessayez."}, status=422)
+                    return Response({"detail": "تعذر العثور على نقطة الانطلاق. تحقق من العنوان ثم أعد المحاولة."}, status=422)
                 pickup_lat, pickup_lon = pickup_position
 
         routing = resolve_legs(
@@ -809,7 +809,7 @@ class CourseViewSet(ModelViewSet):
     def offers(self, request):
         driver = Livreur.objects.filter(user=request.user, user__is_active=True).first()
         if not driver:
-            return Response({"detail": "Compte chauffeur invalide."}, status=403)
+            return Response({"detail": "حساب السائق غير صالح."}, status=403)
 
         expire_stale_offers()
         # Une commande dont personne n'a voulu la vague précédente repart
@@ -828,39 +828,52 @@ class CourseViewSet(ModelViewSet):
     def respond(self, request, pk=None):
         response_value = request.data.get("response")
         if response_value not in ["accepted", "rejected"]:
-            return Response({"detail": "Réponse invalide."}, status=400)
+            return Response({"detail": "الإجابة غير صالحة."}, status=400)
+
+        offered_price = None
+        if response_value == "accepted" and request.data.get("offered_price") not in (None, ""):
+            try:
+                offered_price = serializers.DecimalField(max_digits=10, decimal_places=2).run_validation(
+                    request.data.get("offered_price")
+                )
+            except serializers.ValidationError:
+                return Response({"detail": "السعر المقترح غير صالح."}, status=400)
+            if offered_price < Decimal(settings.COURSE_MIN_PRICE_DZD):
+                return Response({"detail": f"الحد الأدنى للسعر هو {settings.COURSE_MIN_PRICE_DZD} دج."}, status=400)
 
         driver = Livreur.objects.filter(user=request.user, user__is_active=True).first()
         if not driver:
-            return Response({"detail": "Compte chauffeur invalide."}, status=403)
+            return Response({"detail": "حساب السائق غير صالح."}, status=403)
 
         with transaction.atomic():
             course = Course.objects.select_for_update().filter(pk=pk).first()
             if not course:
-                return Response({"detail": "Course introuvable."}, status=404)
+                return Response({"detail": "تعذر العثور على الرحلة."}, status=404)
             offer = CourseOffer.objects.select_for_update().filter(course=course, livreur=driver).first()
             if not offer:
-                return Response({"detail": "Cette course ne vous a pas été proposée."}, status=404)
+                return Response({"detail": "لم تُعرض عليك هذه الرحلة."}, status=404)
             if course.status in ["cancelled", "completed"] or course.livreur_id:
-                return Response({"detail": "Cette course n’est plus disponible."}, status=409)
+                return Response({"detail": "هذه الرحلة لم تعد متاحة."}, status=409)
             if offer.response == response_value:
                 return Response({"status": course.status, "response": offer.response})
             if offer.response != "pending":
-                return Response({"detail": "Cette offre a déjà été traitée."}, status=409)
+                return Response({"detail": "تمت معالجة هذا العرض بالفعل."}, status=409)
             if offer.expires_at and offer.expires_at <= timezone.now():
                 offer.response = "withdrawn"
                 offer.responded_at = timezone.now()
                 offer.save(update_fields=["response", "responded_at"])
-                return Response({"detail": "Cette offre a expiré."}, status=409)
+                return Response({"detail": "انتهت صلاحية هذا العرض."}, status=409)
             if response_value == "accepted" and not driver.est_en_ligne:
-                return Response({"detail": "Remettez-vous en ligne pour accepter une course."}, status=409)
+                return Response({"detail": "اتصل بالإنترنت لقبول الرحلة."}, status=409)
             if response_value == "accepted" and Course.objects.filter(livreur=driver, active=True).exclude(pk=course.pk).exists():
-                return Response({"detail": "Vous avez déjà une course en cours."}, status=409)
+                return Response({"detail": "لديك رحلة جارية بالفعل."}, status=409)
 
             previous_status = course.status
             offer.response = response_value
             offer.responded_at = timezone.now()
-            offer.save(update_fields=["response", "responded_at"])
+            if response_value == "accepted":
+                offer.offered_price = offered_price if offered_price is not None else course.final_price
+            offer.save(update_fields=["response", "responded_at", "offered_price"])
             if response_value == "accepted":
                 course.status = "driver_accepted"
                 course.save(update_fields=["status"])
@@ -905,23 +918,23 @@ class CourseViewSet(ModelViewSet):
     def select_driver(self, request, pk=None):
         client = Client.objects.filter(user=request.user).first()
         if not client:
-            return Response({"detail": "Accès réservé au client."}, status=403)
+            return Response({"detail": "هذه العملية متاحة للعميل فقط."}, status=403)
         try:
             driver_id = int(request.data["livreur_id"])
         except (KeyError, TypeError, ValueError):
-            return Response({"detail": "Chauffeur invalide."}, status=400)
+            return Response({"detail": "السائق غير صالح."}, status=400)
 
         with transaction.atomic():
             course = Course.objects.select_for_update().filter(pk=pk, client=client).first()
             if not course:
-                return Response({"detail": "Course introuvable."}, status=404)
+                return Response({"detail": "تعذر العثور على الرحلة."}, status=404)
             if course.status not in ["searching", "driver_accepted"] or course.livreur_id:
-                return Response({"detail": "La course n’est plus disponible pour une sélection."}, status=409)
+                return Response({"detail": "هذه الرحلة لم تعد متاحة للاختيار."}, status=409)
             offer = CourseOffer.objects.select_for_update().filter(
                 course=course, livreur_id=driver_id, response="accepted"
             ).select_related("livreur").first()
             if not offer:
-                return Response({"detail": "Ce chauffeur n’a pas accepté la course."}, status=409)
+                return Response({"detail": "لم يقبل هذا السائق الرحلة."}, status=409)
             offer.livreur = Livreur.objects.select_for_update().get(pk=offer.livreur_id)
             if not offer.livreur.est_en_ligne or not offer.livreur.user_id or not offer.livreur.user.is_active or Course.objects.filter(
                 livreur=offer.livreur, active=True
@@ -930,10 +943,12 @@ class CourseViewSet(ModelViewSet):
 
             previous_status = course.status
             course.livreur = offer.livreur
+            if offer.offered_price is not None:
+                course.final_price = offer.offered_price
             course.client_confirmed = True
             course.status = "driver_selected"
             course.availability_before_course = offer.livreur.disponible
-            course.save(update_fields=["livreur", "client_confirmed", "status", "availability_before_course"])
+            course.save(update_fields=["livreur", "final_price", "client_confirmed", "status", "availability_before_course"])
             offer.livreur.disponible = False
             offer.livreur.save(update_fields=["disponible"])
             CourseOffer.objects.filter(course=course).exclude(pk=offer.pk).update(
@@ -983,19 +998,19 @@ class CourseViewSet(ModelViewSet):
     def _transition(self, request, pk, new_status, allowed_statuses, timestamp_field):
         driver = Livreur.objects.filter(user=request.user, user__is_active=True).first()
         if not driver:
-            return Response({"detail": "Compte chauffeur invalide."}, status=403)
+            return Response({"detail": "حساب السائق غير صالح."}, status=403)
         with transaction.atomic():
             course = Course.objects.select_for_update().filter(pk=pk, livreur=driver).first()
             if not course:
-                return Response({"detail": "Course introuvable."}, status=404)
+                return Response({"detail": "تعذر العثور على الرحلة."}, status=404)
             if new_status == "picked_up" and not course.is_delivery:
-                return Response({"detail": "La récupération de commande est réservée aux livraisons."}, status=409)
+                return Response({"detail": "استلام الطلب متاح لخدمة التوصيل فقط."}, status=409)
             if new_status == "in_progress" and course.is_delivery:
                 allowed_statuses = ["picked_up"]
             if course.status == new_status:
                 return Response(self.get_serializer(course).data)
             if not course.active or course.status not in allowed_statuses:
-                return Response({"detail": "Cette transition n’est pas autorisée."}, status=409)
+                return Response({"detail": "لا يمكن تغيير حالة الرحلة بهذه الطريقة."}, status=409)
             previous_status = course.status
             course.status = new_status
             update_fields = ["status"]
@@ -1015,21 +1030,21 @@ class CourseViewSet(ModelViewSet):
         client_reasons = {"changed_mind", "driver_delay", "request_error", "other"}
         driver_reasons = {"cannot_complete", "vehicle_issue", "route_unsuitable", "other"}
         if (client and reason not in client_reasons) or (driver and reason not in driver_reasons) or not (client or driver):
-            return Response({"detail": "Motif d’annulation invalide."}, status=400)
+            return Response({"detail": "سبب الإلغاء غير صالح."}, status=400)
         if reason == "other" and not comment:
-            return Response({"detail": "Précisez le motif dans le commentaire."}, status=400)
+            return Response({"detail": "يرجى توضيح سبب الإلغاء في التعليق."}, status=400)
         with transaction.atomic():
             course = Course.objects.select_for_update().filter(pk=pk).first()
             if not course or (not client or course.client_id != client.id) and (not driver or course.livreur_id != driver.id):
-                return Response({"detail": "Course introuvable."}, status=404)
+                return Response({"detail": "تعذر العثور على الرحلة."}, status=404)
             actor_type = "client" if client and course.client_id == client.id else "livreur"
             actor_id = client.id if actor_type == "client" else driver.id
             if course.status == "cancelled":
                 return Response(self.get_serializer(course).data)
             if course.status == "completed" or not course.active:
-                return Response({"detail": "Cette course ne peut plus être annulée."}, status=409)
+                return Response({"detail": "لم يعد بإمكانك إلغاء هذه الرحلة."}, status=409)
             if actor_type == "livreur" and course.status not in ["driver_selected", "driver_arriving", "driver_arrived", "picked_up", "in_progress"]:
-                return Response({"detail": "Vous ne pouvez pas annuler cette demande."}, status=403)
+                return Response({"detail": "لا يمكنك إلغاء هذا الطلب."}, status=403)
 
             previous_status = course.status
             course.previous_status = previous_status
@@ -1087,15 +1102,15 @@ class CourseViewSet(ModelViewSet):
         livreur_id = request.query_params.get("livreur_id")
 
         if not livreur_id:
-            return Response({"error": "livreur_id obligatoire"}, status=400)
+            return Response({"error": "معرّف السائق مطلوب."}, status=400)
 
         livreur = Livreur.objects.filter(id=livreur_id).first()
 
         if not livreur:
-            return Response({"error": "Livreur introuvable"}, status=404)
+            return Response({"error": "تعذر العثور على السائق."}, status=404)
 
         if livreur.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         course = Course.objects.filter(
             livreur_id=livreur_id,
@@ -1117,10 +1132,10 @@ class CourseViewSet(ModelViewSet):
         course = self.get_object()
 
         if course.client.user != request.user:
-            return Response({"error": "Accès interdit"}, status=403)
+            return Response({"error": "الوصول غير مسموح."}, status=403)
 
         if not course.active:
-            raise CourseConflict("La course est terminée ; sa position ne peut plus être modifiée.")
+            raise CourseConflict("انتهت الرحلة ولا يمكن تعديل موقعها.")
         latitude, longitude = read_coordinates(
             request.data, "client_latitude", "client_longitude", required=True
         )
@@ -1131,7 +1146,7 @@ class CourseViewSet(ModelViewSet):
         course.save(update_fields=["client_latitude", "client_longitude"])
 
         return Response({
-            "message": "Position client mise à jour",
+            "message": "تم تحديث موقع العميل.",
             "id": course.id,
             "client_latitude": course.client_latitude,
             "client_longitude": course.client_longitude,
@@ -1142,18 +1157,18 @@ class CourseViewSet(ModelViewSet):
         with transaction.atomic():
             course = Course.objects.select_for_update().filter(pk=pk).first()
             if not course:
-                return Response({"detail": "Course introuvable."}, status=404)
+                return Response({"detail": "تعذر العثور على الرحلة."}, status=404)
             livreur = course.livreur
             client = course.client
             is_livreur = bool(livreur and livreur.user_id == request.user.id)
             is_client = client.user_id == request.user.id
 
             if not is_livreur and not is_client:
-                return Response({"error": "Accès interdit"}, status=403)
+                return Response({"error": "الوصول غير مسموح."}, status=403)
             if not course.active or course.status in ["completed", "cancelled"]:
                 return Response(self.get_serializer(course).data)
             if course.status != "in_progress" or not course.livreur_id:
-                return Response({"detail": "Seule une course en cours peut être terminée."}, status=409)
+                return Response({"detail": "يمكن إنهاء رحلة جارية فقط."}, status=409)
 
             previous_status = course.status
             course.active = False
@@ -1186,7 +1201,7 @@ class CourseViewSet(ModelViewSet):
 
         return Response({
             **self.get_serializer(course).data,
-            "message": "Course terminée",
+            "message": "اكتملت الرحلة.",
             "active": False,
             "nombre_livraisons": livreur.nombre_livraisons if livreur else None,
             "disponible": livreur.disponible if livreur else None,

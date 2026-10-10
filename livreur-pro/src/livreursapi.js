@@ -147,7 +147,7 @@ export async function loginJWT(credentials) {
     "livreur",
     JSON.stringify({
       id: livreur.id,
-      nom: livreur.nom || credentials.nom || "Livreur",
+      nom: livreur.nom || credentials.nom || "سائق",
       telephone: credentials.telephone,
       ville: livreur.ville,
       vehicule: livreur.vehicule,
@@ -449,8 +449,9 @@ export async function loginClient(credentials) {
     "client",
     JSON.stringify({
       id: client.id,
-      nom: client.nom || "Client",
+      nom: client.nom || "عميل",
       telephone: client.telephone,
+      photo: client.photo,
     })
   );
 
@@ -513,12 +514,16 @@ export async function deleteClient(id) {
 }
 
 export async function updateClientProfile(id, data) {
+  const hasPhoto = data.photo instanceof File;
+  const body = hasPhoto ? new FormData() : JSON.stringify(data);
+  if (hasPhoto) {
+    body.append("nom", data.nom);
+    body.append("photo", data.photo);
+  }
   const response = await fetch(`${API_BASE_URL}/clients/${id}/`, {
     method: "PATCH",
-    headers: authHeaders({
-      "Content-Type": "application/json",
-    }),
-    body: JSON.stringify(data),
+    headers: authHeaders(hasPhoto ? {} : { "Content-Type": "application/json" }),
+    body,
   });
 
   const result = await response.json();
@@ -527,7 +532,7 @@ export async function updateClientProfile(id, data) {
     handleInvalidToken(result);
     throw new Error(
       toArabicMessage(
-        result.error || result.telephone || result.detail,
+        result.photo || result.error || result.telephone || result.detail,
         "حدث خطأ أثناء تعديل المعلومات."
       )
     );
@@ -667,7 +672,7 @@ async function fetchCourseAddress(position) {
   const response = await fetch(`${API_BASE_URL}/courses/address/?${params}`, {
     signal: AbortSignal.timeout(6000),
   });
-  if (!response.ok) throw new Error("Adresse indisponible.");
+  if (!response.ok) throw new Error("تعذر العثور على العنوان.");
   const data = await response.json();
   return data.address;
 }
@@ -708,8 +713,11 @@ export async function getCourseOffers() {
   return Array.isArray(data) ? data : data.results || [];
 }
 
-export function respondToCourseOffer(courseId, response) {
-  return courseAction(courseId, "respond", "POST", { response });
+export function respondToCourseOffer(courseId, response, offeredPrice) {
+  return courseAction(courseId, "respond", "POST", {
+    response,
+    ...(response === "accepted" && offeredPrice != null ? { offered_price: offeredPrice } : {}),
+  });
 }
 
 export function selectCourseDriver(courseId, livreurId) {

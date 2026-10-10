@@ -17,6 +17,7 @@ export default function ClientDashboard() {
   const [client, setClient] = useState(() => readStoredAccount("client"));
   const [editingProfile, setEditingProfile] = useState(false);
   const [editNom, setEditNom] = useState(client?.nom || "");
+  const [editPhoto, setEditPhoto] = useState(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -81,16 +82,21 @@ export default function ClientDashboard() {
     if (!client || savingProfile) return;
     const nom = editNom.trim();
     if (!nom) { setError("الاسم مطلوب."); return; }
+    if (editPhoto && editPhoto.size > 5 * 1024 * 1024) {
+      setError("حجم الصورة يجب ألا يتجاوز 5 ميغابايت.");
+      return;
+    }
     setSavingProfile(true);
     setError("");
     setMessage("");
     try {
-      const updated = await updateClientProfile(client.id, { nom });
+      const updated = await updateClientProfile(client.id, { nom, ...(editPhoto ? { photo: editPhoto } : {}) });
       const next = { ...client, ...updated };
       setClient(next);
       localStorage.setItem("client", JSON.stringify(next));
       window.dispatchEvent(new Event("authChanged"));
       setEditingProfile(false);
+      setEditPhoto(null);
       setMessage("تم تحديث معلوماتك.");
     } catch (err) { setError(err.message || "تعذر تحديث المعلومات."); }
     finally { setSavingProfile(false); }
@@ -134,14 +140,14 @@ export default function ClientDashboard() {
   return (
     <section className="page account-page" dir="rtl">
       <header className="account-header">
-        <div className="account-avatar" aria-hidden="true">{client.nom?.trim().charAt(0) || "؟"}</div>
+        <div className="account-avatar" aria-hidden="true">{client.photo ? <img src={client.photo} alt="" /> : client.nom?.trim().charAt(0) || "؟"}</div>
         <div className="account-identity">
           <h1>{client.nom}</h1>
           <span className="account-role">حساب عميل</span>
           <span className="account-meta"><bdi>{client.telephone}</bdi></span>
         </div>
         <button type="button" className="account-edit-btn" aria-expanded={editingProfile}
-          onClick={() => { setEditNom(client.nom || ""); setEditingProfile(!editingProfile); }}>تعديل</button>
+          onClick={() => { setEditNom(client.nom || ""); setEditPhoto(null); setEditingProfile(!editingProfile); }}>تعديل</button>
       </header>
       <nav className="account-sections" aria-label="أقسام الحساب">
         <a href="#personal-info">المعلومات</a><a href="#trip-history">رحلاتي وطلباتي</a><a href="#account-settings">الإعدادات</a>
@@ -180,10 +186,11 @@ export default function ClientDashboard() {
         <h2>تعديل المعلومات</h2>
         <form className="account-form" onSubmit={handleProfileSave}>
           <label>الاسم<input value={editNom} onChange={(event) => setEditNom(event.target.value)} maxLength={100} autoComplete="name" required /></label>
+          <label>صورة الحساب (اختيارية)<input type="file" accept="image/*" onChange={(event) => setEditPhoto(event.target.files?.[0] || null)} /></label>
           <label>رقم الهاتف<input value={client.telephone} dir="ltr" disabled readOnly /></label>
           <div className="account-form-actions">
             <button type="submit" className="save" disabled={savingProfile}>{savingProfile ? "جارٍ الحفظ…" : "حفظ"}</button>
-            <button type="button" className="cancel" disabled={savingProfile} onClick={() => setEditingProfile(false)}>إلغاء</button>
+            <button type="button" className="cancel" disabled={savingProfile} onClick={() => { setEditingProfile(false); setEditPhoto(null); }}>إلغاء</button>
           </div>
         </form>
       </section>}

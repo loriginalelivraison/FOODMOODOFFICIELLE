@@ -321,8 +321,8 @@ export default function ClientCourse() {
                     {driver.note != null && <> · ★ {driver.note}</>}
                     {driver.distance_km != null && <> · {driver.distance_km} كم</>}
                   </span>
-                  {(course.final_price ?? course.proposed_price) != null && (
-                    <span>{course.final_price ?? course.proposed_price} دج</span>
+                  {(driver.offered_price ?? course.final_price ?? course.proposed_price) != null && (
+                    <span>سعر السائق: {driver.offered_price ?? course.final_price ?? course.proposed_price} دج</span>
                   )}
                 </div>
                 <button

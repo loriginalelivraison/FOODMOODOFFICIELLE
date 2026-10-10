@@ -106,6 +106,7 @@ class Client(models.Model):
     )
     nom = models.CharField(max_length=100)
     telephone = models.CharField(max_length=20, unique=True)
+    photo = models.ImageField(upload_to="clients/", blank=True, null=True)
     points = models.PositiveIntegerField(default=0)
     fcm_token = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -253,6 +254,7 @@ class CourseOffer(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="offers")
     livreur = models.ForeignKey(Livreur, on_delete=models.CASCADE, related_name="course_offers")
     response = models.CharField(max_length=12, choices=RESPONSE_CHOICES, default="pending")
+    offered_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     # Numéro de vague de diffusion : une offre retirée au profit d'une nouvelle
     # vague laisse la trace du numéro qui l'a générée.
     round_number = models.PositiveIntegerField(default=1)

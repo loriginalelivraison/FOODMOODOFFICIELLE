@@ -194,15 +194,14 @@ export default function TrackingMap({
           >
             {(() => {
               const v = currentCourier?.vehicle || currentCourier?.vehicule || "moto";
-              const label = vehicleLabels[v] || "moto";
               const emoji =
-                label === "moto"
+                v === "moto" || v === "scooter"
                   ? "🛵"
-                  : label === "vélo"
+                  : v === "velo"
                   ? "🚴"
-                  : label === "voiture"
+                  : v === "voiture"
                   ? "🚘"
-                  : label === "camion"
+                  : v === "camion"
                   ? "🚚"
                   : "🚗";
               return `${emoji} السائق`;

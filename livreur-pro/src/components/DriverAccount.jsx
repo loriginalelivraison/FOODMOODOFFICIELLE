@@ -19,12 +19,11 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
   const photo = profile?.photo || livreur.photo || livreur.image;
   const assignedCourses = courses.filter((course) => String(course.livreur) === String(livreur.id));
   return <>
-    <header className="driver-account-title"><h1>حسابي</h1><span>كل معلوماتك في مكان واحد</span></header>
+    <header className="driver-account-title"><h1>حسابي</h1></header>
     <section className="account-card driver-profile-card" id="personal-info">
       <div className="driver-profile-heading">
         <div className="account-avatar">{photo ? <img src={photo} alt={name} /> : <User size={30} aria-hidden="true" />}</div>
         <div className="account-identity"><h2>{name}</h2>
-          <span className="account-role">{vehicle === "voiture" ? "حساب سائق" : "حساب عامل توصيل"}</span>
           <span className="driver-profile-phone"><Phone size={15} aria-hidden="true" /><bdi>{profile?.telephone || livreur.telephone}</bdi></span>
         </div>
         <button className="driver-edit-button" type="button" onClick={onEdit} aria-expanded={editingProfile} disabled={form.saving}>
@@ -60,23 +59,24 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
         <span className="account-row-value">{VEHICLES[vehicle] || vehicle || "غير متوفر"}</span></div>
       {vehicle === "voiture" && (profile?.modele_vehicule || livreur.modele_vehicule) && <div className="account-row"><span className="account-row-label">طراز السيارة</span>
         <span className="account-row-value">{profile?.modele_vehicule || livreur.modele_vehicule}</span></div>}
-      <DriverDocuments driverId={livreur.id} />
     </section>
+    <DriverDocuments driverId={livreur.id} />
     <section className="account-card driver-account-rewards">
-      <div className="driver-reward-line"><span className="driver-reward-icon"><Trophy size={22} aria-hidden="true" /></span>
-        <div><strong>{formatDriverNumber(profile?.points ?? livreur.points)} نقطة</strong><span>مكافآتك</span></div>
-      </div>
+      <h2><Trophy size={20} aria-hidden="true" />النشاط</h2>
       <div className="driver-account-stats">
-        <span>{formatDriverNumber(profile?.nombre_livraisons ?? livreur.nombre_livraisons)} <small>رحلات مكتملة</small></span>
-        <span><Star size={15} aria-hidden="true" />{formatDriverNumber(profile?.note ?? livreur.note)} <small>التقييم</small></span>
+        <div><strong>{formatDriverNumber(profile?.points ?? livreur.points)}</strong><span>النقاط</span></div>
+        <div><strong>{formatDriverNumber(profile?.nombre_livraisons ?? livreur.nombre_livraisons)}</strong><span>الرحلات</span></div>
+        <div><strong><Star size={17} aria-hidden="true" />{formatDriverNumber(profile?.note ?? livreur.note)}</strong><span>التقييم</span></div>
       </div>
+    </section>
+    <section className="account-card driver-account-history-card">
       <details className="driver-account-archive">
         <summary><History size={18} aria-hidden="true" />السجل والتقييمات<ChevronDown size={16} aria-hidden="true" /></summary>
         <div className="driver-account-history">
           <h3>سجل الرحلات</h3>
           {loadingHistory && <LoadingSpinner label="جارٍ تحميل السجل…" />}
           {historyError && <p role="alert">{historyError}</p>}
-          {!loadingHistory && !historyError && assignedCourses.length === 0 && <p className="account-empty">لا توجد رحلات مسجلة حالياً.</p>}
+          {!loadingHistory && !historyError && assignedCourses.length === 0 && <p className="account-empty">لا توجد رحلات</p>}
           {!loadingHistory && assignedCourses.map((course) => <article className="account-item" key={course.id}>
             <div className="account-item-head"><strong>رحلة رقم <bdi>{course.id}</bdi></strong>
               <span className="account-status-pill">{getCourseStatusLabel(course)}</span></div>
@@ -97,7 +97,7 @@ export default function DriverAccount({ livreur, profile, courses, reviews, load
       <button className="account-link" type="button" onClick={onPrivacy}>سياسة الخصوصية</button>
       <a className="account-link" href="https://www.winrak.fr" target="_blank" rel="noreferrer">موقع WinRak</a>
       <button className="account-logout" type="button" onClick={onLogout} disabled={closingAccount}><LogOut size={18} aria-hidden="true" />تسجيل الخروج</button>
+      <button className="account-delete" type="button" onClick={onDelete} disabled={closingAccount}>حذف الحساب نهائياً</button>
     </section>
-    <button className="account-delete" type="button" onClick={onDelete} disabled={closingAccount}>حذف الحساب نهائياً</button>
   </>;
 }

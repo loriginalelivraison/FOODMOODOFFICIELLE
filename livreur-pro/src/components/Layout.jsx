@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigation, useLocation } from "react-router-dom";
-import { Home, User, LogIn, Lock, ClipboardList } from "lucide-react";
+import { Home, User, LogIn, ShieldCheck, ClipboardList, Menu, X, CarFront, History, Settings } from "lucide-react";
 import LoadingSpinner from "./LoadingSpinner";
 import PageScrollManager from "./PageScrollManager.jsx";
 import logo from "../assets/logo3.png";
@@ -18,6 +18,9 @@ export default function Layout() {
   const navigation = useNavigation();
   const location = useLocation();
   const contentRef = useRef(null);
+  const menuRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [auth, setAuth] = useState(readAuth);
   const driver = auth.role === "livreur";
   const driverDashboard = location.pathname.startsWith("/livreur-dashboard/");
@@ -35,6 +38,30 @@ export default function Layout() {
     };
   }, []);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.key, auth.role, auth.user?.id]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event) => {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
   const homeLink = driver ? `/livreur-dashboard/${auth.user.id}` : "/livreurs";
   const accountLink = driver ? `${homeLink}?section=account` : auth.token ? "/client-dashboard" : "/connexion-client";
   const homeActive = driver ? driverDashboard && !accountView : location.pathname === "/livreurs";
@@ -42,6 +69,19 @@ export default function Layout() {
     { path: homeLink, label: driver ? "طلباتي" : "رحلة أو توصيل", icon: driver ? ClipboardList : Home, active: homeActive },
     { path: accountLink, label: auth.token ? "حسابي" : "تسجيل الدخول", icon: auth.token ? User : LogIn,
       active: accountView || (!auth.token && ["/connexion-client", "/inscription-livreur"].includes(location.pathname)) },
+  ];
+  const menuLinks = [
+    links[0],
+    { ...links[1], active: auth.token ? accountView && !location.hash : location.pathname === "/connexion-client" },
+    ...(!auth.token ? [{ path: "/inscription-livreur", label: "فضاء السائق والتوصيل", icon: CarFront,
+      active: location.pathname === "/inscription-livreur" }] : [
+      { path: `${accountLink}${driver ? "#vehicle-info" : "#trip-history"}`,
+        label: driver ? "المركبة والوثائق" : "رحلاتي وطلباتي", icon: driver ? CarFront : History,
+        active: accountView && location.hash === (driver ? "#vehicle-info" : "#trip-history") },
+      { path: `${accountLink}#account-settings`, label: "الإعدادات", icon: Settings,
+        active: accountView && location.hash === "#account-settings" },
+    ]),
+    { path: "/privacy", label: "سياسة الخصوصية", icon: ShieldCheck, active: location.pathname === "/privacy" },
   ];
   const renderLinks = (className) => links.map(({ path, label, icon: Icon, active }) => (
     <Link key={path} to={path} className={`${className}${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
@@ -59,7 +99,32 @@ export default function Layout() {
         </Link>
         <div className="pro-topbar-actions">
           {auth.user && <span className="pro-auth-status">{auth.user.nom}</span>}
-          <Link to="/privacy" className="privacy-link" title="سياسة الخصوصية" aria-label="سياسة الخصوصية"><Lock size={18} /></Link>
+          <div className="pro-navigation-menu" ref={menuRef}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+            }}>
+            <button ref={menuButtonRef} type="button" className="pro-menu-toggle"
+              aria-label={menuOpen ? "إغلاق القائمة" : "فتح القائمة"}
+              aria-expanded={menuOpen} aria-controls="main-navigation-menu"
+              onClick={() => setMenuOpen((open) => !open)}>
+              {menuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
+            </button>
+            {menuOpen && <nav id="main-navigation-menu" className="pro-menu-panel" dir="rtl" aria-label="القائمة الرئيسية">
+              <p className="pro-menu-heading">القائمة الرئيسية</p>
+              <ul>
+                {menuLinks.map(({ path, label, icon: Icon, active }) => <li key={path}>
+                  <Link to={path} className={`pro-menu-link${active ? " active" : ""}`}
+                    aria-current={active ? (path.includes("#") ? "location" : "page") : undefined}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      menuButtonRef.current?.focus();
+                    }}>
+                    <Icon size={20} aria-hidden="true" /><span>{label}</span>
+                  </Link>
+                </li>)}
+              </ul>
+            </nav>}
+          </div>
         </div>
         <nav className="desktop-nav" aria-label="التنقل الرئيسي">{renderLinks("nav-link")}</nav>
       </header>

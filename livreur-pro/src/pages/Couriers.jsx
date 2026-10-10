@@ -9,7 +9,7 @@ import CouriersMap from "../components/CouriersMap.jsx";
 import BookingSummary from "../components/BookingSummary.jsx";
 import { MY_LOCATION_LABEL } from "../components/DepartureField.jsx";
 import DestinationField from "../components/DestinationField.jsx";
-import { destinationCoordinates } from "../utils/destinationSearch.js";
+import { destinationCoordinates, suggestedDeliveryPickups, suggestedDestinations } from "../utils/destinationSearch.js";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import { clearCurrentClientCourse, isValidId } from "../utils/navigation.js";
 import { isDeliveryVehicle } from "../utils/courseTracking.js";
@@ -500,6 +500,7 @@ export default function Couriers() {
 
   const pickupField = (
     <DestinationField
+      suggestedPlaces={isDelivery ? suggestedDeliveryPickups : []}
       onSelectPlace={(place) => handleLocalPlaceSelection(place, true)}
       id="departure-input"
       label={pickupLabel}
@@ -520,6 +521,7 @@ export default function Couriers() {
   const destinationField = (
     <div ref={destinationSectionRef}>
       <DestinationField
+        suggestedPlaces={isDelivery ? [] : suggestedDestinations}
         keepHistory
         onSelectPlace={(place) => handleLocalPlaceSelection(place, false)}
         id="destination-input"

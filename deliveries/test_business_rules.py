@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -156,6 +157,34 @@ class BusinessRulesTests(TestCase):
         course.refresh_from_db()
         self.assertEqual(course.status, "driver_accepted")
         self.assertEqual(course.broadcast_round, 1)
+
+    def test_driver_price_is_shown_to_client_and_used_when_selected(self):
+        course = self.make_course(livreur=None, status="searching", client_confirmed=False,
+                                  final_price=Decimal("500.00"))
+        offer = CourseOffer.objects.create(course=course, livreur=self.driver)
+        for invalid in ("99", "NaN", "100.123", "999999999"):
+            with self.subTest(invalid=invalid):
+                response = self.driver_api.post(f"/api/courses/{course.id}/respond/", {
+                    "response": "accepted", "offered_price": invalid,
+                }, format="json")
+                self.assertEqual(response.status_code, 400)
+                offer.refresh_from_db()
+                self.assertEqual(offer.response, "pending")
+
+        accepted = self.driver_api.post(f"/api/courses/{course.id}/respond/", {
+            "response": "accepted", "offered_price": "650.00",
+        }, format="json")
+        self.assertEqual(accepted.status_code, 200)
+        offer.refresh_from_db()
+        self.assertEqual(offer.offered_price, Decimal("650.00"))
+        self.assertEqual(self.driver_api.get(f"/api/courses/{course.id}/").data["my_offer_price"], Decimal("650.00"))
+        client_view = self.customer_api.get(f"/api/courses/{course.id}/")
+        self.assertEqual(client_view.data["accepted_drivers"][0]["offered_price"], Decimal("650.00"))
+        selected = self.customer_api.post(f"/api/courses/{course.id}/select_driver/", {
+            "livreur_id": self.driver.id,
+        }, format="json")
+        self.assertEqual(selected.status_code, 200)
+        self.assertEqual(Decimal(selected.data["final_price"]), Decimal("650.00"))
 
     @override_settings(COURSE_OFFER_MAX_ROUNDS=2)
     def test_rejection_does_not_exceed_dispatch_round_limit(self):

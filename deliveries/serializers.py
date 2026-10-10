@@ -16,7 +16,7 @@ class AccountRegistrationSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if User.objects.filter(username=attrs["telephone"]).exists():
-            raise serializers.ValidationError({"telephone": "Un compte avec ce téléphone existe déjà."})
+            raise serializers.ValidationError({"telephone": "رقم الهاتف مسجّل بالفعل."})
         try:
             validate_password(attrs["password"], User(username=attrs["telephone"]))
         except DjangoValidationError as exc:
@@ -102,6 +102,13 @@ class CommentaireLivreurSerializer(serializers.ModelSerializer):
         read_only_fields = ["nom_client", "created_at"]
 
 class ClientSerializer(serializers.ModelSerializer):
+    photo = OptionalPhotoField(required=False, allow_null=True)
+
+    def validate_photo(self, photo):
+        if photo and photo.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("حجم الصورة يجب ألا يتجاوز 5 ميغابايت.")
+        return photo
+
     class Meta:
         model = Client
         fields = [
@@ -109,6 +116,7 @@ class ClientSerializer(serializers.ModelSerializer):
             "user",
             "nom",
             "telephone",
+            "photo",
             "points",
             "created_at",
         ]
@@ -122,6 +130,7 @@ class CourseSerializer(serializers.ModelSerializer):
     accepted_drivers = serializers.SerializerMethodField()
     events = serializers.SerializerMethodField()
     my_offer_response = serializers.SerializerMethodField()
+    my_offer_price = serializers.SerializerMethodField()
     my_offer_expires_in = serializers.SerializerMethodField()
     my_offer_pickup_eta_minutes = serializers.SerializerMethodField()
     my_offer_pickup_distance_km = serializers.SerializerMethodField()
@@ -150,6 +159,10 @@ class CourseSerializer(serializers.ModelSerializer):
         offer = obj.offers.filter(livreur__user=request.user).values_list("response", flat=True).first()
         return offer
 
+    def get_my_offer_price(self, obj):
+        offer = self._my_offer(obj)
+        return offer.offered_price if offer and offer.response == "accepted" else None
+
     def get_my_offer_expires_in(self, obj):
         """Secondes restantes pour accepter l'offre (compte à rebours Uber)."""
         from .course_services import remaining_offer_seconds
@@ -173,11 +186,11 @@ class CourseSerializer(serializers.ModelSerializer):
             return []
 
         accepted = obj.offers.filter(response="accepted", livreur__est_en_ligne=True).select_related("livreur")
-        accepted_drivers = {offer.livreur_id: offer.livreur for offer in accepted}
+        accepted_drivers = {offer.livreur_id: (offer.livreur, offer.offered_price) for offer in accepted}
         if obj.livreur:
-            accepted_drivers[obj.livreur_id] = obj.livreur
+            accepted_drivers[obj.livreur_id] = (obj.livreur, obj.final_price)
         drivers = []
-        for driver in accepted_drivers.values():
+        for driver, offered_price in accepted_drivers.values():
             distance = None
             pickup_lat, pickup_lon = obj.pickup_position
             if pickup_lat is not None and pickup_lon is not None and driver.latitude is not None and driver.longitude is not None:
@@ -194,6 +207,7 @@ class CourseSerializer(serializers.ModelSerializer):
                 "latitude": driver.latitude,
                 "longitude": driver.longitude,
                 "distance_km": distance,
+                "offered_price": offered_price if offered_price is not None else obj.final_price,
             })
         return drivers
 
@@ -357,6 +371,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "accepted_drivers",
             "events",
             "my_offer_response",
+            "my_offer_price",
             "my_offer_expires_in",
             "my_offer_pickup_eta_minutes",
             "my_offer_pickup_distance_km",
@@ -380,6 +395,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "accepted_drivers",
             "events",
             "my_offer_response",
+            "my_offer_price",
             "my_offer_expires_in",
             "my_offer_pickup_eta_minutes",
             "my_offer_pickup_distance_km",

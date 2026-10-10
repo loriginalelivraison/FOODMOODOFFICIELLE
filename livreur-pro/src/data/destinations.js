@@ -39,6 +39,12 @@ const sourcedStatus = "position sourcée ; accès routier à vérifier";
 const publicStatus = "coordonnée publique localisée ; accès routier à confirmer";
 const geographicSource = "source géographique publiée";
 const mapcartaSource = "OpenStreetMap / GeoNames via Mapcarta";
+const categoryLabels = {
+  Commune: "بلدية", Loisirs: "ترفيه", Commerce: "تجارة", Hôtel: "فندق",
+  Plage: "شاطئ", Stade: "ملعب", Administration: "إدارة", Justice: "محكمة",
+  Port: "ميناء", Pâtisserie: "حلويات", "Café / pâtisserie": "مقهى وحلويات",
+  Pizzeria: "بيتزا", "Centre commercial": "مركز تجاري", Restaurant: "مطعم", Quartier: "حي",
+};
 const places = [
   [33, "موستالاند", "Mostaland", "Loisirs", "Mostaganem", 35.95662, 0.09773, sourcedStatus, geographicSource, "OSM way 365149459 ; centre du parc"],
   [34, "المركز التجاري لويزة", "Centre commercial Louisa", "Commerce", "Mostaganem", 35.9306875, 0.0885625, plusStatus, "https://www.africabizinfo.com/fr-DZ/centre-commercial-louisa_1L", plusPrecision],
@@ -59,6 +65,8 @@ const places = [
   [168, "فندق كوت ويست", "Hôtel Côte Ouest", "Hôtel", "Sablettes, Mazagran", 35.8916875, 0.0485625, sourcedStatus, "business listing: Hotel Cote Ouest", "point géographique approximatif"],
   [169, "بيتزا السلامندر", "Pizzeria La Salamandre", "Restaurant", "Mostaganem", 35.9189375, 0.0615625, sourcedStatus, "business listing: Pizzeria La Salamandre", "point géographique approximatif"],
   [170, "مديرية البريد", "Direction postale de Mostaganem", "Administration", "Mostaganem", 35.9283125, 0.0959375, sourcedStatus, "business listing: DUPW Mostaganem", "point géographique approximatif"],
+  [171, "الخروبة", "Kharrouba", "Quartier", "Mostaganem", 35.96496, 0.09403, publicStatus, "https://mapcarta.com/17329796 (GeoNames 2492059)", "centre de la localité ; accès routier à confirmer"],
+  [172, "كارنتيكا كحلة 1", "Karantika Kahla 1", "Restaurant", "Mostaganem", 35.9319183, 0.1112622, publicStatus, "Google Maps : Karantika Kahla 1 (W4J6+RF2)", "position indiquée sur la carte fournie ; entrée routière à confirmer"],
 ];
 
 export const destinations = [
@@ -67,7 +75,13 @@ export const destinations = [
     "riadh2002/algeria-69-wilayas-1541-communes (MIT)", "point de commune, entrée routière non vérifiée"]),
   ...places,
 ].map(([id, name_ar, name_fr, category, commune_secteur, latitude, longitude, gps_status, source_gps, precision_gps]) => ({
-  id, search_name: `${name_ar} - ${name_fr}`, name_ar, name_fr, category, commune_secteur,
+  id, search_name: `${name_ar} - ${name_fr}`, name_ar, name_fr, category,
+  category_ar: categoryLabels[category] || category,
+  commune_secteur,
+  commune_secteur_ar: communes.find(([, , fr]) => fr === commune_secteur)?.[1]
+    || ({ Mostaland: "موستالاند", "Sablettes, Mazagran": "الصابلات، مزغران",
+      "Route de Relizane, Mostaganem": "طريق غليزان، مستغانم" })[commune_secteur]
+    || commune_secteur,
   latitude, longitude, gps_status, source_gps, precision_gps,
   position_gps: latitude == null || longitude == null ? "" : `${latitude}, ${longitude}`,
 }));

@@ -1,22 +1,23 @@
 import React, { useMemo } from "react";
-import { Bell, CarFront, Check, Clock, WifiOff, X } from "lucide-react";
+import { Bell, CarFront, Clock, WifiOff } from "lucide-react";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import OrderCard from "./DriverCourseCard.jsx";
+import DriverOfferActions from "./DriverOfferActions.jsx";
 import { groupDriverCourses } from "../utils/driverOrders.js";
 export { groupDriverCourses } from "../utils/driverOrders.js";
 export { default as OfferCountdown } from "./OfferCountdown.jsx";
-import { canFinishCourse, getCourseStatusLabel, getDriverCourseHint, isDeliveryVehicle } from "../utils/courseTracking.js";
+import { canFinishCourse, getCourseStatusLabel, isDeliveryVehicle } from "../utils/courseTracking.js";
 
 
 
 function OrdersGroup({ title, count, children }) {
   return (
-    <div className={"orders-group" + (count === 1 ? " has-single-course" : "")}>
+    <section className="orders-group" aria-label={title}>
       <h3>
         {title} <span className="orders-count">{count}</span>
       </h3>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -41,21 +42,23 @@ export default function LivreurOrders({
     <section className="orders-board" aria-label="رحلاتي وطلباتي"
       data-scroll-step={loading ? undefined : [...toAccept, ...ongoing, ...waiting].map(course => `${course.id}:${course.status}:${course.my_offer_response || ""}`).sort().join("|")}>
 
+      <h2 className="driver-section-title">طلباتي</h2>
+
       <div className="orders-board-summary">
         <div className={'orders-tile is-offer' + (toAccept.length > 0 ? ' has-orders' : '')}>
           <Bell size={23} aria-hidden="true" />
           <strong>{loading ? "—" : toAccept.length}</strong>
-          <small>طلبات جديدة</small>
+          <small>جديدة</small>
         </div>
         <div className="orders-tile is-waiting">
           <Clock size={23} aria-hidden="true" />
           <strong>{loading ? "—" : waiting.length}</strong>
-          <small>في الانتظار</small>
+          <small>بانتظار الرد</small>
         </div>
         <div className="orders-tile is-ongoing">
           <CarFront size={23} aria-hidden="true" />
           <strong>{loading ? "—" : ongoing.length}</strong>
-          <small>رحلات جارية</small>
+          <small>جارية</small>
         </div>
       </div>
 
@@ -68,8 +71,7 @@ export default function LivreurOrders({
       {!loading && !error && toAccept.length === 0 && ongoing.length === 0 && waiting.length === 0 && (
         <div className="orders-empty">
           <span aria-hidden="true" className="orders-empty-car"><CarFront size={62} strokeWidth={1.5} /></span>
-          <h3>لا توجد طلبات حالياً</h3>
-          <p>ستظهر الطلبات الجديدة هنا.</p>
+          <h3>لا توجد طلبات</h3>
         </div>
       )}
 
@@ -81,25 +83,10 @@ export default function LivreurOrders({
               course={course}
               variant="offer"
               badge="طلب جديد"
-              hint="راجع تفاصيل الرحلة ثم اقبل أو ارفض."
               busy={respondingOfferId === course.id}
             >
-              <div className="driver-offer-actions">
-                <button
-                  type="button"
-                  onClick={() => onAccept?.(course.id)}
-                  disabled={respondingOfferId !== null}
-                >
-                  <Check size={21} aria-hidden="true" />{respondingOfferId === course.id ? "جارٍ الإرسال…" : "قبول"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReject?.(course.id)}
-                  disabled={respondingOfferId !== null}
-                >
-                  <X size={21} aria-hidden="true" />رفض
-                </button>
-              </div>
+              <DriverOfferActions course={course} busy={respondingOfferId !== null}
+                onAccept={onAccept} onReject={onReject} />
             </OrderCard>
           ))}
         </OrdersGroup>
@@ -113,7 +100,6 @@ export default function LivreurOrders({
               course={course}
               variant="ongoing"
               badge={getCourseStatusLabel(course)}
-              hint={getDriverCourseHint(course)}
               busy={finishingCourseId === course.id}
             >
               {canFinishCourse(course) && <div className="driver-offer-actions">
@@ -132,14 +118,13 @@ export default function LivreurOrders({
       )}
 
       {waiting.length > 0 && (
-        <OrdersGroup title="في انتظار اختيار الزبون" count={waiting.length}>
+        <OrdersGroup title="بانتظار الرد" count={waiting.length}>
           {waiting.map((course) => (
             <OrderCard
               key={course.id}
               course={course}
               variant="waiting"
               badge="تم إرسال قبولك"
-              hint="بانتظار أن يختارك الزبون. سنحدّث الرحلة هنا عند اختياره."
               busy={respondingOfferId === course.id}
             />
           ))}

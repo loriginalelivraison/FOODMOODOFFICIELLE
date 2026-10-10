@@ -3131,7 +3131,18 @@ input::placeholder {
 /* Shared navigation and client journey. */
 .bottom-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .desktop-nav .nav-link { display: inline-flex; align-items: center; gap: 8px; }
-.privacy-link { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: #9a3412; background: #fff7ed; }
+.pro-navigation-menu { position: relative; flex-shrink: 0; }
+.pro-menu-toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #fed7aa; border-radius: 12px; color: #9a3412; background: #fff7ed; cursor: pointer; }
+.pro-menu-toggle:hover, .pro-menu-toggle[aria-expanded="true"] { background: #ffedd5; border-color: #fdba74; }
+.pro-menu-toggle:focus-visible, .pro-menu-link:focus-visible { outline: 3px solid #fb923c; outline-offset: 2px; }
+.pro-menu-panel { position: absolute; top: calc(100% + 12px); right: 0; z-index: 1; width: min(280px, calc(100vw - 24px)); max-height: calc(100dvh - 180px); overflow-y: auto; overscroll-behavior: contain; padding: 10px; border: 1px solid #eaecf0; border-radius: 18px; background: #fff; box-shadow: 0 16px 40px rgba(15, 23, 42, .14); text-align: start; }
+.pro-menu-heading { margin: 0; padding: 6px 12px 10px; color: #667085; font-size: 12px; font-weight: 600; }
+.pro-menu-panel ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.pro-menu-link { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 10px 12px; border-radius: 10px; color: #344054; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.pro-menu-link svg { flex-shrink: 0; color: #667085; }
+.pro-menu-link:hover, .pro-menu-link.active { color: #9a3412; background: #fff7ed; }
+.pro-menu-link:hover svg, .pro-menu-link.active svg { color: #ea580c; }
+.pro-menu-panel li:last-child { margin-top: 6px; padding-top: 6px; border-top: 1px solid #f2f4f7; }
 .skip-link { position: fixed; top: -100px; inset-inline-start: 16px; z-index: 10000; padding: 12px 18px; border-radius: 10px; background: white; color: #9a3412; }
 .skip-link:focus { top: 12px; }
 .account-history-link { display: block; color: inherit; text-decoration: none; transition: border-color .15s; }

@@ -1,13 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { destinations } from "../data/destinations.js";
-import { searchDestinations, destinationCoordinates, rememberDestination, readDestinationHistory, HISTORY_KEY } from "./destinationSearch.js";
+import { searchDestinations, destinationCoordinates, rememberDestination, readDestinationHistory, suggestedDeliveryPickups, suggestedDestinations, HISTORY_KEY } from "./destinationSearch.js";
 
 test("table complète avec identifiants et coordonnées fournis", () => {
-  assert.equal(destinations.length, 51);
-  assert.equal(new Set(destinations.map((place) => place.id)).size, 51);
+  assert.equal(destinations.length, 53);
+  assert.equal(new Set(destinations.map((place) => place.id)).size, 53);
   assert.deepEqual(destinationCoordinates(destinations.find((place) => place.id === 4)), { latitude: 35.8286516, longitude: -0.0143553 });
   assert.ok(destinations.every((place) => destinationCoordinates(place)));
+});
+test("les trois suggestions vides sont des lieux sélectionnables et recherchables", () => {
+  assert.deepEqual(suggestedDestinations.map((place) => place.name_fr), [
+    "Centre commercial Louisa", "Mostaland", "Kharrouba",
+  ]);
+  assert.ok(suggestedDestinations.every((place) => destinationCoordinates(place)));
+  assert.ok(searchDestinations("kharrouba").some((place) => place.id === 171));
+  assert.deepEqual(suggestedDeliveryPickups.map((place) => place.name_fr), [
+    "Mouna Pâtisserie", "Pizzeria Le Five", "Karantika Kahla 1",
+  ]);
+  assert.ok(suggestedDeliveryPickups.every((place) => destinationCoordinates(place)));
+  assert.ok(searchDestinations("karantika kahla").some((place) => place.id === 172));
 });
 test("recherche progressive arabe/français sans accents ni diacritiques", () => {
   assert.ok(searchDestinations("ain tedeles").some((place) => place.id === 5));

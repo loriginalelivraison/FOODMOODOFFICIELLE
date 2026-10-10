@@ -7,6 +7,8 @@ export function normalizeSearch(value) {
     .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 const index = destinations.map((place) => ({ place, text: normalizeSearch(`${place.search_name} ${place.commune_secteur} ${place.category}`) }));
+export const suggestedDestinations = [34, 33, 171].map((id) => destinations.find((place) => place.id === id));
+export const suggestedDeliveryPickups = [116, 123, 172].map((id) => destinations.find((place) => place.id === id));
 export function searchDestinations(query) {
   const words = normalizeSearch(query).split(" ").filter(Boolean);
   return index.filter(({ text }) => words.every((word) => text.includes(word))).map(({ place }) => place);

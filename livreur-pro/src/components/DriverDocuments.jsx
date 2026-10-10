@@ -4,8 +4,8 @@ import { getDriverDocuments, uploadDriverDocument, downloadDriverDocument } from
 
 const LABELS = { missing: "غير مرفق", pending: "قيد المراجعة", verified: "تم التحقق", rejected: "مرفوض" };
 const KINDS = [
-  { kind: "license", title: "رخصة السياقة", hint: "صورة واضحة لرخصة السياقة", Icon: FileCheck },
-  { kind: "vehicle", title: "صورة المركبة", hint: "يجب أن تظهر لوحة الترقيم بوضوح", Icon: Car },
+  { kind: "license", title: "رخصة السياقة", Icon: FileCheck },
+  { kind: "vehicle", title: "صورة المركبة", Icon: Car },
 ];
 
 export default function DriverDocuments({ driverId }) {
@@ -38,13 +38,12 @@ export default function DriverDocuments({ driverId }) {
 
   return <section className="account-card driver-documents" id="driver-documents">
     <h2>الوثائق</h2>
-    <p className="account-points-hint">وثائقك خاصة. يطّلع عليها فريق التحقق فقط.</p>
     {!documents && !error && <p role="status">جارٍ تحميل الوثائق…</p>}
-    {documents && KINDS.map(({ kind, title, hint, Icon }) => {
+    {documents && KINDS.map(({ kind, title, Icon }) => {
       const status = documents.find((item) => item.kind === kind)?.status || "missing";
       return <article className="document-card" key={kind}>
         <Icon size={24} aria-hidden="true" />
-        <div><strong>{title}</strong><p>{hint}</p><span className={`document-status is-${status}`}>{LABELS[status]}</span></div>
+        <div><strong>{title}</strong><span className={`document-status is-${status}`}>{LABELS[status]}</span></div>
         <label className="document-upload">
           {busy === kind ? "جارٍ الإرسال…" : status === "missing" ? "إرفاق" : "استبدال"}
           <input type="file" accept="image/jpeg,image/png" disabled={Boolean(busy)}
@@ -54,7 +53,7 @@ export default function DriverDocuments({ driverId }) {
           downloadDriverDocument(driverId, kind).catch((err) => setError(err.message))}>عرض</button>}
       </article>;
     })}
-    <small>JPEG أو PNG · حتى 5 ميغابايت</small>
+    <small>JPEG / PNG · 5 MB</small>
     {message && <p role="status" data-scroll-step="document-uploaded" className="document-success">{message}</p>}
     {error && <p role="alert" className="course-request-error">{error}</p>}
   </section>;
