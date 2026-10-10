@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clearStoredSession } from "./navigation.js";
+import { clearStoredSession, getClientReturnPath } from "./navigation.js";
 import { canFinishCourse } from "./courseTracking.js";
 import { loginClient, logoutCurrentAccount, createCommentaireLivreur } from "../livreursapi.js";
 
@@ -19,6 +19,13 @@ test("session cleanup removes identities and trip state while preserving prefere
   assert.equal(state.length, 2);
   assert.equal(state.getItem("language"), "ar");
   assert.equal(state.getItem("mapConsent"), "true");
+});
+
+test("client login opens the account unless a valid booking return path is stored", () => {
+  assert.equal(getClientReturnPath(null), "/client-dashboard");
+  assert.equal(getClientReturnPath("/livreurs"), "/livreurs");
+  assert.equal(getClientReturnPath("/course/42"), "/course/42");
+  assert.equal(getClientReturnPath("https://example.com"), "/client-dashboard");
 });
 
 test("legacy courses also need an assigned driver and started trip before completion", () => {

@@ -15,7 +15,12 @@ export default function DriverDocuments({ driverId }) {
   const [message, setMessage] = useState("");
   useEffect(() => {
     let disposed = false;
-    getDriverDocuments(driverId).then((data) => { if (!disposed) setDocuments(data); })
+    getDriverDocuments(driverId).then((data) => {
+      if (!Array.isArray(data) || data.some((document) => !document || typeof document !== "object")) {
+        throw new Error("تعذر قراءة الوثائق. حاول مجدداً.");
+      }
+      if (!disposed) setDocuments(data);
+    })
       .catch((err) => { if (!disposed) setError(err.message); });
     return () => { disposed = true; };
   }, [driverId]);

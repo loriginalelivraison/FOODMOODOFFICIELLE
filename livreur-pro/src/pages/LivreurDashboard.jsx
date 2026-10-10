@@ -81,7 +81,11 @@ export default function LivreurDashboard() {
 
     try {
       const data = await getLivreurCourses();
-      setCourses(Array.isArray(data) ? data : data.results || []);
+      const records = Array.isArray(data) ? data : data?.results;
+      if (!Array.isArray(records) || records.some((course) => !course || typeof course !== "object")) {
+        throw new Error("تعذر قراءة سجل الطلبات. حاول مجدداً.");
+      }
+      setCourses(records);
       setOrdersError("");
     } catch (err) {
       setOrdersError(err.message || "تعذر تحديث الطلبات.");
@@ -240,8 +244,12 @@ export default function LivreurDashboard() {
     async function loadReviews() {
       try {
         const data = await getCommentairesLivreur(livreur.id);
+        const records = Array.isArray(data) ? data : data?.results;
+        if (!Array.isArray(records) || records.some((review) => !review || typeof review !== "object")) {
+          throw new Error("تعذر قراءة التقييمات.");
+        }
         if (!cancelled) {
-          setReviews(Array.isArray(data) ? data : data.results || []);
+          setReviews(records);
         }
       } catch (err) {
         console.error("Erreur chargement avis :", err);

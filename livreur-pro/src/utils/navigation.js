@@ -34,7 +34,7 @@ export function clearCurrentClientCourse(courseId, storage = globalThis.localSto
 
 export function getClientReturnPath(path) {
   return typeof path === "string" && /^\/(livreurs|client-dashboard|course\/[1-9]\d*|tracking\/[1-9]\d*)$/.test(path)
-    ? path : "/livreurs";
+    ? path : "/client-dashboard";
 }
 
 export function clearStoredSession(storage = globalThis.localStorage) {

@@ -39,6 +39,9 @@ export default function ClientDashboard() {
       pending = true;
       try {
         const data = await getClientCourses();
+        if (!Array.isArray(data) || data.some((course) => !course || typeof course !== "object")) {
+          throw new Error("تعذر قراءة سجل الرحلات. حاول مجدداً.");
+        }
         if (cancelled) return;
         setCourses(data);
         setHistoryError("");

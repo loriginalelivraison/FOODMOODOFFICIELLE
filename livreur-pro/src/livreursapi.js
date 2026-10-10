@@ -713,7 +713,11 @@ export async function getCourseOffers() {
     handleInvalidToken(data);
     throw new Error(toArabicMessage(data.detail, "تعذر تحميل طلبات الرحلات."));
   }
-  return Array.isArray(data) ? data : data.results || [];
+  const offers = Array.isArray(data) ? data : data?.results || [];
+  if (!Array.isArray(offers) || offers.some((course) => !course || typeof course !== "object")) {
+    throw new Error("تعذر قراءة الطلبات الجديدة. حاول مجدداً.");
+  }
+  return offers;
 }
 
 export function respondToCourseOffer(courseId, response, offeredPrice) {
