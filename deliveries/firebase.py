@@ -37,11 +37,12 @@ def init_firebase():
 
 def send_livreur_notification(livreur, title, body, course_id=None, notification_type="course_accepted", extra_data=None, recipient_role="livreur"):
     if not livreur.fcm_token:
-        print("AUCUN FCM TOKEN POUR CE LIVREUR")
+        print("AUCUN FCM TOKEN POUR CE DESTINATAIRE")
         return False
 
     try:
         init_firebase()
+        event_id = (extra_data or {}).get("event_id") or f"{recipient_role}:{livreur.id}:{notification_type}:{course_id}:{(extra_data or {}).get('round', 1)}"
 
         message = messaging.Message(
             data={
@@ -50,7 +51,7 @@ def send_livreur_notification(livreur, title, body, course_id=None, notification
                 "body": body,
                 "recipient_role": recipient_role,
                 "account_id": str(livreur.id),
-                "event_id": f"{recipient_role}:{livreur.id}:{notification_type}:{course_id}:{(extra_data or {}).get('round', 1)}",
+                "event_id": event_id,
                 **({"course_id": str(course_id)} if course_id is not None else {}),
                 **{key: str(value) for key, value in (extra_data or {}).items()},
             },
@@ -58,7 +59,7 @@ def send_livreur_notification(livreur, title, body, course_id=None, notification
                 priority="high",
             ),
             apns=messaging.APNSConfig(
-                headers={"apns-priority": "10", "apns-collapse-id": f"course-{course_id}"},
+                headers={"apns-priority": "10", "apns-collapse-id": event_id if recipient_role == "client" else f"course-{course_id}"},
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(
                         alert=messaging.ApsAlert(title=title, body=body),

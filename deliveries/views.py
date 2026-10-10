@@ -54,6 +54,26 @@ class CourseConflict(APIException):
     status_code = 409
 
 
+def notify_client_for_course_event(course, event, title, body, *, notification_type, extra_data=None):
+    """Send a committed course event to the client's current FCM token."""
+    client_id = course.client_id
+    course_id = course.id
+    data = {
+        **(extra_data or {}),
+        "event_id": f"client:{client_id}:course:{course_id}:event:{event.id}",
+    }
+
+    def send():
+        client = Client.objects.filter(pk=client_id).first()
+        if client:
+            send_client_notification(
+                client, title, body, course_id=course_id,
+                notification_type=notification_type, extra_data=data,
+            )
+
+    transaction.on_commit(send)
+
+
 def read_coordinates(data, latitude_key, longitude_key, *, required=False):
     """Reject partial, nonnumeric and nonfinite GPS data before any write/routing."""
     values = [data.get(latitude_key), data.get(longitude_key)]
@@ -929,7 +949,7 @@ class CourseViewSet(ModelViewSet):
                             course, notifier=send_livreur_notification
                         )
                     )
-            record_course_event(
+            event = record_course_event(
                 course,
                 response_value,
                 "livreur",
@@ -937,6 +957,23 @@ class CourseViewSet(ModelViewSet):
                 previous_status=previous_status,
                 new_status=course.status,
             )
+            if response_value == "accepted":
+                price_changed = offer.offered_price is not None and offer.offered_price != course.final_price
+                if price_changed:
+                    price = format(offer.offered_price.normalize(), "f")
+                    notify_client_for_course_event(
+                        course, event, "اقتراح سعر جديد",
+                        f"اقترح السائق {driver.nom} سعراً جديداً: {price} دج.",
+                        notification_type="course_price_proposed",
+                        extra_data={"driver_id": driver.id, "price": price},
+                    )
+                else:
+                    notify_client_for_course_event(
+                        course, event, "قبل السائق طلبك",
+                        f"قبل السائق {driver.nom} الطلب. افتح WinRak لعرض التفاصيل.",
+                        notification_type="course_accepted",
+                        extra_data={"driver_id": driver.id},
+                    )
         return Response({"status": course.status, "response": offer.response})
 
     @action(detail=True, methods=["post"])
@@ -1043,7 +1080,21 @@ class CourseViewSet(ModelViewSet):
                 setattr(course, timestamp_field, timezone.now())
                 update_fields.append(timestamp_field)
             course.save(update_fields=update_fields)
-            record_course_event(course, new_status, "livreur", driver.id, previous_status, new_status)
+            event = record_course_event(course, new_status, "livreur", driver.id, previous_status, new_status)
+            if new_status == "driver_arriving":
+                notify_client_for_course_event(
+                    course, event,
+                    "السائق في الطريق",
+                    "السائق في الطريق إلى نقطة الاستلام." if course.is_delivery else "السائق في الطريق إليك.",
+                    notification_type="driver_arriving",
+                )
+            elif new_status == "in_progress":
+                notify_client_for_course_event(
+                    course, event,
+                    "بدأت رحلة التوصيل" if course.is_delivery else "بدأت الرحلة",
+                    "طلبك في الطريق إلى نقطة التسليم." if course.is_delivery else "بدأ السائق الرحلة إلى وجهتك.",
+                    notification_type="in_progress",
+                )
         return Response(self.get_serializer(course).data)
 
     @action(detail=True, methods=["post"])
@@ -1089,7 +1140,7 @@ class CourseViewSet(ModelViewSet):
             CourseOffer.objects.filter(course=course, response__in=["pending", "accepted"]).update(
                 response="withdrawn", responded_at=timezone.now()
             )
-            record_course_event(
+            event = record_course_event(
                 course, "cancelled", actor_type, actor_id, previous_status, "cancelled",
                 {"reason": reason, "comment": comment},
             )
@@ -1107,11 +1158,13 @@ class CourseViewSet(ModelViewSet):
                     extra_data={"open_home": str(recipient.id != course.livreur_id).lower()},
                 ))
             if actor_type == "livreur":
-                transaction.on_commit(lambda: send_client_notification(
-                    course.client, "تم إلغاء الرحلة",
+                notify_client_for_course_event(
+                    course, event,
+                    "تم إلغاء الطلب" if course.is_delivery else "تم إلغاء الرحلة",
+                    "نعتذر، ألغى السائق الطلب. يمكنك طلب سائق آخر." if course.is_delivery else
                     "نعتذر، ألغى السائق الرحلة. يمكنك طلب سائق آخر.",
-                    course_id=course.id, notification_type="course_cancelled",
-                ))
+                    notification_type="course_cancelled",
+                )
             if course.livreur_id:
                 has_other_active_course = Course.objects.filter(
                     livreur=course.livreur, active=True
@@ -1206,7 +1259,14 @@ class CourseViewSet(ModelViewSet):
             course.save(update_fields=[
                 "active", "status", "finished_at", "finished_by", "finished_by_client",
             ])
-            record_course_event(course, "completed", "livreur" if is_livreur else "client", livreur.id if is_livreur else client.id, previous_status, "completed")
+            event = record_course_event(course, "completed", "livreur" if is_livreur else "client", livreur.id if is_livreur else client.id, previous_status, "completed")
+            if is_livreur:
+                notify_client_for_course_event(
+                    course, event,
+                    "تم تسليم الطلب" if course.is_delivery else "اكتملت الرحلة",
+                    "سلّم السائق طلبك بنجاح." if course.is_delivery else "أنهى السائق الرحلة. شكراً لاستخدام WinRak.",
+                    notification_type="course_completed",
+                )
 
             points_earned = settings.COURSE_COMPLETION_POINTS
 

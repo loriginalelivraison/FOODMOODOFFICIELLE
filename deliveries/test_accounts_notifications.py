@@ -264,8 +264,15 @@ class AccountSecurityTests(TestCase):
         self.assertEqual(message.data["recipient_role"], "client")
         self.assertEqual(message.apns.payload.aps.sound, "winrak_notification.wav")
         self.assertIsNone(message.notification)
+        self.assertEqual(message.apns.headers["apns-collapse-id"], message.data["event_id"])
+        send_client_notification(self.customer, "بدأت الرحلة", "السائق في الطريق", course_id=42,
+                                 notification_type="driver_arriving", extra_data={"event_id": "client:1:course:42:event:7"})
+        message = send.call_args.args[0]
+        self.assertEqual(message.data["event_id"], "client:1:course:42:event:7")
+        self.assertEqual(message.apns.headers["apns-collapse-id"], "client:1:course:42:event:7")
         send_livreur_notification(self.driver, "طلب جديد", "500 دج", course_id=42,
                                  notification_type="course_offer", extra_data={"round": 2})
         message = send.call_args.args[0]
         self.assertEqual(message.data["event_id"], f"livreur:{self.driver.id}:course_offer:42:2")
+        self.assertEqual(message.apns.headers["apns-collapse-id"], "course-42")
         self.assertEqual(message.apns.payload.aps.category, "COURSE_OFFER")
