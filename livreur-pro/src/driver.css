@@ -43,6 +43,54 @@
 .driver-dashboard-page .orders-group { gap: 10px; }
 .driver-dashboard-page .orders-group > h3 { color: #344054; font-size: 14px; font-weight: 750; margin: 8px 2px 0; }
 .driver-dashboard-page .orders-count { min-width: 21px; height: 21px; background: #eef0f4; color: #6a7483; }
+.driver-request { display: grid; gap: 12px; color: #172637; }
+.driver-request-trip, .driver-request .driver-offer-price-panel { border: 1px solid #e0e6ed; border-radius: 20px; background: #fff; }
+.driver-request-trip { display: grid; gap: 10px; padding: 17px 16px 0; }
+.driver-request-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.driver-request-heading > strong { padding: 6px 12px; border: 1px solid #fed7aa; border-radius: 10px; background: #fff7ed; color: #ea580c; font-size: 17px; font-weight: 800; }
+.driver-request-timer { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #fdba74; border-radius: 10px; background: #fff7ed; color: #ea580c; font-size: 15px; font-weight: 800; white-space: nowrap; }
+.driver-request-timer.is-urgent { border-color: #fca5a5; background: #fff1f2; color: #dc2626; }
+.driver-request-number { justify-self: start; color: #758091; font-size: 12px; text-decoration: none; }
+.driver-request-number:hover { color: #ea580c; text-decoration: underline; }
+.driver-request-stops { position: relative; display: grid; gap: 20px; padding: 4px 0 18px; }
+.driver-request-stops::before { content: ""; position: absolute; inset-inline-start: 13px; top: 30px; bottom: 42px; border-inline-start: 1px dashed #aeb8c4; }
+.driver-request-stop { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.driver-request-stop > svg { position: relative; z-index: 1; flex: 0 0 auto; background: #fff; }
+.driver-request-stop.is-pickup > svg { color: #0b9d58; }
+.driver-request-stop.is-destination > svg { color: #ef3340; stroke: #fff; }
+.driver-request-stop > div { display: grid; gap: 5px; min-width: 0; }
+.driver-request-stop > div > span { color: #7b8796; font-size: 12px; }
+.driver-request-stop strong { color: #172637; font-size: 17px; line-height: 1.45; overflow-wrap: anywhere; }
+.driver-request-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid #edf0f3; }
+.driver-request-metrics > div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-content: center; min-width: 0; padding: 13px 8px; }
+.driver-request-metrics > div + div { border-inline-start: 1px solid #edf0f3; }
+.driver-request-metrics svg { grid-row: 1 / 3; align-self: center; color: #253849; }
+.driver-request-metrics strong { font-size: 15px; line-height: 1.2; }
+.driver-request-metrics span { color: #7b8796; font-size: 11px; }
+.driver-request .driver-course-controls { display: block; }
+.driver-request .driver-offer-price-actions { gap: 12px; }
+.driver-request .driver-offer-price-panel { display: grid; justify-items: center; gap: 8px; padding: 17px 12px 14px; }
+.driver-request-client-price { display: grid; justify-items: center; gap: 3px; }
+.driver-request-client-price span { color: #5d6979; font-size: 13px; }
+.driver-request-client-price strong { color: #ea580c; font-size: 24px; line-height: 1.2; }
+.driver-request .driver-offer-price-actions .booking-summary-price { width: 100%; padding: 3px 0 0; }
+.driver-request .driver-offer-price-actions .booking-summary-stepper { gap: 8px; }
+.driver-request .driver-offer-price-actions .booking-summary-stepper > button { flex-basis: 48px; width: 48px; height: 48px; border-radius: 12px; }
+.driver-request .booking-summary-amount.is-caption-inside { display: grid; justify-items: center; gap: 2px; flex: 1 1 auto; padding: 6px 4px; border: 1px solid #fed7aa; border-radius: 12px; background: #fffaf5; }
+.booking-summary-amount-value { display: flex; align-items: baseline; justify-content: center; gap: 5px; max-width: 100%; }
+.driver-request .driver-offer-price-actions .booking-summary-amount input { min-height: 34px; font-size: 31px; }
+.driver-request .booking-summary-amount.is-caption-inside small { color: #7b8796; font-size: 11px; font-weight: 500; }
+.driver-request-price-hint { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 3px 0 0; color: #8993a1; font-size: 11px; text-align: center; }
+.driver-request-price-hint svg { flex: 0 0 auto; }
+.driver-dashboard-page .driver-request .driver-offer-actions { gap: 8px; }
+.driver-dashboard-page .driver-request .driver-offer-actions button { min-height: 54px; border-radius: 12px; font-size: 16px; }
+.driver-dashboard-page .driver-request .driver-offer-actions button + button { border: 2px solid #e11d27; background: #fff7f8; color: #d71920; }
+@media (max-width: 380px) {
+  .driver-request-trip { padding-inline: 12px; }
+  .driver-request .driver-offer-price-actions .booking-summary-stepper > button { flex-basis: 42px; width: 42px; height: 42px; }
+  .driver-request .driver-offer-price-actions .booking-summary-amount input { font-size: 26px; }
+  .driver-dashboard-page .driver-request .driver-offer-actions button { font-size: 14px; }
+}
 .driver-dashboard-page .driver-course-card { display: block; padding: 0; border: 1px solid #edf0f3; border-radius: 23px; overflow: hidden; background: #fff; box-shadow: 0 7px 24px #24304306; }
 .driver-offer-map { height: 108px; background: #edf1f3; position: relative; }
 .driver-offer-map .mapboxgl-ctrl-attrib { font-size: 9px; }

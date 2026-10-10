@@ -10,12 +10,12 @@ import { canFinishCourse, getCourseStatusLabel, isDeliveryVehicle } from "../uti
 
 
 
-function OrdersGroup({ title, count, children }) {
+function OrdersGroup({ title, count, children, hideHeading = false }) {
   return (
-    <section className="orders-group" aria-label={title}>
-      <h3>
+    <section className="orders-group" aria-label={`${title} (${count})`}>
+      {!hideHeading && <h3>
         {title} <span className="orders-count">{count}</span>
-      </h3>
+      </h3>}
       {children}
     </section>
   );
@@ -42,9 +42,9 @@ export default function LivreurOrders({
     <section className="orders-board" aria-label="رحلاتي وطلباتي"
       data-scroll-step={loading ? undefined : [...toAccept, ...ongoing, ...waiting].map(course => `${course.id}:${course.status}:${course.my_offer_response || ""}`).sort().join("|")}>
 
-      <h2 className="driver-section-title">طلباتي</h2>
+      {toAccept.length === 0 && <h2 className="driver-section-title">طلباتي</h2>}
 
-      <div className="orders-board-summary">
+      {toAccept.length === 0 && <div className="orders-board-summary">
         <div className={'orders-tile is-offer' + (toAccept.length > 0 ? ' has-orders' : '')}>
           <Bell size={23} aria-hidden="true" />
           <strong>{loading ? "—" : toAccept.length}</strong>
@@ -60,7 +60,7 @@ export default function LivreurOrders({
           <strong>{loading ? "—" : ongoing.length}</strong>
           <small>جارية</small>
         </div>
-      </div>
+      </div>}
 
       {loading && <LoadingSpinner label="جاري تحميل الطلبات..." />}
       {error && <div className="driver-orders-error" role="alert"><WifiOff size={20} aria-hidden="true" />
@@ -76,7 +76,7 @@ export default function LivreurOrders({
       )}
 
       {toAccept.length > 0 && (
-        <OrdersGroup title="طلبات جديدة" count={toAccept.length}>
+        <OrdersGroup title="طلبات جديدة" count={toAccept.length} hideHeading>
           {toAccept.map((course) => (
             <OrderCard
               key={course.id}
@@ -85,7 +85,7 @@ export default function LivreurOrders({
               badge="طلب جديد"
               busy={respondingOfferId === course.id}
             >
-              <DriverOfferActions course={course} busy={respondingOfferId !== null}
+              <DriverOfferActions course={course} busy={respondingOfferId !== null} requestLayout
                 onAccept={onAccept} onReject={onReject} />
             </OrderCard>
           ))}
